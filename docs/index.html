@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOKAK: Operasyon — Ücretsiz Online Taktik FPS</title>
+<meta name="description" content="SOKAK: Operasyon — Türkiye'nin sokaklarında geçen ücretsiz online taktik FPS. Eski Mahalle, Safranbolu, Liman ve Gemi haritaları, 16 silah, eklentiler, kasalar ve arkadaşlarla online oda.">
+<meta property="og:title" content="SOKAK: Operasyon">
+<meta property="og:description" content="Türkiye'nin sokaklarında taktik çatışma. Ücretsiz indir, arkadaşlarınla online oyna.">
+<meta property="og:image" content="https://taha123123224.github.io/sokak/img/og.jpg">
+<meta name="theme-color" content="#0c0e11">
+<link rel="icon" href="img/favicon.png">
+<style>
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:600;font-display:swap;src:url(fonts/barlow-condensed-latin-600-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:600;font-display:swap;src:url(fonts/barlow-condensed-latin-ext-600-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:700;font-display:swap;src:url(fonts/barlow-condensed-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:700;font-display:swap;src:url(fonts/barlow-condensed-latin-ext-700-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:800;font-display:swap;src:url(fonts/barlow-condensed-latin-800-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:800;font-display:swap;src:url(fonts/barlow-condensed-latin-ext-800-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Barlow Condensed';font-style:italic;font-weight:800;font-display:swap;src:url(fonts/barlow-condensed-latin-800-italic.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Barlow Condensed';font-style:italic;font-weight:800;font-display:swap;src:url(fonts/barlow-condensed-latin-ext-800-italic.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Barlow Condensed';font-style:italic;font-weight:900;font-display:swap;src:url(fonts/barlow-condensed-latin-900-italic.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Barlow Condensed';font-style:italic;font-weight:900;font-display:swap;src:url(fonts/barlow-condensed-latin-ext-900-italic.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Barlow';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/barlow-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Barlow';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/barlow-latin-ext-400-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Barlow';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/barlow-latin-500-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Barlow';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/barlow-latin-ext-500-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Barlow';font-style:normal;font-weight:600;font-display:swap;src:url(fonts/barlow-latin-600-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Barlow';font-style:normal;font-weight:600;font-display:swap;src:url(fonts/barlow-latin-ext-600-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+:root{
+  --bg:#0c0e11; --bg2:#12151a; --panel:#171b21; --line:#262c35;
+  --tx:#e9ecef; --mut:#9aa3ad; --dim:#6b747e;
+  --or:#ff8a1f; --or2:#ffb45c; --ord:#c75a0c;
+  --blue:#3d8bff; --red:#ff4d3d;
+  --cut:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:72px}
+body{background:var(--bg);color:var(--tx);font:16px/1.6 Barlow,system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+.wrap{width:min(1180px,92vw);margin:0 auto}
+h1,h2,h3,.cond{font-family:"Barlow Condensed",sans-serif;letter-spacing:.01em;line-height:1.05}
+.eyebrow{font:700 13px/1 "Barlow Condensed",Impact,"Arial Narrow",sans-serif;letter-spacing:.32em;text-transform:uppercase;color:var(--or);display:flex;align-items:center;gap:12px}
+.eyebrow::before{content:"";width:28px;height:2px;background:var(--or)}
+h2{font-size:clamp(34px,5vw,56px);font-weight:800;font-style:italic;text-transform:uppercase;margin:14px 0 14px}
+.lead{color:var(--mut);max-width:620px;font-size:17px}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:12px;font:800 18px/1 "Barlow Condensed",Impact,"Arial Narrow",sans-serif;letter-spacing:.08em;text-transform:uppercase;padding:18px 30px;clip-path:polygon(var(--cut) 0,100% 0,calc(100% - var(--cut)) 100%,0 100%);transition:transform .15s,filter .15s;cursor:pointer;border:0}
+.btn:hover{transform:translateY(-2px);filter:brightness(1.08)}
+.btn-or{background:linear-gradient(180deg,var(--or2),var(--or) 45%,var(--ord));color:#1a0f04;box-shadow:0 10px 40px -10px rgba(255,138,31,.6)}
+.btn-ghost{background:rgba(255,255,255,.06);color:var(--tx);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.btn small{display:block;font:600 12px/1.2 Barlow,system-ui,sans-serif;letter-spacing:.02em;text-transform:none;opacity:.75;margin-top:4px}
+.btn svg{width:22px;height:22px;flex:none}
+
+/* nav */
+nav{position:fixed;inset:0 0 auto;z-index:50;transition:background .25s,box-shadow .25s}
+nav.solid{background:rgba(12,14,17,.92);backdrop-filter:blur(10px);box-shadow:0 1px 0 var(--line)}
+nav .wrap{display:flex;align-items:center;height:68px;gap:28px}
+.brand{display:flex;align-items:center;gap:10px;font:900 italic 26px/1 "Barlow Condensed",Impact,"Arial Narrow",sans-serif;letter-spacing:.02em}
+.brand img{width:38px;height:38px}
+.brand span{color:var(--or)}
+nav ul{display:flex;gap:26px;list-style:none;margin-left:auto;font:700 15px/1 "Barlow Condensed",Impact,"Arial Narrow",sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+nav ul a:hover{color:var(--tx)}
+nav .btn{padding:12px 20px;font-size:15px}
+@media(max-width:860px){nav ul{display:none}nav .btn{margin-left:auto}}
+
+/* hero */
+.hero{position:relative;min-height:100vh;min-height:100svh;display:flex;align-items:center;overflow:hidden}
+.hero-bg{position:absolute;inset:0;background:url(img/hero.jpg) center/cover no-repeat;transform:scale(1.06);animation:drift 24s ease-in-out infinite alternate}
+@keyframes drift{to{transform:scale(1.12) translate(-1.5%,-1%)}}
+
+.hero::after{content:"";position:absolute;inset:0;background:
+  linear-gradient(180deg,rgba(12,14,17,.75) 0%,transparent 16%),
+  linear-gradient(90deg,rgba(12,14,17,.96) 0%,rgba(12,14,17,.78) 38%,rgba(12,14,17,.15) 72%,rgba(12,14,17,.35) 100%),
+  linear-gradient(0deg,var(--bg) 0%,transparent 28%)}
+.hero .wrap{position:relative;z-index:2;padding:110px 0 80px}
+.hero-logo{width:min(560px,88vw);margin:18px 0 6px -14px;filter:drop-shadow(0 12px 30px rgba(0,0,0,.6))}
+.hero p.tag{font-size:20px;color:#cfd5db;max-width:520px;margin:8px 0 34px}
+.hero .cta{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.ver{display:inline-flex;align-items:center;gap:8px;font:600 13px/1 Barlow,system-ui,sans-serif;color:var(--mut);margin-top:22px}
+.ver i{width:8px;height:8px;border-radius:50%;background:#4ade80;box-shadow:0 0 10px #4ade80}
+.scroll-hint{position:absolute;left:50%;bottom:26px;z-index:2;width:22px;height:36px;border:2px solid rgba(255,255,255,.35);border-radius:12px;transform:translateX(-50%)}
+.scroll-hint::after{content:"";position:absolute;left:50%;top:7px;width:3px;height:7px;margin-left:-1.5px;border-radius:2px;background:#fff;animation:sh 1.6s infinite}
+@keyframes sh{to{transform:translateY(12px);opacity:0}}
+
+/* stats strip */
+.stats{border-block:1px solid var(--line);background:var(--bg2)}
+.stats .wrap{display:grid;grid-template-columns:repeat(4,1fr)}
+.stat{padding:30px 10px;text-align:center;border-left:1px solid var(--line)}
+.stat:first-child{border-left:0}
+.stat b{display:block;font:900 italic 48px/1 "Barlow Condensed",Impact,"Arial Narrow",sans-serif;color:var(--or)}
+.stat span{font:700 13px/1 "Barlow Condensed",Impact,"Arial Narrow",sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--mut)}
+@media(max-width:700px){.stats .wrap{grid-template-columns:repeat(2,1fr)}.stat:nth-child(3){border-left:0}.stat{border-top:1px solid var(--line)}}
+
+section{padding:110px 0}
+
+/* features */
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:50px}
+.feat{position:relative;background:var(--panel);padding:30px 28px 28px;clip-path:polygon(0 0,calc(100% - 22px) 0,100% 22px,100% 100%,0 100%);transition:background .2s}
+.feat:hover{background:#1c2129}
+.feat::before{content:"";position:absolute;left:0;top:0;width:3px;height:42px;background:var(--or)}
+.feat .ic{width:46px;height:46px;color:var(--or);margin-bottom:18px}
+.feat h3{font-size:25px;font-weight:800;text-transform:uppercase;margin-bottom:8px}
+.feat p{color:var(--mut);font-size:15.5px}
+@media(max-width:960px){.feat-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:620px){.feat-grid{grid-template-columns:1fr}}
+
+/* showcase split */
+.split{display:grid;grid-template-columns:1.15fr 1fr;gap:60px;align-items:center}
+.split.rev{grid-template-columns:1fr 1.15fr}
+.split.rev .shot{order:2}
+.shot{position:relative;clip-path:polygon(0 0,100% 0,100% calc(100% - 30px),calc(100% - 30px) 100%,0 100%);box-shadow:0 30px 60px -20px #000}
+.shot img{width:100%;aspect-ratio:16/9;object-fit:cover}
+.shot::after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.ticks{list-style:none;margin-top:24px;display:grid;gap:12px}
+.ticks li{display:flex;gap:12px;color:#cfd5db}
+.ticks li::before{content:"";flex:none;width:10px;height:10px;margin-top:8px;background:var(--or);clip-path:polygon(0 0,100% 50%,0 100%)}
+@media(max-width:900px){.split,.split.rev{grid-template-columns:1fr;gap:34px}.split.rev .shot{order:0}}
+
+/* maps */
+#haritalar{background:linear-gradient(180deg,var(--bg),var(--bg2))}
+.maps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:50px}
+.map{position:relative;aspect-ratio:3/4;overflow:hidden;background:#000;cursor:pointer}
+.map img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .6s,filter .4s;filter:saturate(.85) brightness(.8)}
+.map:hover img{transform:scale(1.07);filter:saturate(1) brightness(.95)}
+.map::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.92) 0%,rgba(0,0,0,.2) 55%,transparent)}
+.map .info{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:22px}
+.map .sz{display:inline-block;font:700 11px/1 "Barlow Condensed",Impact,"Arial Narrow",sans-serif;letter-spacing:.2em;text-transform:uppercase;background:var(--or);color:#1a0f04;padding:5px 8px;margin-bottom:10px}
+.map h3{font-size:30px;font-weight:800;font-style:italic;text-transform:uppercase}
+.map p{font-size:14px;color:#c3c9cf;margin-top:6px}
+@media(max-width:960px){.maps{grid-template-columns:repeat(2,1fr)}}
+
+/* weapons */
+.wtabs{display:flex;flex-wrap:wrap;gap:10px;margin-top:40px}
+.wtab{font:700 14px/1 "Barlow Condensed",Impact,"Arial Narrow",sans-serif;letter-spacing:.16em;text-transform:uppercase;padding:11px 18px;background:var(--panel);color:var(--mut);cursor:pointer;border:0;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)}
+.wtab.on{background:var(--or);color:#1a0f04}
+.wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin-top:22px}
+.w{background:var(--panel);padding:20px 22px;border-left:3px solid var(--line);transition:border-color .2s}
+.w:hover{border-color:var(--or)}
+.w .top{display:flex;justify-content:space-between;align-items:baseline}
+.w h4{font:800 italic 24px/1 "Barlow Condensed",Impact,"Arial Narrow",sans-serif;text-transform:uppercase}
+.w .cls{font:700 11px/1 "Barlow Condensed",Impact,"Arial Narrow",sans-serif;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.bar{display:grid;grid-template-columns:62px 1fr;align-items:center;gap:10px;margin-top:10px;font:600 12px/1 Barlow,system-ui,sans-serif;color:var(--mut)}
+.bar div{height:5px;background:#252b33;position:relative}
+.bar div i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,var(--ord),var(--or2))}
+.w .ab{margin-top:14px;font-size:13.5px;color:#c9cfd5;border-top:1px dashed var(--line);padding-top:12px}
+
+/* install */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:50px;counter-reset:s}
+.step{background:var(--panel);padding:34px 28px;position:relative;overflow:hidden}
+.step::before{counter-increment:s;content:"0" counter(s);position:absolute;right:14px;top:-6px;font:900 italic 96px/1 "Barlow Condensed",Impact,"Arial Narrow",sans-serif;color:rgba(255,138,31,.09)}
+.step h3{font-size:26px;font-weight:800;text-transform:uppercase;margin-bottom:10px;position:relative}
+.step p{color:var(--mut);position:relative}
+.step code{font:600 13px/1.4 ui-monospace,monospace;background:#0f1216;padding:2px 6px;color:var(--or2)}
+@media(max-width:860px){.steps{grid-template-columns:1fr}}
+
+/* system */
+.sys{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:50px}
+.sys .card{background:var(--panel);padding:30px}
+.sys h3{font-size:24px;font-weight:800;text-transform:uppercase;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.sys h3 em{font-style:normal;font-size:12px;letter-spacing:.2em;padding:4px 8px;background:#252b33;color:var(--mut)}
+.sys .card.rec h3 em{background:var(--or);color:#1a0f04}
+.sys dl{display:grid;grid-template-columns:120px 1fr;gap:10px 16px;font-size:15px}
+.sys dt{color:var(--dim);font:700 13px/1.6 "Barlow Condensed",Impact,"Arial Narrow",sans-serif;letter-spacing:.16em;text-transform:uppercase}
+@media(max-width:760px){.sys{grid-template-columns:1fr}}
+
+/* faq */
+.faq{margin-top:40px;max-width:860px}
+details{border-bottom:1px solid var(--line)}
+summary{list-style:none;cursor:pointer;padding:22px 40px 22px 0;position:relative;font:700 21px/1.3 "Barlow Condensed",Impact,"Arial Narrow",sans-serif;letter-spacing:.02em}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";position:absolute;right:6px;top:16px;font:400 30px/1 Barlow,system-ui,sans-serif;color:var(--or);transition:transform .2s}
+details[open] summary::after{transform:rotate(45deg)}
+details p{color:var(--mut);padding:0 0 22px;max-width:760px}
+
+/* final cta */
+.final{position:relative;padding:130px 0;text-align:center;overflow:hidden}
+.final::before{content:"";position:absolute;inset:0;background:url(img/safranbolu.jpg) center/cover;opacity:.22;filter:grayscale(.3)}
+.final::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 0%,var(--bg) 75%)}
+.final .wrap{position:relative;z-index:2}
+.final img{width:120px;margin:0 auto 20px}
+.final h2{margin-bottom:26px}
+
+footer{border-top:1px solid var(--line);padding:34px 0;color:var(--dim);font-size:14px}
+footer .wrap{display:flex;flex-wrap:wrap;gap:16px 30px;align-items:center;justify-content:space-between}
+footer a:hover{color:var(--tx)}
+
+/* lightbox */
+#lb{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;padding:4vw;cursor:zoom-out}
+#lb.on{display:flex}
+#lb img{max-height:90vh;box-shadow:0 20px 80px #000}
+
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .7s,transform .7s}
+.reveal.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.hero-bg{animation:none}.reveal{opacity:1;transform:none;transition:none}}
+</style>
+</head>
+<body>
+
+<nav id="nav">
+  <div class="wrap">
+    <a class="brand" href="#"><img src="img/emblem.png" alt="">SOKAK<span>.</span></a>
+    <ul>
+      <li><a href="#ozellikler">Özellikler</a></li>
+      <li><a href="#haritalar">Haritalar</a></li>
+      <li><a href="#silahlar">Silahlar</a></li>
+      <li><a href="#kurulum">Kurulum</a></li>
+      <li><a href="#sss">SSS</a></li>
+    </ul>
+    <a class="btn btn-or dl" href="#">İndir</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="hero-bg"></div>
+  <div class="wrap">
+    <div class="eyebrow">Ücretsiz · Online · Taktik FPS</div>
+    <img class="hero-logo" src="img/logo.png" alt="SOKAK: Operasyon">
+    <p class="tag">Türkiye'nin sokaklarında taktik çatışma. Hesabını aç, arkadaşlarını odaya çağır, Eski Mahalle'den Safranbolu'ya kadar her köşede çatış.</p>
+    <div class="cta">
+      <a class="btn btn-or dl" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></svg>
+        <span>Ücretsiz İndir<small>Windows 10 / 11 · Kurulum 24 MB</small></span>
+      </a>
+      <a class="btn btn-ghost" href="#kurulum">Nasıl kurulur?</a>
+    </div>
+    <div class="ver"><i></i><span id="ver">Güncel sürüm kontrol ediliyor…</span></div>
+  </div>
+  <div class="scroll-hint"></div>
+</header>
+
+<div class="stats">
+  <div class="wrap">
+    <div class="stat"><b>4</b><span>Harita</span></div>
+    <div class="stat"><b>16</b><span>Silah</span></div>
+    <div class="stat"><b>5</b><span>Oyun Modu</span></div>
+    <div class="stat"><b>10</b><span>Kişilik Oda</span></div>
+  </div>
+</div>
+
+<section id="ozellikler">
+  <div class="wrap">
+    <div class="eyebrow reveal">Neler var</div>
+    <h2 class="reveal">Sahaya hazır</h2>
+    <p class="lead reveal">Hızlı maçlar, her silahın kendine has hissi ve arkadaşlarınla tek tıkla aynı odada buluşma.</p>
+    <div class="feat-grid">
+      <div class="feat reveal">
+        <svg class="ic" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3"><circle cx="17" cy="16" r="7"/><circle cx="34" cy="19" r="5"/><path d="M4 40c1-8 6-12 13-12s12 4 13 12M30 30c6 0 11 3 13 10"/></svg>
+        <h3>Online &amp; arkadaşlar</h3>
+        <p>Kullanıcı adını seç, arkadaş ekle, odaya davet et. Oda kodu ile katıl ya da açık odalardan birine gir.</p>
+      </div>
+      <div class="feat reveal">
+        <svg class="ic" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3"><circle cx="24" cy="24" r="16"/><circle cx="24" cy="24" r="5"/><path d="M24 2v10M24 36v10M2 24h10M36 24h10"/></svg>
+        <h3>Gerçek balistik</h3>
+        <p>Her silahın hasarı, menzil düşüşü, zırh delme ve duvar delme gücü farklı. Kafa, gövde, uzuv — vurduğun yer önemli.</p>
+      </div>
+      <div class="feat reveal">
+        <svg class="ic" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 22h26l4-4h10v8H34l-2 2H18l-2 12H8l2-12H4z"/><path d="M14 28v-6"/></svg>
+        <h3>Silah özelleştirme</h3>
+        <p>Susturucu, kompansatör, holografik nişangah, uzun şarjör, tutamak, lazer. Takınca silahın üstünde görünür, istatistiği değişir.</p>
+      </div>
+      <div class="feat reveal">
+        <svg class="ic" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 18h36v24H6zM4 10h40v8H4zM24 10v32"/><path d="M24 10c-4-8-12-6-10 0M24 10c4-8 12-6 10 0"/></svg>
+        <h3>Kasalar &amp; desenler</h3>
+        <p>Osmanlı Çini, Turkuaz Altın, Lav Akıntısı… Animasyonlu kasa açılışı ve silah yükseltmede ince parlama.</p>
+      </div>
+      <div class="feat reveal">
+        <svg class="ic" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3"><path d="M10 18v12h8l10 8V10l-10 8z"/><path d="M34 16c3 3 3 13 0 16M39 11c6 6 6 20 0 26"/></svg>
+        <h3>Spiker &amp; gerçek sesler</h3>
+        <p>Gerçek silah kayıtlarından sesler. Kafadan vuruş, çifte ve üçlü öldürmelerde yapay zekâ spiker anons eder.</p>
+      </div>
+      <div class="feat reveal">
+        <svg class="ic" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3"><path d="M40 24a16 16 0 1 1-5-11.6"/><path d="M40 6v8h-8"/><path d="M24 16v9l6 4"/></svg>
+        <h3>Otomatik güncelleme</h3>
+        <p>Yeni sürüm çıkınca giriş ekranında "Güncelle" düğmesi çıkar. Hesabın, paran ve silahların olduğu gibi kalır.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="split">
+      <div class="shot reveal zoom"><img src="img/tutus.jpg" alt="Konteyner arkasında asker" loading="lazy"></div>
+      <div>
+        <div class="eyebrow reveal">KARTAL vs AKREP</div>
+        <h2 class="reveal">Siper al,<br>açıyı kes</h2>
+        <p class="lead reveal">Haritalar siper, dar geçit ve merdivenlerle tasarlandı. Botlar da senin gibi siper alıyor, nişan alıyor, şarjör değiştiriyor.</p>
+        <ul class="ticks reveal">
+          <li>Ölüm Maçı, Takım Ölüm Maçı, Silah Oyunu, Bıçak Arenası, Nişancı Düellosu</li>
+          <li>Kolay, normal ve zor bot seviyeleri — internetsiz de oynanır</li>
+          <li>Öldürme kamerası, kan ve isabet efektleri, el bombası</li>
+        </ul>
+      </div>
+    </div>
+    <div class="split rev" style="margin-top:110px">
+      <div class="shot reveal zoom"><img src="img/market.jpg" alt="Market ekranı" loading="lazy"></div>
+      <div>
+        <div class="eyebrow reveal">Market · Çanta · Kasa</div>
+        <h2 class="reveal">Silahını<br>kendine göre kur</h2>
+        <p class="lead reveal">Maçlardan kazandığın parayla silah, desen ve eklenti al. İncele modunda silahını 360° döndür, istatistiklerini karşılaştır.</p>
+        <ul class="ticks reveal">
+          <li>AUG A3, Vector .45, M249 SAW dahil 16 silah</li>
+          <li>Eklentiler kasadan çıkar veya marketten alınır</li>
+          <li>Hesap verilerin bulutta — başka bilgisayarda da devam edersin</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="haritalar">
+  <div class="wrap">
+    <div class="eyebrow reveal">Haritalar</div>
+    <h2 class="reveal">Tanıdık sokaklar</h2>
+    <p class="lead reveal">İstanbul'un ara sokaklarından Safranbolu konaklarına, sisli limandan Marmara'daki yük gemisine.</p>
+    <div class="maps">
+      <div class="map reveal zoom" data-src="img/mahalle.jpg"><img src="img/mahalle.jpg" alt="" loading="lazy"><div class="info"><span class="sz">Orta</span><h3>Eski Mahalle</h3><p>Ara sokaklar, dükkanlar ve çay bahçesi. Yakın-orta mesafe.</p></div></div>
+      <div class="map reveal zoom" data-src="img/safranbolu.jpg"><img src="img/safranbolu.jpg" alt="" loading="lazy"><div class="info"><span class="sz">Büyük</span><h3>Safranbolu</h3><p>Osmanlı konakları, Arasta çarşısı ve teraslar. Çok katmanlı.</p></div></div>
+      <div class="map reveal zoom" data-src="img/liman.jpg"><img src="img/liman.jpg" alt="" loading="lazy"><div class="info"><span class="sz">Büyük</span><h3>Liman Deposu</h3><p>Sisli sabah, konteyner sahası ve depo. Nişancı dostu.</p></div></div>
+      <div class="map reveal zoom" data-src="img/gemi.jpg"><img src="img/gemi.jpg" alt="" loading="lazy"><div class="info"><span class="sz">Orta</span><h3>Gemi</h3><p>Gün batımında yük gemisi. Konteyner koridorları ve üst güverte.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="silahlar">
+  <div class="wrap">
+    <div class="eyebrow reveal">Cephanelik</div>
+    <h2 class="reveal">Her silah başka</h2>
+    <p class="lead reveal">Aynı güçte iki silah yok. Hasar, atış hızı ve menzil dengesi her birinde farklı — bir de kendine özel yeteneği var.</p>
+    <div class="wtabs" id="wtabs"></div>
+    <div class="wgrid" id="wgrid"></div>
+  </div>
+</section>
+
+<section id="kurulum" style="background:var(--bg2)">
+  <div class="wrap">
+    <div class="eyebrow reveal">Kurulum</div>
+    <h2 class="reveal">Üç adımda sahada</h2>
+    <div class="steps">
+      <div class="step reveal"><h3>İndir</h3><p><b>SOKAK_Kurulum.exe</b> dosyasını indir (24 MB). Oyunun geri kalanı kurulum sırasında otomatik iner (~330 MB).</p></div>
+      <div class="step reveal"><h3>Kur</h3><p>Dosyayı çalıştır. Windows "bilgisayarınız korundu" derse <code>Ek bilgi</code> → <code>Yine de çalıştır</code>. Yönetici izni gerekmez; masaüstüne kısayol eklenir.</p></div>
+      <div class="step reveal"><h3>Oyna</h3><p>Kullanıcı adı ve şifreyle hesap aç, arkadaşlarını ekle. Yeni sürüm çıktığında giriş ekranındaki <code>Güncelle</code> düğmesine basman yeter.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="sistem">
+  <div class="wrap">
+    <div class="eyebrow reveal">Sistem gereksinimleri</div>
+    <h2 class="reveal">Bilgisayarın yeter mi?</h2>
+    <div class="sys">
+      <div class="card reveal"><h3>Minimum <em>30+ FPS</em></h3><dl>
+        <dt>Sistem</dt><dd>Windows 10 64-bit</dd>
+        <dt>İşlemci</dt><dd>4 çekirdek, 2.5 GHz (i5-4460 / Ryzen 3 1200)</dd>
+        <dt>Bellek</dt><dd>8 GB RAM</dd>
+        <dt>Ekran kartı</dt><dd>Vulkan destekli, 2 GB (GTX 750 Ti / RX 460)</dd>
+        <dt>Disk</dt><dd>1 GB boş alan</dd></dl></div>
+      <div class="card rec reveal"><h3>Önerilen <em>60+ FPS</em></h3><dl>
+        <dt>Sistem</dt><dd>Windows 10 / 11 64-bit</dd>
+        <dt>İşlemci</dt><dd>6 çekirdek (i5-9400F / Ryzen 5 2600)</dd>
+        <dt>Bellek</dt><dd>16 GB RAM</dd>
+        <dt>Ekran kartı</dt><dd>4 GB (GTX 1650 / RX 570 veya üstü)</dd>
+        <dt>Bağlantı</dt><dd>Online maçlar için genişbant internet</dd></dl></div>
+    </div>
+  </div>
+</section>
+
+<section id="sss" style="padding-top:20px">
+  <div class="wrap">
+    <div class="eyebrow reveal">SSS</div>
+    <h2 class="reveal">Sık sorulanlar</h2>
+    <div class="faq">
+      <details><summary>Oyun ücretli mi?</summary><p>Hayır. SOKAK: Operasyon tamamen ücretsiz; oyun içi para maç oynayarak kazanılır, gerçek parayla satış yok.</p></details>
+      <details><summary>Güncellemeler nasıl geliyor?</summary><p>Oyun her açılışta yeni sürüm olup olmadığına bakar. Varsa giriş ekranında "Güncelle" düğmesi çıkar; basınca yeni dosyalar iner, oyun kendini yeniden başlatır. Tekrar kurulum yapman gerekmez.</p></details>
+      <details><summary>Güncelleyince hesabım, param, silahlarım silinir mi?</summary><p>Hayır. Hesap verilerin buluta kaydedilir ve güncelleme yalnızca oyun dosyalarını değiştirir. Başka bir bilgisayardan giriş yapsan da kaldığın yerden devam edersin.</p></details>
+      <details><summary>Windows SmartScreen uyarısı çıkıyor, güvenli mi?</summary><p>Kurulum dosyası henüz ücretli bir kod imzalama sertifikasıyla imzalanmadığı için Windows bu uyarıyı gösterir. "Ek bilgi" → "Yine de çalıştır" ile devam edebilirsin. Oyun yalnızca kendi klasörüne (%LOCALAPPDATA%\SOKAK) kurulur.</p></details>
+      <details><summary>İnternetsiz oynayabilir miyim?</summary><p>Evet. Giriş ekranındaki "Çevrimdışı oyna" ile botlara karşı tüm modları oynayabilirsin. Online odalar ve arkadaş sistemi için internet gerekir.</p></details>
+      <details><summary>Oyun açılmıyor / siyah ekranda kalıyor.</summary><p>Ekran kartı sürücünü güncelle (oyun Vulkan kullanır). Sorun sürerse %APPDATA%\Godot\app_userdata\SOKAK\logs klasöründeki godot.log dosyasını bize gönder.</p></details>
+      <details><summary>Nasıl kaldırırım?</summary><p>Ayarlar → Uygulamalar listesinden "SOKAK: Operasyon"u seç ve Kaldır'a bas. Hesabın bulutta kalır.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="final">
+  <div class="wrap">
+    <img src="img/emblem.png" alt="">
+    <h2 class="reveal">Sokaklar seni bekliyor</h2>
+    <a class="btn btn-or dl" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></svg>
+      <span>Ücretsiz İndir<small>Windows 10 / 11 · SOKAK_Kurulum.exe</small></span>
+    </a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="#"><img src="img/emblem.png" alt="">SOKAK<span>.</span></a>
+    <span>© 2026 SOKAK: Operasyon · Godot Engine ile yapıldı · Silah sesleri: Free Firearm Sound Library (CC0)</span>
+    <a href="https://github.com/taha123123224/sokak">GitHub</a>
+  </div>
+</footer>
+
+<div id="lb"><img alt=""></div>
+
+<script>
+const REPO="taha123123224/sokak";
+const RAW="https://raw.githubusercontent.com/"+REPO;
+let INSTALLER=RAW+"/main/indir/SOKAK_Kurulum.exe";
+document.querySelectorAll(".dl").forEach(a=>a.href=INSTALLER);
+
+fetch(RAW+"/main/version.json",{cache:"no-store"}).then(r=>r.json()).then(m=>{
+  if(m.installer){INSTALLER=m.installer;document.querySelectorAll(".dl").forEach(a=>a.href=INSTALLER)}
+  document.getElementById("ver").textContent="Güncel sürüm v"+m.version+(m.notes?" — "+m.notes:"");
+}).catch(()=>{document.getElementById("ver").textContent="SOKAK: Operasyon"});
+
+const nav=document.getElementById("nav");
+const onS=()=>nav.classList.toggle("solid",scrollY>40);onS();addEventListener("scroll",onS,{passive:true});
+
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}}),{threshold:.12});
+document.querySelectorAll(".reveal").forEach((el,i)=>{el.style.transitionDelay=(i%6)*60+"ms";io.observe(el)});
+
+const lb=document.getElementById("lb");
+document.querySelectorAll(".zoom").forEach(el=>el.addEventListener("click",()=>{lb.querySelector("img").src=el.dataset.src||el.querySelector("img").src;lb.classList.add("on")}));
+lb.onclick=()=>lb.classList.remove("on");
+addEventListener("keydown",e=>{if(e.key==="Escape")lb.classList.remove("on")});
+
+// name, class, cat, dmg, rpm, range, ability
+const W=[
+ ["AK-47","Makinalı","tufek",33,600,160,"7.62 mermi: ince duvar ve kapıları deler."],
+ ["M4A1","Makinalı","tufek",29,740,160,"En düşük sekme, isabetli uzun seri."],
+ ["SCAR-H","Makinalı","tufek",38,560,180,"Ağır mermi: zırhı büyük ölçüde deler."],
+ ["AUG A3","Makinalı","tufek",31,700,180,"Entegre dürbün: uzak mesafede keskin nişan."],
+ ["M249 SAW","Ağır Makinalı","tufek",30,760,170,"100'lük şarjör: bastırma ateşi hedefin nişanını bozar."],
+ ["MP5","Hafif Makinalı","hafif",23,800,90,"Hafif ve hızlı: en hızlı nişan alma."],
+ ["P90","Hafif Makinalı","hafif",21,900,90,"50'lik şarjör, zırh delici 5.7 mm."],
+ ["UMP-45","Hafif Makinalı","hafif",27,650,85,"Yavaşlatan .45 mermi: vurulan hedef yavaşlar."],
+ ["Vector .45","Hafif Makinalı","hafif",19,1150,70,"Dakikada 1150 atış: yakın mesafenin kralı."],
+ ["SPAS-12","Pompalı","hafif",16*9,70,40,"Yakın mesafede tek atışta öldürür."],
+ ["AWP","Nişancı","nisanci",120,40,400,"Gövdeden tek atış, duvar deler."],
+ ["Kar98","Nişancı","nisanci",105,48,400,"Hızlı sürgü, kafadan kesin ölüm."],
+ ["Magnum .357","Tabanca","tabanca",62,150,120,"En güçlü tabanca, sert geri tepme."],
+ ["Deagle .50","Tabanca","tabanca",54,210,120,"Kafadan tek atış."],
+ ["Glock 17","Tabanca","tabanca",24,420,80,"Işık hızında çekiş ve geniş şarjör."],
+ ["Karambit","Bıçak","yakin",60,130,3,"Hızlı savurma, yakın dövüşte en ölümcülü."],
+];
+const CATS=[["hepsi","Hepsi"],["tufek","Tüfekler"],["hafif","Hafif & Pompalı"],["nisanci","Nişancı"],["tabanca","Tabancalar"],["yakin","Yakın dövüş"]];
+const tabs=document.getElementById("wtabs"),grid=document.getElementById("wgrid");
+const pct=(v,m)=>Math.min(100,Math.round(v/m*100));
+function draw(c){
+  grid.innerHTML=W.filter(w=>c==="hepsi"||w[2]===c).map(w=>`<div class="w"><div class="top"><h4>${w[0]}</h4><span class="cls">${w[1]}</span></div>
+  <div class="bar">Hasar<div><i style="width:${pct(w[3],125)}%"></i></div></div>
+  <div class="bar">Atış hızı<div><i style="width:${pct(w[4],1150)}%"></i></div></div>
+  <div class="bar">Menzil<div><i style="width:${pct(w[5],400)}%"></i></div></div>
+  <div class="ab">${w[6]}</div></div>`).join("");
+  tabs.querySelectorAll(".wtab").forEach(b=>b.classList.toggle("on",b.dataset.c===c));
+}
+tabs.innerHTML=CATS.map(c=>`<button class="wtab" data-c="${c[0]}">${c[1]}</button>`).join("");
+tabs.onclick=e=>{const b=e.target.closest(".wtab");if(b)draw(b.dataset.c)};
+draw("hepsi");
+</script>
+</body>
