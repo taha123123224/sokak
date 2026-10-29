@@ -1,24 +1,25 @@
 {
-	"version": "2.2.0",
-	"build": 22,
+	"version": "2.3.0",
+	"build": 23,
 	"parts": [
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK.pck.part00",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v23.pck.part00",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK.pck.part01",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v23.pck.part01",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK.pck.part02",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v23.pck.part02",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK.pck.part03",
-			"size": 49738640
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v23.pck.part03",
+			"size": 50090212
 		}
 	],
-	"pck_size": 332854160,
-	"notes": "Online sistem (hesap, arkadaşlar, davet, online maç), yeni silah eklentisi modelleri ve daha estetik yükseltme parlaması."
+	"pck_size": 333205732,
+	"installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
+	"notes": "Kurulum programı (SOKAK_Kurulum.exe), yeni oyun logosu, web sitesi ve otomatik güncelleme altyapısı."
 }

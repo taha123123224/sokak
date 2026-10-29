@@ -94,6 +94,14 @@ func _err_text(d, code: int) -> String:
 		return "Bu kullanıcı adı alınmış"
 	if "Password should be" in m:
 		return "Şifre en az 6 karakter olmalı"
+	if "Signups not allowed" in m or "signup_disabled" in m:
+		return "Yeni kayıtlar şu an kapalı (Supabase > Authentication > Sign In / Providers > 'Allow new users to sign up' açılmalı)"
+	if "rate limit" in m.to_lower() or code == 429:
+		return "Çok fazla deneme yapıldı, birkaç dakika sonra tekrar dene"
+	if "User not found" in m:
+		return "Böyle bir kullanıcı yok"
+	if "JWT" in m or "jwt" in m:
+		return "Oturum süresi doldu, tekrar giriş yap"
 	if "Email not confirmed" in m:
 		return "Supabase'de e-posta onayı kapalı olmalı (Authentication > Providers > Email > Confirm email: KAPALI)"
 	return m if m != "" else "Hata (%d)" % code
