@@ -43,21 +43,21 @@ Section "Oyun" SecMain
   SetOutPath "$INSTDIR"
   ; close a running game before replacing files
   nsExec::Exec 'taskkill /IM SOKAK.exe /F'
-  nsExec::Exec 'taskkill /IM SOKAKBaslatici.exe /F'
   File "payload\SOKAK.exe"
   File "payload\OKU_BENI.txt"
   File "sokak.ico"
-  File "payload\SOKAKBaslatici.exe"
+  File "payload\baslatici.pck"
+  Delete "$INSTDIR\SOKAKBaslatici.exe"
   Delete "$INSTDIR\indir.ps1"
   SetOutPath "$INSTDIR\mods"
   File /r "payload\mods\*.*"
   SetOutPath "$INSTDIR"
   CreateDirectory "$SMPROGRAMS\${APPNAME}"
   Delete "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk"
-  CreateShortcut "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk" "$INSTDIR\SOKAKBaslatici.exe" "" "$INSTDIR\sokak.ico"
+  CreateShortcut "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk" "$INSTDIR\SOKAK.exe" '--main-pack "$INSTDIR\baslatici.pck"' "$INSTDIR\sokak.ico"
   CreateShortcut "$SMPROGRAMS\${APPNAME}\Kaldır.lnk" "$INSTDIR\Kaldir.exe"
   Delete "$DESKTOP\${APPNAME}.lnk"
-  CreateShortcut "$DESKTOP\${APPNAME}.lnk" "$INSTDIR\SOKAKBaslatici.exe" "" "$INSTDIR\sokak.ico"
+  CreateShortcut "$DESKTOP\${APPNAME}.lnk" "$INSTDIR\SOKAK.exe" '--main-pack "$INSTDIR\baslatici.pck"' "$INSTDIR\sokak.ico"
   WriteUninstaller "$INSTDIR\Kaldir.exe"
   WriteRegStr HKCU "Software\${APPKEY}" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPKEY}" "DisplayName" "${APPNAME}"
@@ -68,7 +68,7 @@ Section "Oyun" SecMain
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPKEY}" "NoModify" 1
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPKEY}" "NoRepair" 1
   ; kurulum penceresi kapanır, başlatıcı indirmeyi yapar ve BAŞLAT düğmesini gösterir
-  Exec '"$INSTDIR\SOKAKBaslatici.exe"'
+  Exec '"$INSTDIR\SOKAK.exe" --main-pack "$INSTDIR\baslatici.pck"'
   SetAutoClose true
 SectionEnd
 
@@ -81,6 +81,7 @@ Section "Uninstall"
   Delete "$INSTDIR\sokak.ico"
   Delete "$INSTDIR\indir.ps1"
   Delete "$INSTDIR\SOKAKBaslatici.exe"
+  Delete "$INSTDIR\baslatici.pck"
   Delete "$INSTDIR\surum.txt"
   RMDir /r "$INSTDIR\indirilenler"
   Delete "$INSTDIR\sokak_guncelle.bat"
