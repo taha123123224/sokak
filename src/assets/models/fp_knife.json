@@ -1,0 +1,16 @@
+{
+ "kind": "knife",
+ "slash": {
+  "len": 0.5,
+  "hit": 0.38
+ },
+ "stab": {
+  "len": 0.8,
+  "hit": 0.5
+ },
+ "acts": {
+  "idle": 1.0,
+  "slash": 0.5,
+  "stab": 0.8
+ }
+}

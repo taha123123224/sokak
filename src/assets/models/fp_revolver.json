@@ -1,0 +1,17 @@
+{
+ "kind": "pistol",
+ "reload": {
+  "len": 2.0,
+  "attach": [
+   0.22,
+   0.79
+  ],
+  "mag_out": 0.24,
+  "mag_in": 0.79,
+  "bolt": 0.92
+ },
+ "acts": {
+  "idle": 1.0,
+  "reload": 2.0
+ }
+}

@@ -1,0 +1,13 @@
+{
+ "kind": "frag",
+ "throw": {
+  "len": 1.0,
+  "hold": 0.33,
+  "release": 0.5,
+  "reappear": 0.8
+ },
+ "acts": {
+  "idle": 1.0,
+  "throw": 1.0
+ }
+}
