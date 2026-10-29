@@ -30,16 +30,11 @@ VIAddVersionKey "LegalCopyright" "SOKAK"
 !define MUI_UNWELCOMEFINISHPAGE_BITMAP "welcome.bmp"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "SOKAK: Operasyon Kurulumuna Hoş Geldin"
-!define MUI_WELCOMEPAGE_TEXT "Türkiye'nin sokaklarında taktik çatışma!$\r$\n$\r$\nBu sihirbaz oyunu bilgisayarına kuracak, masaüstüne ve Başlat menüsüne kısayol ekleyecek.$\r$\n$\r$\nKurulum sırasında oyun dosyaları (yaklaşık 330 MB) internetten indirilir. Sonraki güncellemeler oyunun içinden tek tıkla gelir; oyuncu verilerin silinmez."
-!define MUI_FINISHPAGE_RUN "$INSTDIR\SOKAK.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "SOKAK: Operasyon'u şimdi başlat"
-!define MUI_FINISHPAGE_TITLE "Kurulum tamamlandı!"
-!define MUI_FINISHPAGE_TEXT "SOKAK: Operasyon bilgisayarına kuruldu. İyi oyunlar!"
+!define MUI_WELCOMEPAGE_TEXT "Türkiye'nin sokaklarında taktik çatışma!$\r$\n$\r$\nBu sihirbaz oyunu bilgisayarına kuracak, masaüstüne ve Başlat menüsüne kısayol ekleyecek.$\r$\n$\r$\nKurulumdan sonra SOKAK Başlatıcı açılır ve oyun dosyalarını (yaklaşık 330 MB) indirir. İndirme bitince BAŞLAT düğmesiyle oyuna girersin. Güncellemeler de başlatıcıdan otomatik gelir; oyuncu verilerin silinmez."
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
-!insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "Turkish"
@@ -48,23 +43,21 @@ Section "Oyun" SecMain
   SetOutPath "$INSTDIR"
   ; close a running game before replacing files
   nsExec::Exec 'taskkill /IM SOKAK.exe /F'
+  nsExec::Exec 'taskkill /IM SOKAKBaslatici.exe /F'
   File "payload\SOKAK.exe"
   File "payload\OKU_BENI.txt"
   File "sokak.ico"
-  File "indir.ps1"
+  File "payload\SOKAKBaslatici.exe"
+  Delete "$INSTDIR\indir.ps1"
   SetOutPath "$INSTDIR\mods"
   File /r "payload\mods\*.*"
   SetOutPath "$INSTDIR"
-  DetailPrint "Oyun dosyaları indiriliyor (yaklaşık 330 MB)..."
-  ExecWait 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\indir.ps1"' $0
-  ${If} $0 != 0
-    MessageBox MB_ICONEXCLAMATION|MB_OK "Oyun dosyaları indirilemedi. İnternet bağlantını kontrol edip kurulumu tekrar çalıştır."
-    Abort
-  ${EndIf}
   CreateDirectory "$SMPROGRAMS\${APPNAME}"
-  CreateShortcut "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk" "$INSTDIR\SOKAK.exe" "" "$INSTDIR\sokak.ico"
+  Delete "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk"
+  CreateShortcut "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk" "$INSTDIR\SOKAKBaslatici.exe" "" "$INSTDIR\sokak.ico"
   CreateShortcut "$SMPROGRAMS\${APPNAME}\Kaldır.lnk" "$INSTDIR\Kaldir.exe"
-  CreateShortcut "$DESKTOP\${APPNAME}.lnk" "$INSTDIR\SOKAK.exe" "" "$INSTDIR\sokak.ico"
+  Delete "$DESKTOP\${APPNAME}.lnk"
+  CreateShortcut "$DESKTOP\${APPNAME}.lnk" "$INSTDIR\SOKAKBaslatici.exe" "" "$INSTDIR\sokak.ico"
   WriteUninstaller "$INSTDIR\Kaldir.exe"
   WriteRegStr HKCU "Software\${APPKEY}" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPKEY}" "DisplayName" "${APPNAME}"
@@ -74,6 +67,9 @@ Section "Oyun" SecMain
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPKEY}" "UninstallString" '"$INSTDIR\Kaldir.exe"'
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPKEY}" "NoModify" 1
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPKEY}" "NoRepair" 1
+  ; kurulum penceresi kapanır, başlatıcı indirmeyi yapar ve BAŞLAT düğmesini gösterir
+  Exec '"$INSTDIR\SOKAKBaslatici.exe"'
+  SetAutoClose true
 SectionEnd
 
 Section "Uninstall"
@@ -84,6 +80,9 @@ Section "Uninstall"
   Delete "$INSTDIR\OKU_BENI.txt"
   Delete "$INSTDIR\sokak.ico"
   Delete "$INSTDIR\indir.ps1"
+  Delete "$INSTDIR\SOKAKBaslatici.exe"
+  Delete "$INSTDIR\surum.txt"
+  RMDir /r "$INSTDIR\indirilenler"
   Delete "$INSTDIR\sokak_guncelle.bat"
   Delete "$INSTDIR\Kaldir.exe"
   RMDir /r "$INSTDIR\mods"

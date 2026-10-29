@@ -918,9 +918,10 @@ func test_hook(i: int) -> void:
 		c.global_position = Vector3(v[0], v[1], v[2])
 		c.look_at(Vector3(v[3], v[4], v[5]))
 		c.far = 3000
-		c.fov = 70
+		c.fov = float(OS.get_environment("FOV")) if OS.has_environment("FOV") else 70.0
 		c.current = true
 		if player: player.vm_rect.visible = false
+		if OS.has_environment("NOHUD") and hud: hud.visible = false
 	elif i == 15:
 		# close-up of a bot's hands on the weapon: HC env = "angle" (0 side, 1 front-left, 2 top)
 		var b = null
