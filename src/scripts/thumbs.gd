@@ -7,6 +7,7 @@ var holder: Node3D
 var cache := {}
 var queue: Array = []
 var busy := false
+const THUMB_VER := 28   # bump when weapon models / skins change
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -16,7 +17,7 @@ func _ready() -> void:
 	vp.own_world_3d = true
 	vp.transparent_bg = true
 	vp.size = Vector2i(512, 256)
-	vp.msaa_3d = Viewport.MSAA_8X
+	vp.msaa_3d = Viewport.MSAA_4X
 	vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(vp)
 	var env := Environment.new()
@@ -104,6 +105,18 @@ func _job(job: Array) -> void:
 			job[2].texture = cache[key]
 		busy = false
 		return
+	# disk cache: thumbnails are rendered once per game version, later loads are instant (no GPU readback stall)
+	var dpath := "user://thumbs/%d_%s.png" % [THUMB_VER, key.replace(":", "_").replace("/", "_")]
+	if FileAccess.file_exists(dpath):
+		var dimg := Image.load_from_file(dpath)
+		if dimg and not dimg.is_empty():
+			var dtex := ImageTexture.create_from_image(dimg)
+			cache[key] = dtex
+			for j in [job] + queue:
+				if j[0] + ":" + j[1] == key and is_instance_valid(j[2]):
+					j[2].texture = dtex
+			busy = false
+			return
 	for c in holder.get_children():
 		c.queue_free()
 	var ps: PackedScene = GS.weapon_scene(job[0])
@@ -125,6 +138,9 @@ func _job(job: Array) -> void:
 		print("THUMB ", key, " aabb ", aabb, " camsize ", cam.size)
 	var tex := ImageTexture.create_from_image(img)
 	cache[key] = tex
+	if not job[0].begins_with("mod_"):
+		DirAccess.make_dir_recursive_absolute("user://thumbs")
+		img.save_png(dpath)
 	if is_instance_valid(job[2]):
 		job[2].texture = tex
 	for j in queue:

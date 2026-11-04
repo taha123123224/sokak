@@ -146,7 +146,26 @@ func _test(args: Dictionary) -> void:
 			print("PLAYER pos ", pl.global_position, " ground ", r.get("position", "none"), " cam ", pl.cam.global_position)
 	get_tree().quit()
 
+var _perf_t := 0.0
+var _perf_max := 0.0
 func _process(_d: float) -> void:
+	if OS.has_environment("PERF"):
+		_perf_t += _d
+		_perf_max = maxf(_perf_max, _d)
+		var vr := get_viewport().get_viewport_rid()
+		RenderingServer.viewport_set_measure_render_time(vr, true)
+		var vmr := RID()
+		if current and "player" in current and current.player and current.player.vm_vp:
+			vmr = current.player.vm_vp.get_viewport_rid()
+			RenderingServer.viewport_set_measure_render_time(vmr, true)
+		if _perf_t > 2.0:
+			_perf_t = 0.0
+			print("PERFGPU main=%.1fms vm=%.1fms" % [RenderingServer.viewport_get_measured_render_time_gpu(vr), RenderingServer.viewport_get_measured_render_time_gpu(vmr) if vmr.is_valid() else 0.0])
+			print("PERF fps=%d proc=%.2fms phys=%.2fms maxframe=%.1fms nodes=%d draws=%d objs=%d" % [Engine.get_frames_per_second(),
+				Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
+				_perf_max * 1000.0, Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
+				Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)])
+			_perf_max = 0.0
 	fps_label.visible = bool(GS.settings.get("show_fps", true))
 	if fps_label.visible:
 		fps_label.text = "%d FPS" % Engine.get_frames_per_second()

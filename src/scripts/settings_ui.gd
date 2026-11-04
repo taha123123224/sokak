@@ -107,7 +107,7 @@ func _build() -> void:
 			body.add_child(UI.lbl("Haritalar/silahlar görünmüyor, ekranda çizgiler varsa: önce DirectX 12, olmazsa Uyumluluk modunu seç. Oyun yeniden başlar.", 15, UI.DIM, "Rajdhani-SemiBold"))
 			_section("PERFORMANS")
 			_check("dyn_res", "Dinamik çözünürlük (FPS düşünce 3D görüntüyü otomatik ölçekler)", "Zayıf bilgisayarlarda akıcılık sağlar")
-			_options("dyn_target", "Hedef FPS", [[60, "60"], [90, "90"], [120, "120"], [144, "144"]])
+			_options("dyn_target", "Hedef FPS", [[60, "60"], [75, "75"], [90, "90"], [120, "120"], [144, "144"]])
 			body.add_child(UI.lbl("Ekran kartın: %s   •   Önerilen ayar: %s" % [RenderingServer.get_video_adapter_name(), str(GS.detect_tier()).to_upper()], 15, UI.DIM, "Rajdhani-SemiBold"))
 			_section("EKRAN")
 			_check("fullscreen", "Tam Ekran")

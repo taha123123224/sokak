@@ -63,6 +63,8 @@ func _req(method: int, path: String, body = null, extra: PackedStringArray = Pac
 		return {"ok": false, "code": 0, "data": null, "err": "Online servis yapılandırılmamış"}
 	var h := HTTPRequest.new()
 	h.timeout = 12.0
+	# network + TLS work on a background thread: polling never blocks a frame (was the lobby / in-match hitch)
+	h.use_threads = true
 	add_child(h)
 	var headers := PackedStringArray(["apikey: " + anon, "Content-Type: application/json"])
 	# new-style publishable keys (sb_publishable_...) are not JWTs: only send a Bearer token for a logged-in user
@@ -346,13 +348,14 @@ func _process(delta: float) -> void:
 	if _hb_t <= 0:
 		_hb_t = 30.0
 		set_status(status, room)
+	var in_match := status == "match"
 	_inv_t -= delta
 	if _inv_t <= 0:
-		_inv_t = 4.0
+		_inv_t = 15.0 if in_match else 6.0
 		_poll_invites()
 	_fr_t -= delta
 	if _fr_t <= 0:
-		_fr_t = 20.0
+		_fr_t = 90.0 if in_match else 25.0
 		refresh_friends()
 	if _save_t > 0:
 		_save_t -= delta
@@ -360,7 +363,7 @@ func _process(delta: float) -> void:
 			save_now()
 	_ann_t -= delta
 	if _ann_t <= 0:
-		_ann_t = 15.0
+		_ann_t = 30.0 if in_match else 15.0
 		_poll_news()
 
 var _ann_t := 3.0

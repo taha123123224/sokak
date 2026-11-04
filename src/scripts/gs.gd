@@ -667,8 +667,8 @@ func default_settings() -> Dictionary:
 	return {
 		"sens": 1.0, "ads_sens": 0.8, "scope_sens": 0.6, "invert_y": false, "fov": 80.0,
 		"quality": "high", "resolution_scale": 1.0, "upscaler": "fsr2", "fullscreen": true, "vsync": false, "fps_cap": 0,
-		"msaa": 2, "taa": false, "fxaa": true, "shadows": 2, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false,
-		"dyn_res": true, "dyn_target": 60,
+		"msaa": 0, "taa": false, "fxaa": true, "shadows": 2, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false,
+		"dyn_res": true, "dyn_target": 75,
 		"motion_blur": false, "draw_distance": 1.0, "sharpen": 0.3, "brightness": 1.0, "show_fps": true, "announcer": true,
 		"vol_master": 0.8, "vol_sfx": 1.0, "vol_music": 0.5, "vol_amb": 0.6, "vol_voice": 1.0, "voice_on": true,
 		"xh_style": 0, "xh_color": "3dff8a", "xh_size": 7.0, "xh_gap": 5.0, "xh_thick": 2.0, "xh_dot": false, "xh_outline": true, "xh_dynamic": true, "xh_alpha": 1.0,
@@ -685,11 +685,11 @@ func load_settings() -> void:
 			for k in d.keys():
 				settings[k] = d[k]
 	# v2.7: one-time automatic quality pick (older installs defaulted to ULTRA, too heavy for many PCs)
-	if not bool(settings.get("perf_v27", false)):
+	if not bool(settings.get("perf_v28", false)):
 		var tier := detect_tier()
 		apply_preset(tier)
 		settings["dyn_res"] = true
-		settings["perf_v27"] = true
+		settings["perf_v28"] = true
 		settings["auto_tier"] = tier
 		save_settings.call_deferred()
 
@@ -703,7 +703,7 @@ func save_settings() -> void:
 const QUALITY_PRESETS := {
 	"low": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 0, "ssao": false, "ssil": false, "ssr": false, "sdfgi": false, "glow": false, "volumetric": false, "resolution_scale": 0.75, "draw_distance": 0.6},
 	"medium": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 1, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false, "resolution_scale": 1.0, "draw_distance": 0.8},
-	"high": {"msaa": 2, "fxaa": true, "taa": false, "shadows": 2, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false, "resolution_scale": 1.0, "draw_distance": 1.0},
+	"high": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 2, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false, "resolution_scale": 1.0, "draw_distance": 1.0},
 	"ultra": {"msaa": 2, "fxaa": true, "taa": false, "shadows": 3, "ssao": true, "ssil": true, "ssr": true, "sdfgi": false, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 1.0},
 	"uhd": {"msaa": 4, "fxaa": true, "taa": false, "shadows": 4, "ssao": true, "ssil": true, "ssr": true, "sdfgi": true, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 1.3},
 }
@@ -758,7 +758,7 @@ func apply_settings() -> void:
 	vp.mesh_lod_threshold = 1.0 if float(settings["draw_distance"]) >= 1.0 else 2.0
 	vp.use_occlusion_culling = true
 	var sh := int(settings["shadows"])
-	var sizes := [1024, 2048, 4096, 4096, 8192]
+	var sizes := [1024, 2048, 2048, 4096, 8192]
 	RenderingServer.directional_shadow_atlas_set_size(sizes[clamp(sh, 0, 4)], true)
 	RenderingServer.directional_soft_shadow_filter_set_quality([RenderingServer.SHADOW_QUALITY_HARD, RenderingServer.SHADOW_QUALITY_SOFT_LOW, RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM, RenderingServer.SHADOW_QUALITY_SOFT_HIGH, RenderingServer.SHADOW_QUALITY_SOFT_ULTRA][clamp(sh, 0, 4)])
 	# post-process quality tiers (AO / indirect light / reflections)

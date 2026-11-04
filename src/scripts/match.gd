@@ -291,6 +291,7 @@ func _bot_weapon(gg: int) -> String:
 var env_exp := 1.0
 
 func _setup_env(env_cfg: Dictionary) -> void:
+	Engine.max_fps = int(GS.settings.get("fps_cap", 0))   # menu caps at 144, the match uses the player's setting
 	var preset: String = env_cfg.get("preset", "day")
 	var s := GS.settings
 	world_env = WorldEnvironment.new()
@@ -311,8 +312,10 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	sun.light_color = c["sun"]
 	sun.light_energy = c["se"]
 	sun.shadow_enabled = int(s["shadows"]) > 0
-	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if int(s["shadows"]) >= 2 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-	sun.directional_shadow_max_distance = [40.0, 70.0, 110.0, 150.0, 220.0][clamp(int(s["shadows"]), 0, 4)]
+	# every shadow split re-renders the map from the sun: 4 splits only on ULTRA+, shorter range on lower tiers
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if int(s["shadows"]) >= 3 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	sun.directional_shadow_max_distance = [40.0, 55.0, 80.0, 120.0, 180.0][clamp(int(s["shadows"]), 0, 4)]
+	sun.directional_shadow_fade_start = 0.85
 	sun.directional_shadow_blend_splits = true
 	sun.shadow_bias = 0.03
 	sun.shadow_normal_bias = 1.2
@@ -533,11 +536,13 @@ func _dyn_res(delta: float) -> void:
 	var target := float(GS.settings.get("dyn_target", 60))
 	var old := _dr_scale
 	if fps < target * 0.92:
-		_dr_scale = maxf(0.6, _dr_scale - (0.1 if fps < target * 0.7 else 0.05))
+		_dr_scale = maxf(0.67, _dr_scale - (0.1 if fps < target * 0.7 else 0.05))
 	elif fps > target * 1.35 and _dr_scale < user_s:
 		_dr_scale = minf(user_s, _dr_scale + 0.05)
 	if absf(old - _dr_scale) > 0.001:
 		vp.scaling_3d_scale = _dr_scale
+		if player and player.vm_vp:
+			player.vm_vp.scaling_3d_scale = minf(1.0, _dr_scale + 0.15)
 		if _dr_scale < 0.99:
 			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR
 			vp.fsr_sharpness = 0.25

@@ -881,7 +881,9 @@ func _build_viewmodel() -> void:
 	vm_vp.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	vm_vp.own_world_3d = true
 	vm_vp.transparent_bg = true
-	vm_vp.msaa_3d = Viewport.MSAA_4X
+	# the weapon is a second render pass at screen size: keep it cheap (it used 4x MSAA + SSAO + glow + SMAA always)
+	var qi: int = ["low", "medium", "high", "ultra", "uhd"].find(str(GS.settings.get("quality", "high")))
+	vm_vp.msaa_3d = Viewport.MSAA_2X if qi >= 2 else Viewport.MSAA_DISABLED
 	vm_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	vm_vp.size = get_viewport().get_visible_rect().size
 	add_child(vm_vp)
@@ -898,16 +900,16 @@ func _build_viewmodel() -> void:
 	vm_env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	vm_env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	# weapon-scale contact AO: crevices, rails and grip texture read much sharper
-	vm_env.ssao_enabled = bool(GS.settings.get("ssao", true))
+	vm_env.ssao_enabled = bool(GS.settings.get("ssao", true)) and qi >= 3
 	vm_env.ssao_radius = 0.06; vm_env.ssao_intensity = 1.6; vm_env.ssao_power = 1.4; vm_env.ssao_detail = 1.0
 	vm_env.ssao_horizon = 0.02; vm_env.ssao_light_affect = 0.1
-	vm_env.glow_enabled = bool(GS.settings.get("glow", true))
+	vm_env.glow_enabled = bool(GS.settings.get("glow", true)) and qi >= 2
 	vm_env.glow_intensity = 0.35; vm_env.glow_hdr_threshold = 1.6; vm_env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 	vm_env.adjustment_enabled = true
 	vm_env.adjustment_contrast = 1.05
 	vm_env.adjustment_saturation = 1.04
 	vm_cam.environment = vm_env
-	vm_vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_SMAA
+	vm_vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_SMAA if qi < 2 else Viewport.SCREEN_SPACE_AA_DISABLED
 	vm_vp.use_debanding = true
 	vm_vp.positional_shadow_atlas_size = 0
 	# cool rim light from behind: crisp highlight edges on the weapon silhouette

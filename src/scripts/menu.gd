@@ -127,6 +127,9 @@ func _exit_tree() -> void:
 	if Online.gifts_arrived.is_connected(_on_gifts): Online.gifts_arrived.disconnect(_on_gifts)
 
 func _ready() -> void:
+	# menus don't need more than 144 FPS: less GPU heat, no fan spin-up, smoother frame pacing
+	if int(GS.settings.get("fps_cap", 0)) == 0 or int(GS.settings.get("fps_cap", 0)) > 144:
+		Engine.max_fps = 144
 	online = preload("res://scripts/menu_online.gd").new(self)
 	adminp = preload("res://scripts/menu_admin.gd").new(self)
 	Online.announced.connect(_on_announce)
@@ -284,8 +287,9 @@ func _build_world() -> void:
 	e.tonemap_white = 6.0
 	e.glow_enabled = true
 	e.glow_intensity = 0.6; e.glow_bloom = 0.05; e.glow_hdr_threshold = 1.1
-	e.ssr_enabled = bool(GS.settings["ssr"])
-	e.ssao_enabled = true
+	var qi: int = ["low", "medium", "high", "ultra", "uhd"].find(str(GS.settings.get("quality", "high")))
+	e.ssr_enabled = bool(GS.settings["ssr"]) and qi >= 3
+	e.ssao_enabled = qi >= 1
 	e.ssao_intensity = 1.2
 	e.adjustment_enabled = true
 	e.adjustment_saturation = 1.18
@@ -296,7 +300,7 @@ func _build_world() -> void:
 	e.fog_depth_end = 30.0
 	e.fog_light_color = Color(0.03, 0.035, 0.045)
 	e.fog_density = 0.5
-	e.volumetric_fog_enabled = bool(GS.settings["volumetric"])
+	e.volumetric_fog_enabled = bool(GS.settings["volumetric"]) and qi >= 3
 	e.volumetric_fog_density = 0.006
 	e.volumetric_fog_albedo = Color(1.0, 0.9, 0.8)
 	e.volumetric_fog_anisotropy = 0.75
@@ -317,7 +321,7 @@ func _build_world() -> void:
 	key.look_at_from_position(key.position, Vector3(0.5, 1, 0))
 	key.light_energy = 6; key.spot_range = 14; key.spot_angle = 30
 	key.light_color = Color(1, 0.95, 0.88)
-	key.shadow_enabled = true
+	key.shadow_enabled = qi >= 2
 	key.light_volumetric_fog_energy = 1.5
 	world.add_child(key)
 	rim = SpotLight3D.new()
