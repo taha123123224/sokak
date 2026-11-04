@@ -1,33 +1,33 @@
 {
-	"version": "2.9.0",
-	"build": 29,
+	"version": "2.9.1",
+	"build": 30,
 	"parts": [
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v29.pck.part00",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v30.pck.part00",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v29.pck.part01",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v30.pck.part01",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v29.pck.part02",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v30.pck.part02",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v29.pck.part03",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v30.pck.part03",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v29.pck.part04",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v30.pck.part04",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v29.pck.part05",
-			"size": 58616516
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v30.pck.part05",
+			"size": 58630580
 		}
 	],
-	"pck_size": 530475716,
+	"pck_size": 530489780,
 	"installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
-	"notes": "Çevrimiçi SABOTAJ modu, yeni oda kurma ekranı, yeni kasa açma animasyonu ve bilgi kartı, yeni arkadaşlar sayfası + arkadaşlık isteği bildirimi, sesli sohbet düzeltmesi (otomatik ses yükseltme, açık mikrofon seçeneği), Performans grafik modu."
+	"notes": "Sabotaj yenilendi: bomba kurulunca silahın bozulması düzeltildi, elde C4 ve tuş takımı animasyonu, nişangahta ilerleme halkası, e-spor tarzı A/B bölgeleri ve rozetleri, mini haritada A/B ve bomba, ölünce takım arkadaşını izleme."
 }

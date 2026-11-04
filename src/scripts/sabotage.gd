@@ -217,31 +217,137 @@ func _reachable(nav: RID, from: Vector3, to: Vector3) -> bool:
 	var path := NavigationServer3D.map_get_path(nav, NavigationServer3D.map_get_closest_point(nav, from), to, true)
 	return path.size() > 0 and path[path.size() - 1].distance_to(to) < 1.5
 
+const SITE_SHADER := """
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_draw_never, shadows_disabled;
+uniform vec4 col : source_color = vec4(1.0, 0.78, 0.35, 1.0);
+uniform float hot = 0.0;      // 1 = bomb planted here (pulses)
+uniform float dim = 0.0;      // 1 = the other site after a plant
+void fragment() {
+	vec2 p = UV * 2.0 - 1.0;
+	float r = length(p);
+	if (r > 1.0) discard;
+	float a = atan(p.y, p.x) / 6.28318 + 0.5;
+	float t = TIME;
+	// crisp inner ring
+	float ring = smoothstep(0.012, 0.0, abs(r - 0.93) - 0.012);
+	// rotating dashed outer ring
+	float dash = step(0.45, fract(a * 36.0 + t * 0.6));
+	float outer = smoothstep(0.01, 0.0, abs(r - 0.985) - 0.008) * dash;
+	// corner brackets at 4 angles
+	float br = 0.0;
+	for (int i = 0; i < 4; i++) {
+		float ca = float(i) * 0.25 + 0.125;
+		float da = abs(fract(a - ca + 0.5) - 0.5);
+		br += smoothstep(0.035, 0.03, da) * smoothstep(0.02, 0.0, abs(r - 0.86) - 0.02);
+	}
+	// soft fill fading to the edge + expanding scan wave
+	float fill = mix(0.05, 0.12, smoothstep(0.2, 0.93, r)) * step(r, 0.93);
+	float wave = smoothstep(0.06, 0.0, abs(r - fract(t * 0.35) * 0.93)) * 0.18 * step(r, 0.93);
+	float pulse = hot * (0.5 + 0.5 * sin(t * 7.0));
+	vec3 c = mix(col.rgb, vec3(1.0, 0.18, 0.12), hot);
+	ALBEDO = c;
+	ALPHA = (ring * 0.95 + outer * 0.75 + br * 0.9 + fill + wave + pulse * 0.25 * step(r, 0.93)) * (1.0 - dim * 0.75);
+}
+"""
+
+static func _badge_tex(letter_col: Color) -> ImageTexture:
+	## hexagon badge (drawn once): dark glass inside, bright rim
+	var n := 128
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	var c := Vector2(n, n) * 0.5
+	for y in n:
+		for x in n:
+			var p := (Vector2(x, y) - c) / (n * 0.5)
+			# hexagon distance (pointy top)
+			var q := Vector2(absf(p.x), absf(p.y))
+			var d := maxf(q.x * 0.866 + q.y * 0.5, q.y)
+			var col := Color(0, 0, 0, 0)
+			if d < 0.78:
+				col = Color(0.03, 0.035, 0.05, 0.82)
+			if d >= 0.78 and d < 0.9:
+				col = letter_col
+			elif d >= 0.9 and d < 0.97:
+				col = Color(letter_col.r, letter_col.g, letter_col.b, 0.25)
+			img.set_pixel(x, y, col)
+	return ImageTexture.create_from_image(img)
+
+var site_nodes := []     # per site: {"zone": ShaderMaterial, "badge": Sprite3D, "letter": Label3D, "dist": Label3D}
+
 func _site_marker(s: Dictionary) -> void:
-	var ring := MeshInstance3D.new()
-	var cm := CylinderMesh.new()
-	cm.top_radius = SITE_R; cm.bottom_radius = SITE_R; cm.height = 0.03; cm.radial_segments = 48
-	ring.mesh = cm
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = Color(1.0, 0.45, 0.1, 0.22)
-	ring.material_override = mat
-	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(ring)
-	ring.global_position = s["pos"] + Vector3(0, 0.03, 0)
+	var gold := Color(1.0, 0.78, 0.35)
+	var zone := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(SITE_R * 2.0, SITE_R * 2.0)
+	zone.mesh = pm
+	var sm := ShaderMaterial.new()
+	var sh := Shader.new(); sh.code = SITE_SHADER
+	sm.shader = sh
+	sm.set_shader_parameter("col", gold)
+	zone.material_override = sm
+	zone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(zone)
+	zone.global_position = s["pos"] + Vector3(0, 0.04, 0)
+	# floating badge with the letter + live distance (constant size on screen, seen through walls)
+	var badge := Sprite3D.new()
+	badge.texture = _badge_tex(gold)
+	badge.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	badge.no_depth_test = true
+	badge.fixed_size = true
+	badge.pixel_size = 0.0006
+	badge.render_priority = 10
+	add_child(badge)
+	badge.global_position = s["pos"] + Vector3(0, 2.6, 0)
 	var lb := Label3D.new()
 	lb.text = s["name"]
 	lb.font = UI.font("RussoOne-Regular")
-	lb.font_size = 96
-	lb.outline_size = 18
-	lb.modulate = Color(1.0, 0.62, 0.2)
+	lb.font_size = 64
+	lb.outline_size = 0
+	lb.modulate = Color.WHITE
 	lb.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lb.no_depth_test = true
 	lb.fixed_size = true
 	lb.pixel_size = 0.0006
+	lb.render_priority = 11
 	add_child(lb)
-	lb.global_position = s["pos"] + Vector3(0, 3.2, 0)
+	lb.global_position = badge.global_position
+	var dl := Label3D.new()
+	dl.font = UI.font("Rajdhani-Bold")
+	dl.font_size = 40
+	dl.outline_size = 10
+	dl.outline_modulate = Color(0, 0, 0, 0.7)
+	dl.modulate = Color(1, 1, 1, 0.85)
+	dl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	dl.no_depth_test = true
+	dl.fixed_size = true
+	dl.pixel_size = 0.0006
+	dl.offset = Vector2(0, -90)
+	dl.render_priority = 11
+	add_child(dl)
+	dl.global_position = badge.global_position
+	site_nodes.append({"zone": sm, "badge": badge, "letter": lb, "dist": dl})
+
+var _mk_t := 0.0
+func _update_markers(delta: float) -> void:
+	_mk_t -= delta
+	if _mk_t > 0 or site_nodes.size() != sites.size():
+		return
+	_mk_t = 0.1
+	var cam := get_viewport().get_camera_3d()
+	for i in sites.size():
+		var sn: Dictionary = site_nodes[i]
+		var is_hot: bool = planted and _near_site(bomb_pos) == i
+		var is_dim: bool = planted and not is_hot
+		(sn["zone"] as ShaderMaterial).set_shader_parameter("hot", 1.0 if is_hot else 0.0)
+		(sn["zone"] as ShaderMaterial).set_shader_parameter("dim", 1.0 if is_dim else 0.0)
+		var d := 0.0
+		if cam:
+			d = cam.global_position.distance_to(sites[i]["pos"])
+		var near := d < SITE_R + 1.0
+		for k in ["badge", "letter", "dist"]:
+			(sn[k] as Node3D).visible = not near and not is_dim
+		(sn["dist"] as Label3D).text = ("BOMBA  %dm" % int(d)) if is_hot else "%dm" % int(d)
+		(sn["badge"] as Sprite3D).modulate = Color(1, 0.35, 0.3) if is_hot else Color.WHITE
 
 # ------------------------------------------------------------------ rounds
 func alive_count(t: String) -> int:
@@ -317,7 +423,7 @@ func _end_round(winner: String, why: String) -> void:
 		return
 	phase = "post"
 	post_t = POST_T
-	progress = 0.0; prog_kind = ""
+	progress = 0.0; prog_kind = ""; prog_who = null
 	m.team_score[winner] += 1
 	if online:
 		Net.send({"t": "sabe", "w": winner, "why": why})
@@ -416,6 +522,7 @@ func _near_site(p: Vector3) -> int:
 	return -1
 
 func _process(delta: float) -> void:
+	_update_markers(delta)
 	if m.ended or (m.paused and not online):
 		return
 	if not is_host:
@@ -478,7 +585,7 @@ func _process(delta: float) -> void:
 			m.time_left = BOMB_TIME
 			beep_t = 0.0
 			_place_bomb(bomb_pos, true)
-			progress = 0.0; prog_kind = ""
+			progress = 0.0; prog_kind = ""; prog_who = null
 			planted_site = sites[_near_site(bomb_pos) if _near_site(bomb_pos) >= 0 else 0]["name"]
 			banner_t = 3.0
 			SFX.play("beep_go", 0)
@@ -583,82 +690,119 @@ func _explode() -> void:
 
 # ------------------------------------------------------------------ HUD
 class SabUI extends Control:
+	## esports-style sabotage HUD: round pill, bomb status, progress ring at the crosshair, prompts
 	var sab
 
 	func _process(_d: float) -> void:
 		queue_redraw()
+
+	func _box(r: Rect2, bg: Color, border: Color = Color(0, 0, 0, 0), rad: int = 8) -> void:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = bg
+		sb.set_corner_radius_all(rad)
+		if border.a > 0:
+			sb.border_color = border
+			sb.set_border_width_all(1)
+		draw_style_box(sb, r)
+
+	func _hex(c: Vector2, r: float, fill: Color, rim: Color) -> void:
+		var pts := PackedVector2Array()
+		for i in 6:
+			pts.append(c + Vector2.from_angle(PI / 6.0 + i * PI / 3.0) * r)
+		draw_colored_polygon(pts, fill)
+		pts.append(pts[0])
+		draw_polyline(pts, rim, 2.0, true)
+
+	func _c4_icon(c: Vector2, s: float, col: Color) -> void:
+		for i in 3:
+			draw_rect(Rect2(c + Vector2(-s, -s * 0.55 + i * s * 0.38), Vector2(s * 2.0, s * 0.3)), col)
+		draw_rect(Rect2(c + Vector2(-s * 0.35, -s * 0.8), Vector2(s * 0.7, s * 0.5)), col.darkened(0.3))
 
 	func _draw() -> void:
 		if sab == null or sab.m == null or sab.m.player == null:
 			return
 		var f: Font = UI.font("Rajdhani-Bold")
 		var fr: Font = UI.font("RussoOne-Regular")
+		var ft: Font = UI.font("Teko")
 		var pl = sab.m.player
 		var c := size / 2.0
-		# round strip under the timer
-		var rs := "TUR %d  •  İLK %d TUR" % [sab.round_no, sab.WIN_ROUNDS]
-		draw_string(f, Vector2(c.x - 150, 104), rs, HORIZONTAL_ALIGNMENT_CENTER, 300, 17, Color(1, 1, 1, 0.75))
+		var red := Color(1.0, 0.27, 0.22)
+		var gold := Color(1.0, 0.78, 0.35)
+		var blue := Color(0.42, 0.78, 1.0)
+		# ---- round pill under the score bar
+		var rs := "TUR %d  •  İLK %d" % [sab.round_no, sab.WIN_ROUNDS]
+		var rw := f.get_string_size(rs, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x + 28
+		_box(Rect2(c.x - rw / 2, 96, rw, 24), Color(0.02, 0.025, 0.035, 0.75), Color(1, 1, 1, 0.12), 12)
+		draw_string(f, Vector2(c.x - rw / 2, 113), rs, HORIZONTAL_ALIGNMENT_CENTER, rw, 15, Color(1, 1, 1, 0.8))
+		# ---- planted: bomb pill with countdown bar
 		if sab.phase == "planted":
-			var a := 0.55 + 0.45 * sin(Time.get_ticks_msec() / 1000.0 * (6.0 + 10.0 * (1.0 - sab.m.time_left / sab.BOMB_TIME)))
-			var pr := Rect2(c.x - 170, 116, 340, 34)
-			draw_set_transform(Vector2(pr.position.x + 170, pr.position.y), 0.0, Vector2.ONE)
-			draw_colored_polygon(PackedVector2Array([Vector2(-160, 0), Vector2(170, 0), Vector2(160, 34), Vector2(-170, 34)]), Color(0.35, 0.02, 0.02, 0.75 * a + 0.2))
-			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-			draw_string(fr, Vector2(c.x - 170, 141), "BOMBA KURULU  •  %s  •  %d sn" % [sab.planted_site, int(sab.m.time_left)], HORIZONTAL_ALIGNMENT_CENTER, 340, 19, Color(1, 0.85, 0.8, 0.6 + 0.4 * a))
-		# big banner right after planting
+			var tl: float = sab.m.time_left
+			var k := clampf(tl / sab.BOMB_TIME, 0.0, 1.0)
+			var blink := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 1000.0 * (5.0 + 12.0 * (1.0 - k)))
+			var pr := Rect2(c.x - 150, 128, 300, 46)
+			_box(pr, Color(0.12, 0.02, 0.02, 0.85), Color(red.r, red.g, red.b, 0.5 + 0.5 * blink), 10)
+			_c4_icon(Vector2(pr.position.x + 28, pr.position.y + 23), 11, red.lerp(Color.WHITE, blink * 0.4))
+			draw_string(fr, Vector2(pr.position.x + 52, pr.position.y + 30), "BOMBA  •  %s" % sab.planted_site, HORIZONTAL_ALIGNMENT_LEFT, 150, 17, Color.WHITE)
+			draw_string(ft, Vector2(pr.end.x - 86, pr.position.y + 38), "%d" % int(ceil(tl)), HORIZONTAL_ALIGNMENT_RIGHT, 72, 40, red.lerp(Color.WHITE, 0.3 + blink * 0.3))
+			draw_rect(Rect2(pr.position.x + 10, pr.end.y - 6, (pr.size.x - 20), 3), Color(1, 1, 1, 0.1))
+			draw_rect(Rect2(pr.position.x + 10, pr.end.y - 6, (pr.size.x - 20) * k, 3), red)
+		elif sab.bomb_drop != Vector3.INF and pl.team == "a":
+			var dr := Rect2(c.x - 110, 128, 220, 30)
+			_box(dr, Color(0.12, 0.06, 0.02, 0.85), Color(gold.r, gold.g, gold.b, 0.6), 10)
+			draw_string(f, Vector2(dr.position.x, dr.position.y + 21), "⚠ BOMBA YERDE  •  %dm" % int(pl.global_position.distance_to(sab.bomb_drop)), HORIZONTAL_ALIGNMENT_CENTER, 220, 16, gold)
+		# ---- big banner right after the plant
 		if sab.banner_t > 0.0:
 			sab.banner_t -= get_process_delta_time()
 			var k2 := clampf(sab.banner_t / 3.0, 0.0, 1.0)
 			var al := minf(1.0, k2 * 3.0)
-			var w := 620.0 * minf(1.0, (1.0 - k2) * 8.0 + 0.2)
-			draw_rect(Rect2(c.x - w / 2, c.y - 190, w, 70), Color(0.45, 0.02, 0.02, 0.8 * al))
-			draw_rect(Rect2(c.x - w / 2, c.y - 190, w, 4), Color(1, 0.3, 0.2, al))
-			draw_rect(Rect2(c.x - w / 2, c.y - 124, w, 4), Color(1, 0.3, 0.2, al))
-			draw_string(fr, Vector2(c.x - 310, c.y - 143), "BOMBA KURULDU  —  %s NOKTASI" % sab.planted_site, HORIZONTAL_ALIGNMENT_CENTER, 620, 36, Color(1, 1, 1, al))
-		# carrier badge
-		if sab.carrier == pl:
-			var r := Rect2(c.x - 120, size.y - 210, 240, 34)
-			draw_rect(r, Color(0.35, 0.15, 0.02, 0.85))
-			draw_rect(r, Color(1, 0.55, 0.12), false, 2.0)
+			var grow := minf(1.0, (1.0 - k2) * 7.0 + 0.15)
+			var w := 760.0 * grow
+			var by := c.y - 210
+			var pts := PackedVector2Array([Vector2(c.x - w / 2, by), Vector2(c.x + w / 2, by), Vector2(c.x + w / 2 - 24, by + 66), Vector2(c.x - w / 2 + 24, by + 66)])
+			draw_polygon(pts, PackedColorArray([Color(0.4, 0.02, 0.02, 0.0), Color(0.4, 0.02, 0.02, 0.0), Color(0.5, 0.03, 0.03, 0.88 * al), Color(0.5, 0.03, 0.03, 0.88 * al)]))
+			draw_colored_polygon(PackedVector2Array([Vector2(c.x - w * 0.35, by + 18), Vector2(c.x + w * 0.35, by + 18), Vector2(c.x + w * 0.35 - 16, by + 66), Vector2(c.x - w * 0.35 + 16, by + 66)]), Color(0.45, 0.03, 0.03, 0.9 * al))
+			draw_rect(Rect2(c.x - w * 0.35, by + 64, w * 0.7, 3), Color(1, 0.35, 0.25, al))
+			_hex(Vector2(c.x - 200, by + 42), 22, Color(0.05, 0.02, 0.02, al), Color(1, 0.5, 0.4, al))
+			draw_string(fr, Vector2(c.x - 222, by + 52), sab.planted_site, HORIZONTAL_ALIGNMENT_CENTER, 44, 26, Color(1, 1, 1, al))
+			draw_string(fr, Vector2(c.x - 170, by + 54), "BOMBA KURULDU", HORIZONTAL_ALIGNMENT_LEFT, 400, 32, Color(1, 1, 1, al))
+		# ---- prompts (bottom centre)
+		var prompt := ""
+		var pcol := gold
+		if sab.carrier == pl and pl.alive and sab.prog_kind == "":
 			var si: int = sab._near_site(pl.global_position)
-			draw_string(f, r.position + Vector2(0, 24), ("E BASILI TUT: BOMBAYI KUR (%s)" % sab.sites[si]["name"]) if si >= 0 else "BOMBA SENDE  •  A / B NOKTASINA GİT", HORIZONTAL_ALIGNMENT_CENTER, 240, 17, Color.WHITE)
+			prompt = ("[E] BASILI TUT  —  BOMBAYI KUR  (%s)" % sab.sites[si]["name"]) if si >= 0 else "BOMBA SENDE  —  A ya da B noktasına götür"
 		elif sab.phase == "planted" and pl.team == "b" and pl.alive and pl.global_position.distance_to(sab.bomb_pos) < 1.9 and sab.prog_kind != "defuse":
-			draw_string(f, Vector2(c.x - 160, size.y - 186), "E BASILI TUT: BOMBAYI ÇÖZ", HORIZONTAL_ALIGNMENT_CENTER, 320, 20, Color(0.5, 0.85, 1.0))
-		# progress bar (whoever is planting / defusing, visible to the player when it is them)
+			prompt = "[E] BASILI TUT  —  BOMBAYI ÇÖZ"
+			pcol = blue
+		if prompt != "":
+			var pw := f.get_string_size(prompt, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x + 64
+			var pr2 := Rect2(c.x - pw / 2, size.y - 214, pw, 38)
+			_box(pr2, Color(0.02, 0.025, 0.035, 0.85), Color(pcol.r, pcol.g, pcol.b, 0.7), 19)
+			_c4_icon(Vector2(pr2.position.x + 24, pr2.position.y + 19), 8, pcol)
+			draw_string(f, Vector2(pr2.position.x + 40, pr2.position.y + 26), prompt, HORIZONTAL_ALIGNMENT_LEFT, pw - 40, 18, Color.WHITE)
+		# ---- progress ring at the crosshair
 		if sab.prog_kind != "" and sab.prog_who == pl:
 			var total: float = sab.PLANT_T if sab.prog_kind == "plant" else sab.DEFUSE_T
 			var k := clampf(sab.progress / total, 0.0, 1.0)
-			var col := Color(1, 0.55, 0.12) if sab.prog_kind == "plant" else Color(0.35, 0.75, 1.0)
-			var pnl := Rect2(c.x - 210, c.y + 40, 420, 150)
-			draw_rect(pnl, Color(0.02, 0.025, 0.035, 0.85))
-			draw_rect(pnl, Color(col.r, col.g, col.b, 0.8), false, 2.0)
-			draw_string(fr, pnl.position + Vector2(0, 30), "BOMBA KURULUYOR" if sab.prog_kind == "plant" else "BOMBA ÇÖZÜLÜYOR", HORIZONTAL_ALIGNMENT_CENTER, 420, 22, col)
+			var col := gold if sab.prog_kind == "plant" else blue
+			var rc := c
+			draw_arc(rc, 48, 0, TAU, 64, Color(0, 0, 0, 0.45), 9.0, true)
+			draw_arc(rc, 48, -PI / 2, -PI / 2 + TAU * k, 64, col, 6.0, true)
+			draw_arc(rc, 56, 0, TAU, 64, Color(col.r, col.g, col.b, 0.18), 1.5, true)
+			var title := "KURULUYOR" if sab.prog_kind == "plant" else "ÇÖZÜLÜYOR"
+			_box(Rect2(rc.x - 120, rc.y + 66, 240, 54), Color(0.02, 0.025, 0.035, 0.85), Color(col.r, col.g, col.b, 0.5), 10)
+			draw_string(fr, Vector2(rc.x - 120, rc.y + 88), title, HORIZONTAL_ALIGNMENT_CENTER, 240, 17, col)
 			if sab.prog_kind == "plant":
-				# keypad display: the arming code is typed digit by digit
 				var code := "1923145"
-				var shown := code.substr(0, int(k * 7.0))
-				var disp := Rect2(pnl.position + Vector2(60, 44), Vector2(300, 46))
-				draw_rect(disp, Color(0.03, 0.08, 0.03))
-				draw_rect(disp, Color(0.2, 0.5, 0.2), false, 1.5)
-				var txt := ""
+				var shown := int(k * 7.0)
 				for i in 7:
-					txt += (shown[i] if i < shown.length() else "*") + " "
-				draw_string(fr, disp.position + Vector2(0, 34), txt, HORIZONTAL_ALIGNMENT_CENTER, 300, 30, Color(0.45, 1.0, 0.45))
+					var cr := Rect2(rc.x - 98 + i * 28, rc.y + 96, 24, 18)
+					_box(cr, Color(0.03, 0.09, 0.03) if i < shown else Color(1, 1, 1, 0.06), Color(0.3, 0.8, 0.3, 0.5) if i < shown else Color(0, 0, 0, 0), 3)
+					draw_string(f, Vector2(cr.position.x, cr.position.y + 15), code[i] if i < shown else "•", HORIZONTAL_ALIGNMENT_CENTER, 24, 15, Color(0.5, 1.0, 0.5) if i < shown else Color(1, 1, 1, 0.35))
 			else:
-				# wires: cut one after another
-				var wcols := [Color(0.9, 0.15, 0.1), Color(0.95, 0.85, 0.1), Color(0.2, 0.45, 1.0)]
-				for i in 3:
-					var y := pnl.position.y + 56 + i * 14
-					var cut := k > (i + 1) / 3.0
-					if cut:
-						draw_line(Vector2(pnl.position.x + 60, y), Vector2(c.x - 14, y + 4), wcols[i], 4.0)
-						draw_line(Vector2(c.x + 14, y - 4), Vector2(pnl.position.x + 360, y), wcols[i], 4.0)
-					else:
-						draw_line(Vector2(pnl.position.x + 60, y), Vector2(pnl.position.x + 360, y), wcols[i], 4.0)
-			var br := Rect2(pnl.position.x + 30, pnl.position.y + 112, 360, 12)
-			draw_rect(br.grow(2), Color(0, 0, 0, 0.7))
-			draw_rect(Rect2(br.position, Vector2(br.size.x * k, br.size.y)), col)
-			draw_string(f, Vector2(pnl.position.x, pnl.position.y + 143), "%.1f sn" % maxf(total - sab.progress, 0.0), HORIZONTAL_ALIGNMENT_CENTER, 420, 16, Color(1, 1, 1, 0.75))
-		# dead: waiting for next round
+				draw_string(f, Vector2(rc.x - 120, rc.y + 112), "%.1f sn  •  hareket etme" % maxf(total - sab.progress, 0.0), HORIZONTAL_ALIGNMENT_CENTER, 240, 15, Color(1, 1, 1, 0.75))
+		# ---- alive counter (dead players see who is left)
 		if not pl.alive and sab.phase != "post":
-			draw_string(fr, Vector2(c.x - 300, size.y - 150), "ÖLDÜN  •  TUR SONUNU BEKLE   (Kalan: %s %d  -  %d %s)" % [GS.TEAMS["a"], sab.alive_count("a"), sab.alive_count("b"), GS.TEAMS["b"]], HORIZONTAL_ALIGNMENT_CENTER, 600, 20, Color(1, 1, 1, 0.85))
+			var s2 := "%s %d   —   %d %s" % [GS.TEAMS["a"], sab.alive_count("a"), sab.alive_count("b"), GS.TEAMS["b"]]
+			_box(Rect2(c.x - 150, 186, 300, 28), Color(0.02, 0.025, 0.035, 0.75), Color(1, 1, 1, 0.1), 14)
+			draw_string(f, Vector2(c.x - 150, 206), "HAYATTA:  " + s2, HORIZONTAL_ALIGNMENT_CENTER, 300, 15, Color(1, 1, 1, 0.85))

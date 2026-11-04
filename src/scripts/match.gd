@@ -698,6 +698,7 @@ func _scatter_grass(cfg: Dictionary) -> void:
 
 func _process(delta: float) -> void:
 	_dyn_res(delta)
+	_spec_tick(delta)
 	if world_env and world_env.environment:  # live brightness slider
 		world_env.environment.tonemap_exposure = env_exp * float(GS.settings.get("brightness", 1.0))
 	if test_follow.size() == 2 and is_instance_valid(test_follow[1]):
@@ -730,6 +731,11 @@ func _process(delta: float) -> void:
 			end_match()
 
 func _input(e: InputEvent) -> void:
+	if spectating and e is InputEventMouseButton and e.pressed and not paused:
+		if e.button_index == MOUSE_BUTTON_LEFT: spec_next(1)
+		elif e.button_index == MOUSE_BUTTON_RIGHT: spec_next(-1)
+	if spectating and e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_SPACE:
+		spec_next(1)
 	# text chat (Enter / T = everyone, Y = team) and push-to-talk voice (V basılı tut, online)
 	# handled in _input (before any UI / player code) so nothing can swallow the keys
 	if hud == null or hud.typing or paused or ended:
@@ -970,6 +976,10 @@ func _sp_on_death(victim, attacker, wid: String, head: bool) -> void:
 			a.set_weapon(nw)
 	if sab:
 		sab.on_death(victim)   # rounds: no respawn until the next round
+		if victim == player:
+			get_tree().create_timer(2.8).timeout.connect(func(): if not player.alive and not ended: start_spectate())
+		elif spectating and spec_target == victim:
+			get_tree().create_timer(1.2).timeout.connect(func(): if spectating: spec_next(1))
 		return
 	# respawn timer
 	get_tree().create_timer(3.5 if victim == player else 3.0).timeout.connect(func(): if not ended: _spawn(ve, false))
@@ -996,6 +1006,90 @@ func _player_kill(head: bool, wid: String) -> void:
 	hud.kill_confirm(head, txt, multi, wid, player_streak)
 
 var killcam: Camera3D
+
+# ---------------------------------------------------------------- spectate teammates (sabotage: dead until next round)
+var spectating := false
+var spec_cam: Camera3D
+var spec_target = null
+var spec_idx := 0
+
+func _spec_mates() -> Array:
+	var out: Array = []
+	for c in combatants:
+		var n = c["node"]
+		if n != player and is_instance_valid(n) and n.alive and (not teams or c["team"] == player.team):
+			out.append(n)
+	return out
+
+func start_spectate() -> void:
+	var mates := _spec_mates()
+	if mates.is_empty():
+		return
+	if killcam and is_instance_valid(killcam):
+		killcam.queue_free()
+	killcam = null
+	if spec_cam == null or not is_instance_valid(spec_cam):
+		spec_cam = Camera3D.new()
+		spec_cam.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+		spec_cam.fov = 70
+		add_child(spec_cam)
+	spectating = true
+	spec_idx = 0
+	spec_target = mates[0]
+	spec_cam.global_transform = player.cam.global_transform
+	spec_cam.current = true
+	player.vm_rect.visible = false
+	hud.show_spectate(true)
+
+func stop_spectate() -> void:
+	if not spectating:
+		return
+	spectating = false
+	spec_target = null
+	if spec_cam and is_instance_valid(spec_cam):
+		spec_cam.queue_free()
+	spec_cam = null
+	if hud:
+		hud.show_spectate(false)
+
+func spec_next(d: int) -> void:
+	var mates := _spec_mates()
+	if mates.is_empty():
+		stop_spectate()
+		if player: player.cam.current = true
+		return
+	spec_idx = (mates.find(spec_target) + d + mates.size()) % mates.size() if mates.has(spec_target) else 0
+	spec_target = mates[spec_idx]
+	SFX.play("ui_click", -8)
+
+func _spec_facing(n) -> float:
+	if "puppet" in n and n.puppet:
+		return float(n.net_yaw)
+	if "aim_yaw" in n:
+		return float(n.aim_yaw)
+	return n.global_rotation.y
+
+func _spec_tick(delta: float) -> void:
+	if not spectating or spec_cam == null or not is_instance_valid(spec_cam):
+		return
+	if spec_target == null or not is_instance_valid(spec_target) or not spec_target.alive:
+		spec_next(1)
+		if not spectating:
+			return
+	var n = spec_target
+	var yw := _spec_facing(n)
+	var bz := Basis(Vector3.UP, yw)
+	var headp: Vector3 = n.global_position + Vector3.UP * 1.62
+	var back: Vector3 = bz.z
+	var right: Vector3 = bz.x
+	var want: Vector3 = headp + back * 2.3 + right * 0.55 + Vector3.UP * 0.25
+	# keep the camera out of walls
+	var hit := get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(headp, want, 1))
+	if hit:
+		want = headp + (hit["position"] - headp) * 0.85
+	spec_cam.global_position = spec_cam.global_position.lerp(want, minf(1.0, delta * 10.0))
+	var look: Vector3 = headp - back * 8.0
+	spec_cam.look_at(look, Vector3.UP)
 
 func _killcam(killer: Node3D) -> void:
 	## after death the camera flies from your eyes to the killer and keeps them framed
@@ -1036,6 +1130,7 @@ func _killcam(killer: Node3D) -> void:
 			killcam.look_at(killer.global_position + Vector3.UP * 1.4, Vector3.UP), 0.0, 1.0, 1.8)
 
 func _end_killcam() -> void:
+	stop_spectate()
 	if killcam and is_instance_valid(killcam):
 		killcam.queue_free()
 	killcam = null
@@ -1148,6 +1243,33 @@ func leave() -> void:
 		main.go_menu("lobby")
 
 func test_hook(i: int) -> void:
+	if i == 27:
+		for c in combatants:
+			if c["node"] != player:
+				c["node"].set_physics_process(false)
+		return
+	if i == 24 and sab:
+		# stand on site A with the bomb and start planting
+		sab.carrier = player
+		player.global_position = sab.sites[0]["pos"]
+		player.reset_physics_interpolation()
+		sab.prog_who = player; sab.prog_kind = "plant"; sab.progress = 1.7
+		sab.set_process(false)
+		return
+	if i == 26 and sab:
+		sab.set_process(true)
+		sab.planted = true; sab.phase = "planted"; sab.bomb_pos = sab.sites[0]["pos"]; sab.planted_site = "A"; sab.banner_t = 2.0
+		sab.prog_kind = ""; sab.prog_who = null
+		sab._place_bomb(sab.bomb_pos, true)
+		player.global_position = sab.sites[0]["pos"] + Vector3(8, 0, 8)
+		player.reset_physics_interpolation()
+		player.yaw = atan2(8, 8)
+		return
+	if i == 25:
+		player.alive = false
+		player.vm_rect.visible = false
+		start_spectate()
+		return
 	if i == 23:
 		hud.force_board = true
 		return

@@ -188,6 +188,7 @@ func setup(p) -> void:
 	nade_lbl = UI.lbl(""); legacy.add_child(nade_lbl)
 	# bottom-left: health / armour
 	var hpw := HealthPanel.new()
+	hp_panel = hpw
 	hpw.hud = self
 	hpw.anchor_top = 1; hpw.anchor_bottom = 1
 	hpw.offset_left = 26; hpw.offset_top = -138; hpw.offset_right = 446; hpw.offset_bottom = -22
@@ -272,6 +273,61 @@ func setup(p) -> void:
 
 func show_countdown() -> void:
 	pass
+
+# ---------------------------------------------------------------- spectate panel
+var spec_panel: SpecPanel
+var hp_panel: Control
+func show_spectate(on: bool) -> void:
+	if on:
+		if spec_panel == null or not is_instance_valid(spec_panel):
+			spec_panel = SpecPanel.new()
+			spec_panel.hud = self
+			spec_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+			spec_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			root.add_child(spec_panel)
+		spec_panel.visible = true
+		if death_panel: death_panel.visible = false
+	elif spec_panel and is_instance_valid(spec_panel):
+		spec_panel.visible = false
+	# your own health / ammo / red overlays make no sense while watching someone else
+	for n in [hp_panel, ammo_panel, vignette, blood_ov]:
+		if n and is_instance_valid(n):
+			(n as CanvasItem).visible = not on
+
+class SpecPanel extends Control:
+	## bottom-centre card while watching a teammate: name, health, weapon, how to switch
+	var hud
+	func _process(_d: float) -> void:
+		queue_redraw()
+	func _draw() -> void:
+		var m = hud.match_node
+		if m == null or not m.spectating or m.spec_target == null or not is_instance_valid(m.spec_target):
+			return
+		var n = m.spec_target
+		var f: Font = UI.font("Rajdhani-Bold")
+		var fr: Font = UI.font("RussoOne-Regular")
+		var tc: Color = GS.TEAM_COLORS.get(m.player.team, UI.ACCENT)
+		var c := size / 2.0
+		var r := Rect2(c.x - 230, size.y - 150, 460, 86)
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.02, 0.025, 0.035, 0.88)
+		sb.set_corner_radius_all(12)
+		sb.border_color = Color(tc.r, tc.g, tc.b, 0.6)
+		sb.set_border_width_all(1)
+		draw_style_box(sb, r)
+		draw_rect(Rect2(r.position.x, r.position.y + 10, 4, r.size.y - 20), tc)
+		draw_string(f, r.position + Vector2(18, 22), "◉ İZLENİYOR", HORIZONTAL_ALIGNMENT_LEFT, 200, 14, Color(1, 1, 1, 0.55))
+		draw_string(fr, r.position + Vector2(18, 50), str(n.display_name) if "display_name" in n else "?", HORIZONTAL_ALIGNMENT_LEFT, 260, 24, Color.WHITE)
+		var wn: String = str(GS.WEAPONS.get(n.wid, {}).get("name", "")) if "wid" in n else ""
+		draw_string(f, r.position + Vector2(18, 74), wn, HORIZONTAL_ALIGNMENT_LEFT, 200, 15, UI.ACCENT2)
+		if "health" in n and not ("puppet" in n and n.puppet):
+			var hp := clampf(float(n.health) / 100.0, 0.0, 1.0)
+			var br := Rect2(r.end.x - 190, r.position.y + 40, 170, 10)
+			draw_rect(br, Color(1, 1, 1, 0.1))
+			draw_rect(Rect2(br.position, Vector2(br.size.x * hp, br.size.y)), Color("2fd67a").lerp(Color("ff3d3d"), 1.0 - hp))
+			draw_string(f, Vector2(br.position.x, br.position.y - 6), "CAN %d" % int(n.health), HORIZONTAL_ALIGNMENT_LEFT, 170, 14, Color(1, 1, 1, 0.7))
+		draw_string(f, Vector2(r.position.x, r.end.y + 22), "◀ SAĞ TIK      SOL TIK / BOŞLUK ▶      takım arkadaşı değiştir", HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 14, Color(1, 1, 1, 0.5))
+
 
 # ---------------------------------------------------------------- chat / voice help
 var _vnote: Label
@@ -432,7 +488,7 @@ func _process(delta: float) -> void:
 	# death
 	if death_panel.visible:
 		death_t -= delta
-		death_timer_lbl.text = "Yeniden doğuluyor: %.1f" % max(death_t, 0.0)
+		death_timer_lbl.text = ("Tur sonunu bekle  •  birazdan takım arkadaşını izleyeceksin" if match_node.sab else "Yeniden doğuluyor: %.1f" % max(death_t, 0.0))
 	# weapon menu (B)
 	if Input.is_action_just_pressed("buy_menu") and not m.ended and not m.paused:
 		toggle_buy(not buy_open)
@@ -1365,6 +1421,31 @@ class Minimap extends Control:
 			draw_circle(c + q, 4.5, col)
 			if not friendly:
 				draw_arc(c + q, 9.0 + sin(Time.get_ticks_msec() * 0.012) * 2.0, 0, TAU, 20, Color(1, 0.25, 0.2, 0.7), 1.5, true)
+		# sabotage: A / B sites and the bomb
+		if m.sab and m.sab.sites.size() == 2:
+			var fb2: Font = UI.font("RussoOne-Regular")
+			for st in m.sab.sites:
+				var q2: Vector2 = ((m.world_to_minimap(st["pos"]) - pp) * k).rotated(p.yaw)
+				if q2.length() > R - 12:
+					q2 = q2.normalized() * (R - 12)
+				var hot: bool = m.sab.planted and st["pos"].distance_to(m.sab.bomb_pos) < m.sab.SITE_R
+				var sc2: Color = Color(1, 0.3, 0.25) if hot else Color(1, 0.78, 0.35)
+				var hp := PackedVector2Array()
+				for hi in 6:
+					hp.append(c + q2 + Vector2.from_angle(PI / 6.0 + hi * PI / 3.0) * 11.0)
+				draw_colored_polygon(hp, Color(0.03, 0.035, 0.05, 0.9))
+				hp.append(hp[0])
+				draw_polyline(hp, sc2, 2.0, true)
+				draw_string(fb2, c + q2 + Vector2(-6, 6), str(st["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
+			var bpos := Vector3.INF
+			if m.sab.planted: bpos = m.sab.bomb_pos
+			elif m.sab.bomb_drop != Vector3.INF and p.team == "a": bpos = m.sab.bomb_drop
+			if bpos != Vector3.INF:
+				var q3: Vector2 = ((m.world_to_minimap(bpos) - pp) * k).rotated(p.yaw)
+				if q3.length() > R - 8:
+					q3 = q3.normalized() * (R - 8)
+				var bl: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.012)
+				draw_rect(Rect2(c + q3 - Vector2(6, 4), Vector2(12, 8)), Color(1, 0.25, 0.2, 0.6 + 0.4 * bl))
 		for kk in hud.pings.keys():
 			hud.pings[kk] -= get_process_delta_time()
 			if hud.pings[kk] <= 0:

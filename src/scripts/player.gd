@@ -351,8 +351,9 @@ func _try_step(delta: float) -> void:
 # ---------------------------------------------------------------- per-frame
 func _process(delta: float) -> void:
 	if not alive:
+		if vm_c4: vm_c4.visible = false
 		return
-	var frozen: bool = match_node.paused or match_node.ended or match_node.countdown > 0 or (match_node.hud != null and match_node.hud.typing)
+	var frozen: bool = match_node.paused or match_node.ended or match_node.countdown > 0 or (match_node.hud != null and match_node.hud.typing) or busy_k > 0.3
 	# recoil recovery
 	if recoil_vel.length() > 0.0001:
 		var step = recoil_vel * min(delta * 22.0, 1.0)
@@ -991,6 +992,88 @@ func _build_viewmodel() -> void:
 	flash_side.visible = false
 	vm_root.add_child(flash_side)
 
+# ---------------------------------------------------------------- C4 in hand (sabotage)
+var vm_c4: Node3D
+var _c4_led: StandardMaterial3D
+var _c4_screen: Label3D
+func _c4_build() -> void:
+	vm_c4 = Node3D.new()
+	vm_root.add_child(vm_c4)
+	var mk := func(c: Color, rough: float, metal: float = 0.0, emit: float = 0.0) -> StandardMaterial3D:
+		var m := StandardMaterial3D.new()
+		m.albedo_color = c; m.roughness = rough; m.metallic = metal
+		if emit > 0.0:
+			m.emission_enabled = true; m.emission = c; m.emission_energy_multiplier = emit
+		return m
+	var olive: StandardMaterial3D = mk.call(Color(0.3, 0.32, 0.22), 0.75)
+	var tape: StandardMaterial3D = mk.call(Color(0.05, 0.05, 0.05), 0.5)
+	var part := func(mesh: Mesh, mat: Material, p: Vector3, r: Vector3 = Vector3.ZERO) -> void:
+		var mi := MeshInstance3D.new()
+		mi.mesh = mesh; mi.material_override = mat; mi.position = p; mi.rotation = r
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		vm_c4.add_child(mi)
+	for i in 4:
+		var cm := CylinderMesh.new(); cm.top_radius = 0.022; cm.bottom_radius = 0.022; cm.height = 0.2; cm.radial_segments = 16
+		part.call(cm, olive, Vector3(-0.066 + i * 0.044, 0, 0), Vector3(0, 0, PI / 2))
+	for z in [-0.055, 0.055]:
+		var tb := BoxMesh.new(); tb.size = Vector3(0.2, 0.05, 0.022)
+		part.call(tb, tape, Vector3(0, 0.0, z))
+	var box := BoxMesh.new(); box.size = Vector3(0.12, 0.035, 0.085)
+	part.call(box, mk.call(Color(0.1, 0.1, 0.11), 0.4, 0.5), Vector3(0, 0.035, 0))
+	var scr := BoxMesh.new(); scr.size = Vector3(0.075, 0.004, 0.028)
+	part.call(scr, mk.call(Color(0.02, 0.06, 0.02), 0.2, 0.0, 0.6), Vector3(0, 0.054, -0.022))
+	for k in 9:
+		var kb := BoxMesh.new(); kb.size = Vector3(0.016, 0.006, 0.011)
+		part.call(kb, mk.call(Color(0.62, 0.64, 0.62), 0.5, 0.3), Vector3(-0.022 + (k % 3) * 0.022, 0.054, 0.006 + (k / 3) * 0.014))
+	for w in [[Color(0.9, 0.1, 0.08), -0.04], [Color(0.1, 0.35, 0.95), 0.04], [Color(0.95, 0.8, 0.1), 0.0]]:
+		var wm := CylinderMesh.new(); wm.top_radius = 0.003; wm.bottom_radius = 0.003; wm.height = 0.11
+		part.call(wm, mk.call(w[0], 0.5), Vector3(w[1], 0.045, 0.05), Vector3(PI / 2 - 0.3, 0, 0))
+	_c4_led = mk.call(Color(1, 0.12, 0.05), 0.3, 0.0, 3.0)
+	var led := SphereMesh.new(); led.radius = 0.007; led.height = 0.014
+	part.call(led, _c4_led, Vector3(0.048, 0.056, -0.03))
+	_c4_screen = Label3D.new()
+	_c4_screen.font = UI.font("RussoOne-Regular")
+	_c4_screen.font_size = 40
+	_c4_screen.pixel_size = 0.00045
+	_c4_screen.modulate = Color(0.45, 1.0, 0.45)
+	_c4_screen.outline_size = 0
+	_c4_screen.shaded = false
+	_c4_screen.position = Vector3(0, 0.0565, -0.022)
+	_c4_screen.rotation = Vector3(-PI / 2, 0, 0)
+	vm_c4.add_child(_c4_screen)
+	vm_c4.visible = false
+
+func _c4_view(delta: float, sabn) -> void:
+	if busy_k <= 0.001:
+		if vm_c4: vm_c4.visible = false
+		return
+	if vm_c4 == null:
+		_c4_build()
+	vm_c4.visible = true
+	var k := busy_k * busy_k * (3.0 - 2.0 * busy_k)
+	var t := Time.get_ticks_msec() / 1000.0
+	var planting: bool = sabn != null and sabn.prog_kind == "plant"
+	var frac: float = 0.0
+	if sabn:
+		frac = clampf(sabn.progress / (sabn.PLANT_T if planting else sabn.DEFUSE_T), 0.0, 1.0)
+	# held low in front of you, tilted so the keypad faces the camera; small "typing" taps
+	var tap := absf(sin(t * 11.0)) * 0.004 if planting else 0.0
+	vm_c4.position = Vector3(0.03, -0.25 - tap, -0.62).lerp(Vector3(0.08, -0.6, -0.5), 1.0 - k)
+	vm_c4.rotation = Vector3(0.8, -0.18 + sin(t * 1.3) * 0.02, 0.05)
+	vm_c4.scale = Vector3.ONE * 0.85
+	var code := "1923145"
+	if planting:
+		var n := int(frac * 7.0)
+		var txt := ""
+		for i in 7:
+			txt += code[i] if i < n else "*"
+		_c4_screen.text = txt
+		_c4_screen.modulate = Color(0.45, 1.0, 0.45)
+	else:
+		_c4_screen.text = "%d%%" % int(frac * 100.0)
+		_c4_screen.modulate = Color(0.45, 0.8, 1.0)
+	_c4_led.emission_energy_multiplier = 4.0 if fmod(t, 0.5) < 0.25 else 0.4
+
 func attach_vm_rect(parent: Control) -> void:
 	vm_rect = TextureRect.new()
 	vm_rect.texture = vm_vp.get_texture()
@@ -1289,14 +1372,17 @@ func _update_viewmodel(delta: float) -> void:
 		ca.dof_blur_far_enabled = ca.dof_blur_amount > 0.002
 		ca.dof_blur_far_distance = 4.0
 		ca.dof_blur_far_transition = 6.0
-	# sabotage: weapon lowered while planting / defusing (hands busy with the charge)
+	# sabotage: the gun is lowered out of view and the C4 comes up in your hands while planting / defusing
 	var busy := 0.0
-	if match_node and "sab" in match_node and match_node.sab and match_node.sab.prog_who == self:
+	var sabn = match_node.sab if match_node and "sab" in match_node else null
+	if sabn and sabn.prog_kind != "" and sabn.prog_who == self:
 		busy = 1.0
-	busy_k = move_toward(busy_k, busy, delta * 4.0)
+	busy_k = move_toward(busy_k, busy, delta * 5.0)
 	if busy_k > 0.0:
-		pos += Vector3(0.05, -0.32, 0.12) * busy_k
-		rot += Vector3(0.9, 0.2, 0.3) * busy_k
+		var bk := busy_k * busy_k * (3.0 - 2.0 * busy_k)
+		pos += Vector3(0.02, -0.42, 0.06) * bk
+		rot += Vector3(-0.35, 0.0, 0.18) * bk
+	_c4_view(delta, sabn)
 	if inspect_t <= 0 and insp_mag:
 		insp_mag = false
 		if reload_t <= 0 and vm_parts.has("mag") and is_instance_valid(vm_parts["mag"]) and (vm_parts["mag"] as Node3D).has_meta("rest"):
