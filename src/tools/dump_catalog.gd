@@ -22,7 +22,7 @@ static func run() -> void:
 	var cr := {}
 	for id in g.CRATES.keys():
 		var c: Dictionary = g.CRATES[id]
-		cr[id] = {"price": int(c["price"]), "skins": c.get("skins", []), "weapons": c.get("weapons", []), "chars": c.get("chars", []), "parts": c.get("parts", [])}
+		cr[id] = {"price": int(c["price"]), "skins": c.get("skins", []), "weapons": c.get("weapons", []), "chars": c.get("chars", []), "parts": c.get("parts", []), "wchance": float(c.get("wchance", 0.0))}
 	var ch := {}
 	for id in g.CHARACTERS.keys():
 		ch[id] = {"price": int(g.CHARACTERS[id]["price"])}

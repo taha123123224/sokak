@@ -2242,7 +2242,7 @@ def map_canakkale():
     for i, (x, y, yaw) in enumerate(spawns_a + spawns_b):
         spawn(x, y, 0.1, yaw, 'a' if i < 6 else 'b')
     bounds_walls(X0, Y0, X1, Y1, 22)
-    finalize('canakkale', dict(preset='sunset', sun=[-24, 280], fog=0.008, sky='sunset', water=True), [X0, Y0, X1, Y1])
+    finalize('canakkale', dict(preset='golden', sun=[-40, 250], fog=0.008, sky='sunset', water=True), [X0, Y0, X1, Y1])
 
 
 ALL = dict(mahalle=map_mahalle, safranbolu=map_safranbolu, gemi=map_gemi, liman=map_liman, insaat=map_insaat, canakkale=map_canakkale)

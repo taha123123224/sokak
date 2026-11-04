@@ -12,7 +12,7 @@ var DEFS := {
 	"paver": ["paver", 0.5, Color(0.86, 0.85, 0.84), -1, 0, {}],
 	"asphalt": ["asphalt", 0.22, Color(1.3, 1.3, 1.32), 0.95, 0, {}],
 	"curb": ["concrete", 0.8, Color(1.1, 1.1, 1.08), -1, 0, {}],
-	"concrete": ["concrete", 0.3, Color(1, 1, 1), -1, 0, {}],
+	"concrete": ["rawconc", 0.3, Color(1.0, 0.99, 0.97), -1, 0, {}],
 	"plaster_white": ["plaster", 0.35, Color(0.86, 0.84, 0.79), -1, 0, {}],
 	"plaster_cream": ["plaster", 0.35, Color(0.86, 0.80, 0.67), -1, 0, {}],
 	"plaster_ochre": ["plaster", 0.35, Color(0.78, 0.63, 0.45), -1, 0, {}],
@@ -54,11 +54,11 @@ var DEFS := {
 	"stonewall": ["stonewall", 0.62, Color(1.05, 1.02, 0.97), -1, 0, {}],
 	"grass": ["grass", 0.25, Color(1, 1, 1), -1, 0, {}],
 	# İnşaat / Çanakkale
-	"site_dirt": ["concrete", 0.22, Color(0.6, 0.53, 0.44), 0.97, 0, {}],
-	"gravel": ["cobble", 1.6, Color(0.72, 0.7, 0.66), 0.95, 0, {}],
-	"sand": ["concrete", 0.6, Color(0.95, 0.82, 0.6), 0.98, 0, {}],
+	"site_dirt": ["dryground", 0.22, Color(0.92, 0.9, 0.9), 0.97, 0, {}],
+	"gravel": ["gravel2", 0.45, Color(0.92, 0.9, 0.87), 0.95, 0, {}],
+	"sand": ["dirt", 0.35, Color(1.22, 1.08, 0.86), 0.98, 0, {}],
 	"rebar_rust": ["paintmetal", 2.0, Color(0.5, 0.28, 0.16), 0.75, 0.6, {}],
-	"crane_yellow": ["paintmetal", 0.8, Color(1.0, 0.72, 0.08), 0.5, 0.3, {}],
+	"crane_yellow": ["paintmetal", 0.8, Color(0.82, 0.6, 0.12), 0.55, 0.3, {}],
 	"scaffold_net": ["", 1.0, Color(0.08, 0.26, 0.16, 0.8), 0.9, 0, {"cull": false}],
 	"fence_mesh": ["corrugated", 2.0, Color(0.7, 0.72, 0.74), 0.4, 0.8, {}],
 	"fence_banner": ["", 1.0, Color(0.08, 0.3, 0.55), 0.75, 0, {"cull": false}],
@@ -69,17 +69,17 @@ var DEFS := {
 	"cone_white": ["", 1.0, Color(0.95, 0.95, 0.95), 0.4, 0, {}],
 	"stripe_red": ["", 1.0, Color(0.8, 0.08, 0.06), 0.5, 0, {}],
 	"cable_black": ["", 1.0, Color(0.04, 0.04, 0.04), 0.6, 0, {}],
-	"dry_grass": ["grass", 0.3, Color(0.92, 0.88, 0.58), 0.95, 0, {}],
-	"path_dirt": ["concrete", 0.25, Color(0.72, 0.58, 0.42), 0.97, 0, {}],
-	"cliff_rock": ["stonewall", 0.35, Color(0.85, 0.8, 0.7), 0.9, 0, {}],
+	"dry_grass": ["grass", 0.26, Color(0.95, 0.9, 0.72), 0.95, 0, {}],
+	"path_dirt": ["dirt", 0.3, Color(1.0, 0.95, 0.88), 0.97, 0, {}],
+	"cliff_rock": ["stonewall", 0.3, Color(0.78, 0.72, 0.64), 0.9, 0, {}],
 	"far_hills": ["grass", 0.02, Color(0.6, 0.65, 0.48), 0.95, 0, {}],
-	"fort_stone": ["stonewall", 1.3, Color(0.98, 0.93, 0.82), -1, 0, {}],
-	"earth": ["concrete", 0.5, Color(0.5, 0.43, 0.34), 0.98, 0, {}],
+	"fort_stone": ["stonewall", 1.1, Color(0.88, 0.83, 0.74), -1, 0, {}],
+	"earth": ["dirt", 0.4, Color(0.82, 0.76, 0.7), 0.98, 0, {}],
 	"cannon_iron": ["paintmetal", 1.5, Color(0.16, 0.16, 0.17), 0.45, 0.85, {}],
 	"canvas": ["cloth_cotton", 0.8, Color(0.75, 0.7, 0.55), 0.9, 0, {"cull": false}],
 	"rock": ["stonewall", 0.8, Color(0.8, 0.76, 0.7), 0.9, 0, {}],
-	"dirt": ["concrete", 0.3, Color(0.6, 0.5, 0.38), 0.95, 0, {}],
-	"marble": ["concrete", 0.3, Color(1.25, 1.22, 1.18), 0.35, 0, {}],
+	"dirt": ["dirt", 0.3, Color(0.95, 0.92, 0.88), 0.95, 0, {}],
+	"marble": ["concrete", 0.3, Color(1.0, 0.98, 0.95), 0.35, 0, {}],
 	"glass_window": ["", 1.0, Color(0.1, 0.13, 0.16), 0.04, 0.3, {"spec": 0.9}],
 	"window_lit": ["", 1.0, Color(0.9, 0.75, 0.45), 0.3, 0, {"emit": Color(1.0, 0.78, 0.5), "emit_e": 1.2}],
 	"window_frame": ["", 1.0, Color(0.86, 0.86, 0.84), 0.55, 0, {}],
@@ -296,6 +296,8 @@ func _tone(name: String, m: Material) -> void:
 			(m as StandardMaterial3D).albedo_color = Color(lerp(c.r, l, 0.3), lerp(c.g, l, 0.3), lerp(c.b, l, 0.3), c.a) * 0.94
 			return
 
+const MACRO_SETS := ["concrete", "rawconc", "dryground", "dirt", "grass", "gravel2", "asphalt", "cobble", "paver", "plaster", "stonewall", "brick", "ashlar", "rooftiles"]
+
 func build(d: Array) -> StandardMaterial3D:
 	var s := StandardMaterial3D.new()
 	var tset: String = d[0]
@@ -331,6 +333,18 @@ func build(d: Array) -> StandardMaterial3D:
 				s.metallic_texture = orm
 				s.metallic_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_BLUE
 		s.uv1_scale = Vector3(uv, uv, uv)
+		# large-scale colour variation (world space) so big surfaces don't look tiled and flat
+		if tset in MACRO_SETS and str(GS.settings.get("quality", "high")) != "low":
+			var mt := tex("macro_noise.png")
+			if mt:
+				s.detail_enabled = true
+				s.detail_albedo = mt
+				s.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MUL
+				s.detail_uv_layer = BaseMaterial3D.DETAIL_UV_2
+				s.uv2_triplanar = true
+				s.uv2_world_triplanar = true
+				s.uv2_scale = Vector3(0.045, 0.045, 0.045)
+				tint = Color(tint.r * 1.1, tint.g * 1.1, tint.b * 1.1, tint.a)
 	s.albedo_color = tint
 	if extra.has("tex"):
 		s.albedo_texture = tex(extra["tex"])

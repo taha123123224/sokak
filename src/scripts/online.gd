@@ -273,7 +273,11 @@ func act(a: String, args: Dictionary) -> Dictionary:
 	return {"ok": false, "err": r["err"] if r["err"] != "" else "Sunucu hatası", "profile": null, "res": {}}
 
 ## yönetici işlemleri: yetki sunucuda (sokak_admin) kontrol edilir
+var admin_mock := {}   # test only: action -> fake result
+
 func admin(a: String, args: Dictionary = {}) -> Dictionary:
+	if admin_mock.has(a):
+		return {"ok": true, "err": "", "res": admin_mock[a]}
 	if not is_logged_in():
 		return {"ok": false, "err": "Giriş yapılmadı", "res": {}}
 	var r := await _req(HTTPClient.METHOD_POST, "/rest/v1/rpc/sokak_admin", {"a": a, "args": args})

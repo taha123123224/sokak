@@ -91,6 +91,24 @@ func _build() -> void:
 				h.add_child(UI.btn(q[1], func(): GS.apply_preset(q[0]); _build(), 20, GS.settings["quality"] == q[0], 170, 48))
 			body.add_child(h)
 			body.add_child(UI.lbl("Ultra HD: 4x MSAA + TAA, 8K gölge haritası, SDFGI global aydınlatma ve uzak çizim mesafesi. Güçlü ekran kartı gerektirir.", 17, UI.DIM, "Rajdhani-Medium"))
+			_section("GRAFİK SÜRÜCÜSÜ  (görüntü bozuksa / 3D görünmüyorsa değiştir)")
+			var Gfx = preload("res://scripts/gfx.gd")
+			var gh := UI.hbox(8)
+			body.add_child(gh)
+			var gm: String = Gfx.mode()
+			for md in Gfx.MODES:
+				if md == "d3d12" and OS.get_name() != "Windows":
+					continue
+				var mdk: String = md
+				gh.add_child(UI.btn(str(Gfx.NAMES[md]), func():
+					Gfx.write(mdk)
+					_gfx_restart_dialog(), 16, gm == md, 0, 44))
+			body.add_child(UI.lbl("Şu an: %s  •  Ekran kartı: %s" % [Gfx.driver().to_upper(), RenderingServer.get_video_adapter_name()], 16, UI.ACCENT2, "Rajdhani-Bold"))
+			body.add_child(UI.lbl("Haritalar/silahlar görünmüyor, ekranda çizgiler varsa: önce DirectX 12, olmazsa Uyumluluk modunu seç. Oyun yeniden başlar.", 15, UI.DIM, "Rajdhani-SemiBold"))
+			_section("PERFORMANS")
+			_check("dyn_res", "Dinamik çözünürlük (FPS düşünce 3D görüntüyü otomatik ölçekler)", "Zayıf bilgisayarlarda akıcılık sağlar")
+			_options("dyn_target", "Hedef FPS", [[60, "60"], [90, "90"], [120, "120"], [144, "144"]])
+			body.add_child(UI.lbl("Ekran kartın: %s   •   Önerilen ayar: %s" % [RenderingServer.get_video_adapter_name(), str(GS.detect_tier()).to_upper()], 15, UI.DIM, "Rajdhani-SemiBold"))
 			_section("EKRAN")
 			_check("fullscreen", "Tam Ekran")
 			_check("vsync", "Dikey Senkronizasyon (V-Sync)", "Yırtılmayı önler, gecikme ekler")
@@ -175,6 +193,41 @@ func _build() -> void:
 			_section("SESLİ SOHBET")
 			_check("voice_on", "Sesli sohbet açık (V tuşuna basılı tut: konuş)")
 			_slide("vol_voice", "Diğer oyuncuların sesi", 0, 1.5, 0.01, "%.2f")
+			var devs := AudioServer.get_input_device_list()
+			var mo := OptionButton.new()
+			mo.custom_minimum_size = Vector2(380, 40)
+			var cur_dev := AudioServer.input_device
+			for d in devs:
+				mo.add_item("Varsayılan mikrofon" if d == "Default" else d)
+				mo.set_item_metadata(mo.item_count - 1, d)
+				if d == cur_dev:
+					mo.select(mo.item_count - 1)
+			mo.item_selected.connect(func(i):
+				AudioServer.input_device = str(mo.get_item_metadata(i))
+				GS.settings["mic_device"] = str(mo.get_item_metadata(i)); GS.save_settings())
+			_row("Mikrofon", mo, "Konuşurken kullanılacak mikrofon")
+			var th := UI.hbox(12)
+			body.add_child(th)
+			var meter := ProgressBar.new()
+			meter.show_percentage = false
+			meter.max_value = 1.0
+			meter.custom_minimum_size = Vector2(360, 18)
+			meter.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			var tb := UI.btn("◉ MİKROFONU TEST ET", Callable(), 18, false, 280, 42)
+			tb.toggle_mode = true
+			tb.toggled.connect(func(on):
+				if not Voice.mic_test(on):
+					tb.button_pressed = false
+					tb.text = "✖ MİKROFON AÇILAMADI"
+					return
+				tb.text = "■ TESTİ DURDUR (konuş, çubuk dolmalı)" if on else "◉ MİKROFONU TEST ET")
+			th.add_child(tb)
+			th.add_child(meter)
+			var tmr := Timer.new(); tmr.wait_time = 0.05; tmr.autostart = true
+			tmr.timeout.connect(func(): meter.value = clampf(Voice.level * 3.0, 0.0, 1.0))
+			th.add_child(tmr)
+			th.tree_exiting.connect(func(): Voice.mic_test(false))
+			body.add_child(UI.lbl("Nasıl kullanılır: çevrimiçi bir odada maça gir, V tuşuna BASILI TUT ve konuş; bırakınca susar.\nYazılı sohbet: Enter (veya T) herkese, Y sadece takımına. Ekranda kimin konuştuğu görünür.", 16, UI.DIM, "Rajdhani-SemiBold"))
 			body.add_child(UI.btn("TEST: SİLAH SESİ", func(): GS.apply_settings(); SFX.play("shot_ak"), 18, false, 260, 42))
 		"oyun":
 			_section("ARAYÜZ")
@@ -273,3 +326,21 @@ class PreviewBox extends Control:
 		if s["xh_dot"] or style == 1 or style == 4:
 			if s["xh_outline"]: draw_circle(c, th + 1.2, oc)
 			draw_circle(c, th, col)
+
+
+func _gfx_restart_dialog() -> void:
+	var w := PanelContainer.new()
+	w.add_theme_stylebox_override("panel", UI.sb(Color(0.03, 0.035, 0.05, 0.98), UI.ACCENT, 2, 10, 22))
+	w.set_anchors_preset(Control.PRESET_CENTER)
+	w.custom_minimum_size = Vector2(560, 0)
+	w.position = Vector2(-280, -90)
+	w.z_index = 50
+	var v := UI.vbox(12)
+	w.add_child(v)
+	v.add_child(UI.lbl("Grafik sürücüsü değişti", 26, UI.ACCENT2, "RussoOne-Regular"))
+	v.add_child(UI.lbl("Değişiklik oyun yeniden başlayınca geçerli olur.", 18, UI.TEXT, "Rajdhani-Bold"))
+	var h := UI.hbox(10)
+	v.add_child(h)
+	h.add_child(UI.btn("ŞİMDİ YENİDEN BAŞLAT", func(): preload("res://scripts/gfx.gd").restart(), 18, true, 280, 48))
+	h.add_child(UI.btn("SONRA", func(): w.queue_free(); _build(), 18, false, 140, 48))
+	get_tree().root.add_child(w)

@@ -69,6 +69,9 @@ var market_tab := "silah"
 var room_cfg := {}
 var room_chat: VBoxContainer
 var room_players: Array = []
+var local_room := false      # inside a bot room (kept while visiting other pages)
+var _room_key := ""
+var _room_log: Array = []
 var room_countdown := -1.0
 
 var online
@@ -764,6 +767,12 @@ class TopGlow extends Control:
 			draw_rect(Rect2(w * t0, 2, w / n + 1, 2), Color(UI.ACCENT.r, UI.ACCENT.g, UI.ACCENT.b, 0.12 * a))
 
 func show_page(p: String) -> void:
+	# while you are in a room, ODALAR takes you back into it (you only leave with the ÇIKIŞ button)
+	if p == "rooms":
+		if Net.active():
+			p = "netroom"
+		elif local_room and not room_cfg.is_empty():
+			p = "room"
 	page = p
 	room_countdown = -1
 	room_chat = null
@@ -808,6 +817,31 @@ func show_page(p: String) -> void:
 		"profile": _page_profile()
 		"settings": _page_settings()
 	_refresh_currency()
+	if p != "room" and p != "netroom" and (Net.active() or (local_room and not room_cfg.is_empty())):
+		_room_return_bar()
+
+## floating "you are still in a room" bar on every other page
+func _room_return_bar() -> void:
+	var online_r := Net.active()
+	var bar := PanelContainer.new()
+	bar.add_theme_stylebox_override("panel", UI.sb(Color(0.05, 0.06, 0.08, 0.95), UI.ACCENT, 2, 10, 10))
+	bar.anchor_left = 0.5; bar.anchor_right = 0.5; bar.anchor_top = 0; bar.anchor_bottom = 0
+	bar.offset_left = -300; bar.offset_right = 300; bar.offset_top = 8; bar.offset_bottom = 66
+	content.add_child(bar)
+	var h := UI.hbox(12)
+	bar.add_child(h)
+	var dot := UI.lbl("●", 22, UI.GREEN, "Rajdhani-Bold")
+	h.add_child(dot)
+	var tw := dot.create_tween().set_loops()
+	tw.tween_property(dot, "modulate:a", 0.25, 0.6)
+	tw.tween_property(dot, "modulate:a", 1.0, 0.6)
+	var v := UI.vbox(-4)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(v)
+	var nm := str(online.room_cfg.get("name", "Oda")) if online_r else str(room_cfg.get("name", "Oda"))
+	v.add_child(UI.lbl("ODADASIN: " + nm, 19, Color.WHITE, "Rajdhani-Bold"))
+	v.add_child(UI.lbl(("Kod %s  •  %d oyuncu" % [Net.code, Net.members.size()]) if online_r else "Bot odası  •  %s" % str(GS.MAPS.get(room_cfg.get("map", ""), {}).get("name", "")), 14, UI.DIM, "Rajdhani-SemiBold"))
+	h.add_child(UI.btn("ODAYA DÖN", func(): show_page("netroom" if Net.active() else "room"), 18, true, 160, 44))
 
 func _margin(c: Control, l: int, t: int, r: int, b: int) -> void:
 	c.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2756,20 +2790,30 @@ func _page_room() -> void:
 	set_showcase(GS.active_set().get("ana", "ak47"))
 	var cfg := room_cfg
 	var teams: bool = GS.MODES[cfg["mode"]]["teams"]
-	room_players.clear()
-	room_players.append({"name": str(GS.profile["name"]), "lvl": int(GS.profile["level"]), "team": cfg.get("team", "a") if teams else "", "you": true, "ready": true, "host": true, "rp": int(GS.profile.get("rp", 0))})
-	var names := GS.BOT_NAMES.duplicate()
-	names.shuffle()
-	for i in int(cfg["bots"]):
-		var t := ""
-		if teams:
-			t = "b" if i % 2 == 0 else "a"
-		room_players.append({"name": names[i % names.size()], "lvl": randi_range(5, 80), "team": t, "you": false, "ready": randf() < 0.8, "rp": randi_range(0, 3200)})
+	local_room = true
+	var key := "%s|%s|%s|%d|%s" % [str(cfg.get("no", "")), str(cfg["map"]), str(cfg["mode"]), int(cfg["bots"]), str(cfg.get("name", ""))]
+	if key != _room_key or room_players.is_empty():
+		# new room: roll the bot line-up once; coming back to the same room keeps it
+		_room_key = key
+		_room_log.clear()
+		room_players.clear()
+		room_players.append({"name": str(GS.profile["name"]), "lvl": int(GS.profile["level"]), "team": "", "you": true, "ready": true, "host": true, "rp": int(GS.profile.get("rp", 0))})
+		var names := GS.BOT_NAMES.duplicate()
+		names.shuffle()
+		for i in int(cfg["bots"]):
+			room_players.append({"name": names[i % names.size()], "lvl": randi_range(5, 80), "team": "", "you": false, "ready": randf() < 0.8, "rp": randi_range(0, 3200), "bi": i})
+	for rp_ in room_players:
+		if rp_["you"]:
+			rp_["team"] = cfg.get("team", "a") if teams else ""
+		elif teams:
+			rp_["team"] = "b" if int(rp_.get("bi", 0)) % 2 == 0 else "a"
+		else:
+			rp_["team"] = ""
 	var lay := room_layout({"title": str(cfg["name"]), "no": cfg["no"], "map": cfg["map"], "mode": cfg["mode"], "time": cfg["time"], "target": cfg["target"],
 		"teams": teams, "players": room_players,
 		"info_extra": [["Zorluk", ["Kolay", "Normal", "Zor"][int(cfg["diff"])]], ["Oyuncu", "%d / 16" % room_players.size()]],
 		"on_settings": func(): _room_dialog(cfg),
-		"on_leave": func(): show_page("rooms"),
+		"on_leave": func(): local_room = false; _room_key = ""; show_page("rooms"),
 		"on_chat": func(t): _chat(str(GS.profile["name"]), t, Color.WHITE); _bot_reply(),
 		"host_box": func(box):
 			box.add_child(UI.lbl("ODA AYARLARI", 16, UI.DIM, "Rajdhani-Bold"))
@@ -2786,14 +2830,23 @@ func _page_room() -> void:
 			room_countdown = 5.99,
 		"start_text": "BAŞLAT"})
 	room_chat = lay["chat"]
-	_chat("SİSTEM", "Odaya hoş geldin! Hazır olduğunda BAŞLAT'a bas.", Color("ffd24a"))
-	if teams:
-		_chat("SİSTEM", "Takım dengesi oyuncu sayısına göre yapıldı.", Color("ffd24a"))
-	get_tree().create_timer(1.2).timeout.connect(func(): _bot_reply())
+	if _room_log.is_empty():
+		_chat("SİSTEM", "Odaya hoş geldin! Hazır olduğunda BAŞLAT'a bas.", Color("ffd24a"))
+		if teams:
+			_chat("SİSTEM", "Takım dengesi oyuncu sayısına göre yapıldı.", Color("ffd24a"))
+		get_tree().create_timer(1.2).timeout.connect(func(): _bot_reply())
+	else:
+		for ln in _room_log:
+			_chat(ln[0], ln[1], ln[2], false)
 
-func _chat(who: String, t: String, c: Color) -> void:
+func _chat(who: String, t: String, c: Color, log_it: bool = true) -> void:
+	if log_it:
+		_room_log.append([who, t, c])
+		if _room_log.size() > 40:
+			_room_log.pop_front()
 	if room_chat == null or not is_instance_valid(room_chat):
 		return
+	t = t.replace("[", "(")
 	var l := RichTextLabel.new()
 	l.bbcode_enabled = true
 	l.fit_content = true
@@ -2998,6 +3051,27 @@ func _page_mods() -> void:
 # ---------------------------------------------------------------- screenshot test hooks
 func test_hook(i: int) -> void:
 	match i:
+		34:
+			room_cfg = {"name": "Kapışma Odası", "map": "canakkale", "mode": "tdm", "bots": 9, "diff": 1, "time": 8, "target": 6, "team": "a", "no": 110}
+			show_page("room")
+			show_page("bag")
+		32, 33:
+			Online.is_admin = true
+			Online.username = "sokakoperasyon"
+			var now := Time.get_datetime_string_from_system(true)
+			var users := []
+			for k in [["sokakoperasyon", 1240, true, "", true], ["KurtReis", 820, true, "match", false], ["Mehmetcik_06", 410, false, "", false], ["hileci99", 60, false, "", false], ["ZulaKing", 2210, true, "", false]]:
+				users.append({"id": k[0], "username": k[0], "level": 12, "status": k[3], "last_seen": now if k[2] else "2026-11-01T10:00:00",
+					"created_at": "2026-10-20T10:00:00", "banned_until": "infinity" if k[0] == "hileci99" else null, "ban_reason": "hile" if k[0] == "hileci99" else null,
+					"gold": 15400, "rp": k[1], "kills": 512, "deaths": 300, "wins": 40, "weapons": 9, "admin": k[4]})
+			Online.admin_mock = {"stats": {"online": 37, "in_match": 22, "rooms": 5, "active_day": 140, "total": 612, "today": 18, "week": 96, "banned": 3, "gold_total": 9114321,
+				"top": [{"username": "ZulaKing", "rp": 2210, "level": 40}, {"username": "sokakoperasyon", "rp": 1240, "level": 30}, {"username": "KurtReis", "rp": 820, "level": 22}]},
+				"users": users, "anns": [{"id": 2, "text": "Bu akşam 21:00'de 2x altın etkinliği!", "created_at": now}],
+				"log": [{"id": 1, "action": "ban", "admin": "sokakoperasyon", "target": "hileci99", "info": {"reason": "hile", "hours": 0}, "at": now},
+					{"id": 2, "action": "gift", "admin": "sokakoperasyon", "target": "all", "info": {"gift": {"gold": 1000, "crates": 2}}, "at": now}]}
+			if i == 33:
+				adminp.tab = "oyuncu"; adminp._sel = users[1]
+			show_page("admin")
 		30:
 			room_cfg = {"name": "Kapışma Odası", "map": "canakkale", "mode": "sabotaj", "bots": 9, "diff": 1, "time": 8, "target": 6, "team": "a", "no": 110}
 			show_page("room")

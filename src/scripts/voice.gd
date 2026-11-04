@@ -16,6 +16,8 @@ var _acc := PackedFloat32Array()
 var _t := 0.0
 var _players := {}                  # sender id -> {"p": AudioStreamPlayer, "pb": playback, "t": last packet time}
 var speaking := {}                  # sender id -> seconds left of "speaking" indicator
+var level := 0.0                    # current mic peak (for the HUD meter / settings test)
+var testing := false                # settings: mic test (no sending)
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -53,18 +55,45 @@ func set_talking(on: bool) -> void:
 	elif _mic:
 		_mic.stop()
 
+## settings page: listen to the mic without sending anything
+func mic_test(on: bool) -> bool:
+	if on:
+		if not _ensure_mic():
+			return false
+		testing = true
+		_capture.clear_buffer()
+		_mic.play()
+	else:
+		testing = false
+		if _mic and not talking:
+			_mic.stop()
+	return true
+
 func _process(delta: float) -> void:
 	for k in speaking.keys():
 		speaking[k] = float(speaking[k]) - delta
 		if speaking[k] <= 0:
 			speaking.erase(k)
-	if not talking or _capture == null:
+	if (not talking and not testing) or _capture == null:
+		level = lerpf(level, 0.0, minf(1.0, delta * 8.0))
+		return
+	if testing and not talking:
+		var nf := _capture.get_frames_available()
+		if nf > 0:
+			var pk := 0.0
+			for f in _capture.get_buffer(nf):
+				pk = maxf(pk, absf(f.x))
+			level = lerpf(level, pk, 0.5)
 		return
 	var mix := AudioServer.get_mix_rate()
 	var step := mix / RATE
 	var n := _capture.get_frames_available()
 	if n > 0:
 		var fr := _capture.get_buffer(n)
+		var pk2 := 0.0
+		for f in fr:
+			pk2 = maxf(pk2, absf(f.x))
+		level = lerpf(level, pk2, 0.5)
 		var i := 0.0
 		while i < fr.size():
 			var v := fr[int(i)]

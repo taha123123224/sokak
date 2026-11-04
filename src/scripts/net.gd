@@ -38,6 +38,8 @@ func join(room_code: String, pid: String, pname: String) -> bool:
 	ws.inbound_buffer_size = 1 << 20
 	ws.outbound_buffer_size = 1 << 20
 	var u := base.replace("https://", "wss://").replace("http://", "ws://") + "/room/%s?id=%s&name=%s" % [code, pid.uri_encode(), pname.uri_encode()]
+	# the relay checks this login token with the server: id and name can't be faked
+	ws.handshake_headers = PackedStringArray(["Authorization: Bearer " + Online.token])
 	var e := ws.connect_to_url(u)
 	if e != OK:
 		ws = null

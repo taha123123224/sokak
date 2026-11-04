@@ -17,6 +17,14 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		var kv := a.trim_prefix("--").split("=")
 		args[kv[0]] = kv[1] if kv.size() > 1 else "1"
+	var testrun := args.has("shot") or args.has("econtest") or args.has("match") or args.has("simstat") or args.has("netsim") or args.has("nettest") or args.has("dumpcatalog")
+	if not testrun or args.has("gfxtest"):
+		# make sure 3D really draws on this PC (switches to DirectX 12 / OpenGL and restarts if not)
+		if await preload("res://scripts/gfx.gd").startup(self):
+			return
+		if args.has("gfxtest"):
+			get_tree().quit()
+			return
 	if args.has("econtest"):
 		for a in [["match_start", {}], ["buy_weapon", {"id": "m4a1"}], ["buy_skin", {"wid": "ak47", "skin": "kar"}], ["open_crate", {"id": "sokak"}], ["upgrade", {"wid": "ak47"}], ["sync", {"active_set": 3}]]:
 			var r: Dictionary = await GS.act(a[0], a[1])
@@ -43,6 +51,8 @@ func _test(args: Dictionary) -> void:
 		GS.set_meta("nofog", true)
 	if args.has("quality"):
 		GS.apply_preset(args["quality"])
+	if true:
+		GS.settings["dyn_res"] = false
 	GS.apply_settings()
 	DisplayServer.window_set_size(Vector2i(int(args.get("w", "1600")), int(args.get("h", "900"))))
 	if args.has("nettest"):

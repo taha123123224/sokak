@@ -13,7 +13,9 @@ func _init(menu) -> void:
 	_c(Net.member_joined, func(_i, n): _sys("%s odaya katıldı." % n); _refresh_room())
 	_c(Net.member_left, func(_i): _refresh_room())
 	_c(Net.host_changed, func(_h): _refresh_room())
-	_c(Net.disconnected_room, func(why): if m.page == "netroom": m._toast(why, UI.RED); m.show_page("rooms"))
+	_c(Net.disconnected_room, func(why):
+		m._toast(why, UI.RED)
+		if m.page == "netroom" or m.page == "rooms": m.show_page("rooms"))
 	_c(Net.connected_room, func(_c2): Net.send({"t": "hello_room"}); _refresh_room())
 
 func _c(sig: Signal, cb: Callable) -> void:
@@ -636,7 +638,7 @@ func _chat_line(who: String, t: String, c: Color) -> void:
 	l.fit_content = true
 	l.custom_minimum_size = Vector2(400, 0)
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	l.text = "[color=#%s][b]%s:[/b][/color] %s" % [c.to_html(false), who, t]
+	l.text = "[color=#%s][b]%s:[/b][/color] %s" % [c.to_html(false), who.replace("[", "("), t.replace("[", "(")]
 	room_chat.add_child(l)
 
 func _sys(t: String) -> void:
@@ -653,7 +655,7 @@ func _publish() -> void:
 
 func tick(delta: float) -> void:
 	_pub_t -= delta
-	if _pub_t <= 0 and Net.active() and Net.is_host() and m.page == "netroom":
+	if _pub_t <= 0 and Net.active() and Net.is_host():
 		_pub_t = 30.0
 		_publish()
 
@@ -691,7 +693,10 @@ func _on_net(d: Dictionary) -> void:
 				room_cfg = d["cfg"]
 				_refresh_room()
 		"start":
-			if m.page == "netroom" and d.get("cfg") is Dictionary:
+			# the host started: join even if you were looking at the bag / market
+			if d.get("cfg") is Dictionary and str(d.get("from", "")) == Net.host_id:
+				if m.modal:
+					m._close_modal()
 				_launch(d["cfg"])
 		"hello_room":
 			if Net.is_host():

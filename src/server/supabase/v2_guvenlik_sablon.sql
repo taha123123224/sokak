@@ -172,7 +172,7 @@ begin
     p := _crate_add(p, t, 1);
 
   when 'buy_pack' then
-    i := coalesce((args->>'i')::int, -1);
+    i := coalesce(floor((args->>'i')::numeric)::int, -1);
     if i < 0 or i >= jsonb_array_length(cat->'packs') then raise exception 'Geçersiz paket'; end if;
     arr := cat->'packs'->i;
     p := _pay(p, _si(arr, '{3}'));
@@ -279,7 +279,7 @@ begin
     foreach m in array array['demir','krom','titanyum','kobalt'] loop
       p := jsonb_set(p, array['mats', m], to_jsonb(_si(p, array['mats', m]) - _si(cost, array[m])));
     end loop;
-    ch := (cat->'chances'->>lvl)::int;
+    ch := floor((cat->'chances'->>lvl)::numeric)::int;
     ok := (1 + floor(random() * 100)::int) <= ch;
     nl := case when ok then lvl + 1 when lvl >= 5 then lvl - 1 else lvl end;
     p := jsonb_set(p, array['owned', wid, 'lvl'], to_jsonb(nl));
@@ -304,13 +304,13 @@ begin
     t0 := coalesce((p->>'_t0')::float8, 0);
     p := p - '_t0';
     secs := case when t0 > 0 then least(greatest(nowt - t0, 0), 1800) else 0 end;
-    kills := least(greatest(coalesce((args->>'kills')::int, 0), 0), least(50, floor(secs / 6)::int));
-    head := least(greatest(coalesce((args->>'head')::int, 0), 0), kills);
-    deaths := least(greatest(coalesce((args->>'deaths')::int, 0), 0), 200);
+    kills := least(greatest(coalesce(floor((args->>'kills')::numeric)::int, 0), 0), least(50, floor(secs / 6)::int));
+    head := least(greatest(coalesce(floor((args->>'head')::numeric)::int, 0), 0), kills);
+    deaths := least(greatest(coalesce(floor((args->>'deaths')::numeric)::int, 0), 0), 200);
     won := coalesce((args->>'won')::boolean, false) and secs >= 60;
-    place := least(greatest(coalesce((args->>'place')::int, 10), 1), 20);
-    shots := least(greatest(coalesce((args->>'shots')::bigint, 0), 0), floor(secs * 15)::bigint);
-    hits := least(greatest(coalesce((args->>'hits')::bigint, 0), 0), shots);
+    place := least(greatest(coalesce(floor((args->>'place')::numeric)::int, 10), 1), 20);
+    shots := least(greatest(coalesce(floor((args->>'shots')::numeric)::bigint, 0), 0), floor(secs * 15)::bigint);
+    hits := least(greatest(coalesce(floor((args->>'hits')::numeric)::bigint, 0), 0), shots);
     is_full := secs >= 45;
     if is_full then
       xp := 200 + kills * 100 + head * 50 + (case when won then 600 else 0 end) + greatest(0, 4 - place) * 100;
@@ -329,7 +329,12 @@ begin
     if is_full then
       if won then i := 18 + least(kills, 20) / 2 + (case when head >= 5 then 3 else 0 end);
       else i := -(14 - least(kills, 12) / 2); end if;
-      if not coalesce((args->>'ranked')::boolean, false) then i := trunc(i / 2.0)::int; end if;
+      -- "ranked" is only believed when the player really is in an online room with other players
+      if not (coalesce((args->>'ranked')::boolean, false) and exists (
+          select 1 from profiles pr join rooms r on r.code = pr.room
+          where pr.id = uid and r.players >= 2 and r.updated_at > now() - interval '45 minutes')) then
+        i := trunc(i / 2.0)::int;
+      end if;
     end if;
     lvl := _si(p, '{rp}')::int;
     p := jsonb_set(p, '{rp}', to_jsonb(greatest(0, lvl + i)));
@@ -360,7 +365,7 @@ begin
     s := args;
     if jsonb_typeof(s->'sets') = 'array' then
       sets := '[]';
-      for i in 0 .. (cat->>'sets')::int - 1 loop
+      for i in 0 .. floor((cat->>'sets')::numeric)::int - 1 loop
         cur := coalesce(p->'sets'->i, p->'sets'->0, '{}');
         if jsonb_typeof(s->'sets'->i) = 'object' then
           foreach slot in array array['ana','tabanca','bicak','bomba'] loop
@@ -375,7 +380,7 @@ begin
       p := jsonb_set(p, '{sets}', sets);
     end if;
     if s ? 'active_set' then
-      p := jsonb_set(p, '{active_set}', to_jsonb(least(greatest(coalesce((s->>'active_set')::int, 0), 0), (cat->>'sets')::int - 1)));
+      p := jsonb_set(p, '{active_set}', to_jsonb(least(greatest(coalesce(floor((s->>'active_set')::numeric)::int, 0), 0), floor((cat->>'sets')::numeric)::int - 1)));
     end if;
     if s ? 'char' then
       id := s->>'char';
@@ -450,6 +455,13 @@ drop policy if exists "announcements readable" on public.sokak_announcements;
 create policy "announcements readable" on public.sokak_announcements for select to authenticated using (true);
 revoke insert, update, delete on public.sokak_announcements from anon, authenticated;
 
+-- every admin action is written here (only readable through sokak_admin('log'))
+create table if not exists public.sokak_admin_log (
+  id bigserial primary key, admin_id uuid, action text not null, target text, info jsonb,
+  at timestamptz not null default now());
+alter table public.sokak_admin_log enable row level security;
+revoke all on public.sokak_admin_log from anon, authenticated;
+
 create or replace function public._is_admin() returns boolean language sql stable security definer set search_path = public as $$
   select exists (select 1 from sokak_admins where user_id = auth.uid())
 $$;
@@ -468,7 +480,7 @@ begin
   if g ? 'crate_type' and _si(g, '{crate_n}') > 0 then p := _crate_add(p, g->>'crate_type', least(_si(g, '{crate_n}'), 1000)::int); end if;
   wid := g->>'weapon';
   if wid is not null and wid <> '' then
-    days := coalesce((g->>'days')::int, 0);
+    days := coalesce(floor((g->>'days')::numeric)::int, 0);
     if p->'owned' ? wid then
       if days = 0 then p := jsonb_set(p, array['owned', wid], (p->'owned'->wid) - 'exp');
       elsif coalesce((p->'owned'->wid->>'exp')::float8, 0) > 0 then
@@ -494,6 +506,10 @@ begin
   if a = 'whoami' then return jsonb_build_object('admin', _is_admin()); end if;
   if not _is_admin() then raise exception 'Yetkin yok'; end if;
   nowt := extract(epoch from clock_timestamp());
+  if a not in ('stats', 'users', 'anns', 'log', 'whoami') then
+    insert into sokak_admin_log (admin_id, action, target, info)
+      values (auth.uid(), a, coalesce(args->>'id', ''), args - 'id');
+  end if;
   case a
   when 'stats' then
     select jsonb_build_object(
@@ -502,15 +518,36 @@ begin
       'total', (select count(*) from profiles),
       'today', (select count(*) from profiles where created_at > now() - interval '1 day'),
       'banned', (select count(*) from profiles where banned_until > now()),
-      'rooms', (select count(*) from rooms where updated_at > now() - interval '2 minutes')) into res;
+      'rooms', (select count(*) from rooms where updated_at > now() - interval '2 minutes'),
+      'week', (select count(*) from profiles where created_at > now() - interval '7 days'),
+      'active_day', (select count(*) from profiles where last_seen > now() - interval '1 day'),
+      'gold_total', (select coalesce(sum(_si(data, '{gold}')), 0) from profiles),
+      'top', (select coalesce(jsonb_agg(t), '[]'::jsonb) from (select username, _si(data, '{rp}') as rp, level
+                from profiles order by _si(data, '{rp}') desc limit 5) t)) into res;
+  when 'anns' then
+    select coalesce(jsonb_agg(x order by x.id desc), '[]'::jsonb) into res
+      from (select id, text, created_at from sokak_announcements order by id desc limit 20) x;
+  when 'ann_del' then
+    delete from sokak_announcements where id = floor((args->>'ann')::numeric)::bigint;
+  when 'log' then
+    select coalesce(jsonb_agg(x order by x.id desc), '[]'::jsonb) into res from (
+      select l.id, l.action, l.at, l.info, coalesce(t.username, l.target) as target, ad.username as admin
+      from sokak_admin_log l left join profiles t on t.id::text = l.target left join profiles ad on ad.id = l.admin_id
+      order by l.id desc limit 60) x;
   when 'users' then
-    q := coalesce(args->>'q', '');
+    q := replace(replace(replace(left(coalesce(args->>'q', ''), 32), '\', ''), '%', ''), '_', '\_');
     select coalesce(jsonb_agg(x), '[]'::jsonb) into res from (
       select id, username, level, status, last_seen, created_at, banned_until, ban_reason,
-        (data->>'gold')::bigint as gold, (data->>'rp')::int as rp, (data->'stats'->>'kills')::int as kills,
+        _si(data, '{gold}') as gold, _si(data, '{rp}') as rp, _si(data, '{stats,kills}') as kills,
+        _si(data, '{stats,deaths}') as deaths, _si(data, '{stats,wins}') as wins, _si(data, '{stats,matches}') as matches,
+        _si(data, '{xp}') as xp,
+        (select count(*) from jsonb_object_keys(case when jsonb_typeof(data->'owned') = 'object' then data->'owned' else '{}'::jsonb end)) as weapons,
         exists (select 1 from sokak_admins s where s.user_id = profiles.id) as admin
-      from profiles where q = '' or username ilike q || '%'
-      order by (last_seen > now() - interval '90 seconds') desc, last_seen desc limit 60) x;
+      from profiles
+      where (q = '' or username ilike q || '%')
+        and (coalesce(args->>'f', '') <> 'online' or last_seen > now() - interval '90 seconds')
+        and (coalesce(args->>'f', '') <> 'banned' or banned_until > now())
+      order by (last_seen > now() - interval '90 seconds') desc, last_seen desc nulls last limit 80) x;
   when 'ban' then
     target := (args->>'id')::uuid;
     if exists (select 1 from sokak_admins where user_id = target) then raise exception 'Yönetici yasaklanamaz'; end if;

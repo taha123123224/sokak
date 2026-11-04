@@ -81,6 +81,7 @@ var dmg_list: Array = []
 var pings := {}
 var death_t := 0.0
 var board_t := 0.0
+var force_board := false   # test only
 var target_t := 0.0
 var hb_t := 0.0
 var medal_box: Control
@@ -267,9 +268,75 @@ func setup(p) -> void:
 	death_timer_lbl = UI.lbl("", 22, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
 	dv.add_child(death_timer_lbl)
 	on_weapon_changed()
+	call_deferred("chat_help")
 
 func show_countdown() -> void:
 	pass
+
+# ---------------------------------------------------------------- chat / voice help
+var _vnote: Label
+var _chat_hint: Label
+func voice_notice(t: String) -> void:
+	if root == null:
+		return
+	if _vnote == null or not is_instance_valid(_vnote):
+		_vnote = UI.lbl("", 19, Color("ffd27a"), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+		_vnote.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+		_vnote.offset_left = -500; _vnote.offset_right = 500; _vnote.offset_top = -250; _vnote.offset_bottom = -220
+		_vnote.add_theme_constant_override("outline_size", 6)
+		_vnote.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+		_vnote.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(_vnote)
+	_vnote.text = "◉ " + t
+	_vnote.modulate.a = 1.0
+	var tw := _vnote.create_tween()
+	tw.tween_interval(3.0)
+	tw.tween_property(_vnote, "modulate:a", 0.0, 0.8)
+
+## small permanent key hint above the chat input + a "how it works" card for the first seconds of a match
+func chat_help() -> void:
+	if root == null:
+		return
+	var online: bool = match_node != null and match_node.net
+	_chat_hint = UI.lbl("[Enter] Sohbet   [Y] Takım" + ("   [V] Konuş (basılı tut)" if online else ""), 15, Color(1, 1, 1, 0.55), "Rajdhani-Bold")
+	_chat_hint.anchor_left = 0; _chat_hint.anchor_top = 1; _chat_hint.anchor_bottom = 1
+	_chat_hint.offset_left = 26; _chat_hint.offset_top = -162; _chat_hint.offset_bottom = -144
+	_chat_hint.add_theme_constant_override("outline_size", 4)
+	_chat_hint.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	_chat_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_chat_hint)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UI.sb(Color(0.02, 0.025, 0.035, 0.86), Color(UI.ACCENT.r, UI.ACCENT.g, UI.ACCENT.b, 0.6), 1, 8, 14))
+	card.anchor_left = 1; card.anchor_right = 1; card.anchor_top = 0.5; card.anchor_bottom = 0.5
+	card.offset_left = -380; card.offset_right = -24; card.offset_top = -40
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(card)
+	var v := UI.vbox(4)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(v)
+	v.add_child(UI.lbl("◆ SOHBET NASIL KULLANILIR", 18, UI.ACCENT, "Rajdhani-Bold"))
+	var rows := [["ENTER / T", "Herkese yazılı mesaj"], ["Y", "Sadece takımına yaz"], ["ESC", "Yazmayı iptal et"]]
+	if online:
+		rows.append(["V (basılı tut)", "Sesli konuş — bırakınca susar"])
+	for r in rows:
+		var h := UI.hbox(10)
+		h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.add_child(h)
+		var k := PanelContainer.new()
+		k.add_theme_stylebox_override("panel", UI.sb(Color(1, 1, 1, 0.1), Color(1, 1, 1, 0.3), 1, 4, 4))
+		k.custom_minimum_size = Vector2(130, 0)
+		k.add_child(UI.lbl(r[0], 15, Color.WHITE, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+		h.add_child(k)
+		h.add_child(UI.lbl(r[1], 16, UI.TEXT, "Rajdhani-SemiBold"))
+	if online:
+		var mic_ok := AudioServer.get_input_device_list().size() > 0
+		v.add_child(UI.lbl("Mikrofon: " + ("hazır ✔" if mic_ok else "bulunamadı ✖"), 14, UI.GREEN if mic_ok else UI.RED, "Rajdhani-Bold"))
+	else:
+		v.add_child(UI.lbl("Sesli sohbet çevrimiçi odalarda açılır.", 14, UI.DIM, "Rajdhani-SemiBold"))
+	var tw := card.create_tween()
+	tw.tween_interval(12.0)
+	tw.tween_property(card, "modulate:a", 0.0, 1.0)
+	tw.tween_callback(card.queue_free)
 
 # ---------------------------------------------------------------- per frame
 var voice_lbl: Label
@@ -277,7 +344,7 @@ func _voice_ui() -> void:
 	if voice_lbl == null:
 		voice_lbl = UI.lbl("", 18, Color(0.6, 1.0, 0.7), "Rajdhani-Bold")
 		voice_lbl.anchor_left = 0; voice_lbl.anchor_top = 1; voice_lbl.anchor_bottom = 1
-		voice_lbl.offset_left = 24; voice_lbl.offset_top = -455; voice_lbl.offset_bottom = -430
+		voice_lbl.offset_left = 24; voice_lbl.offset_top = -480; voice_lbl.offset_bottom = -455
 		voice_lbl.add_theme_constant_override("outline_size", 5)
 		voice_lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 		voice_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -288,6 +355,8 @@ func _voice_ui() -> void:
 	for id in Voice.speaking.keys():
 		names.append(str(Net.members.get(id, {}).get("name", "?")))
 	voice_lbl.text = ("◉ KONUŞUYOR: " + ", ".join(names)) if names.size() > 0 else ""
+	if Voice.talking:
+		voice_lbl.text += "   " + "▮".repeat(int(clampf(Voice.level * 40.0, 0, 10))) + "▯".repeat(10 - int(clampf(Voice.level * 40.0, 0, 10)))
 
 func _process(delta: float) -> void:
 	if match_node and match_node.net and root:
@@ -368,11 +437,11 @@ func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("buy_menu") and not m.ended and not m.paused:
 		toggle_buy(not buy_open)
 	# scoreboard (Tab)
-	var show_board: bool = Input.is_action_pressed("scoreboard") and not m.ended
+	var show_board: bool = (Input.is_action_pressed("scoreboard") or force_board) and not m.ended
 	if show_board:
 		board_t -= delta
 		if board == null or board_t <= 0:
-			board_t = 0.25
+			board_t = 0.6
 			_build_board()
 	elif board:
 		board.queue_free()
@@ -532,13 +601,13 @@ func _ensure_chat() -> void:
 		return
 	chat_box = UI.vbox(2)
 	chat_box.anchor_left = 0; chat_box.anchor_top = 1; chat_box.anchor_bottom = 1
-	chat_box.offset_left = 24; chat_box.offset_top = -420; chat_box.offset_bottom = -170; chat_box.offset_right = 560
+	chat_box.offset_left = 24; chat_box.offset_top = -450; chat_box.offset_bottom = -206; chat_box.offset_right = 560
 	chat_box.alignment = BoxContainer.ALIGNMENT_END
 	chat_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(chat_box)
 	chat_in = LineEdit.new()
 	chat_in.anchor_left = 0; chat_in.anchor_top = 1; chat_in.anchor_bottom = 1
-	chat_in.offset_left = 24; chat_in.offset_right = 560; chat_in.offset_top = -164; chat_in.offset_bottom = -130
+	chat_in.offset_left = 24; chat_in.offset_right = 560; chat_in.offset_top = -200; chat_in.offset_bottom = -166
 	chat_in.max_length = 120
 	chat_in.visible = false
 	chat_in.add_theme_stylebox_override("normal", UI.sb(Color(0, 0, 0, 0.75), UI.ACCENT, 1, 4, 8))
@@ -576,6 +645,26 @@ func _chat_send(t: String) -> void:
 	if match_node and match_node.net:
 		Net.send({"t": "chat", "n": me, "m": t, "team": myteam if chat_team else ""})
 	chat_line(me, t, chat_team, GS.TEAM_COLORS.get(myteam, UI.ACCENT2))
+	if match_node and not match_node.net and "combatants" in match_node and randf() < 0.7:
+		_bot_reply(t, myteam)
+
+const BOT_LINES := ["eyvallah", "tamamdır kanka", "gg", "B'ye geçiyorum", "ön tarafta 2 kişi var", "dikkat sağdan geliyorlar",
+	"iyi oyun", "haha", "yardım lazım!", "bomba bende", "toplanalım", "nice"]
+func _bot_reply(t: String, myteam: String) -> void:
+	var pool: Array = []
+	for c in match_node.combatants:
+		if c["node"] != player and c.get("team", "") == myteam:
+			pool.append(c)
+	if pool.is_empty():
+		return
+	var c: Dictionary = pool[randi() % pool.size()]
+	await get_tree().create_timer(randf_range(1.0, 2.6)).timeout
+	if not is_instance_valid(self):
+		return
+	var line: String = BOT_LINES[randi() % BOT_LINES.size()]
+	if t.to_lower().contains("gg") or t.to_lower().contains("iyi oyun"): line = "gg wp"
+	elif t.to_lower().begins_with("selam") or t.to_lower().strip_edges() == "sa" or t.to_lower().begins_with("sa "): line = "as kardeşim"
+	chat_line(str(c["name"]), line, true, GS.TEAM_COLORS.get(myteam, UI.ACCENT2))
 
 func chat_line(who: String, t: String, team: bool, col: Color) -> void:
 	_ensure_chat()
@@ -851,62 +940,168 @@ func _ignore_mouse(n: Node) -> void:
 	for c in n.get_children():
 		_ignore_mouse(c)
 
+func _sbx(bg: Color, border: Color = Color(0, 0, 0, 0), rad: int = 8, pad: int = 0) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.set_corner_radius_all(rad)
+	if border.a > 0:
+		sb.border_color = border
+		sb.set_border_width_all(1)
+	sb.content_margin_left = pad; sb.content_margin_right = pad; sb.content_margin_top = pad; sb.content_margin_bottom = pad
+	return sb
+
 func _build_board() -> void:
+	## Tab: modern scoreboard — header strip, one card per team with big score, column header, rows with
+	## avatar initial, rank emblem, K / Ö / KAFA / K/Ö / SKOR / PING; you are highlighted, MVP gets a star
 	if board:
 		board.queue_free()
 	var m = match_node
-	board = UI.panel(Color(0.03, 0.04, 0.06, 0.92), Color(1, 1, 1, 0.12), 20, 6)
+	board = PanelContainer.new()
+	board.add_theme_stylebox_override("panel", _sbx(Color(0.012, 0.016, 0.024, 0.9), Color(1, 1, 1, 0.08), 14, 18))
 	board.set_anchors_preset(Control.PRESET_CENTER)
-	board.custom_minimum_size = Vector2(1240 if m.teams else 900, 0)
+	board.custom_minimum_size = Vector2(1320 if m.teams else 900, 0)
 	root.add_child(board)
-	var v := UI.vbox(10)
+	var v := UI.vbox(12)
 	board.add_child(v)
-	var top := UI.hbox(12)
+	# header
+	var top := UI.hbox(14)
 	v.add_child(top)
-	top.add_child(UI.header(GS.MODES[m.mode]["name"].to_upper() + "  •  " + GS.MAPS[m.map_id]["name"].to_upper(), 26))
+	var tv := UI.vbox(-6)
+	top.add_child(tv)
+	tv.add_child(UI.lbl(GS.MAPS[m.map_id]["name"].to_upper(), 34, Color.WHITE, "RussoOne-Regular"))
+	tv.add_child(UI.lbl(GS.MODES[m.mode]["name"].to_upper() + ("   •   HEDEF %d" % int(m.target_score) if m.mode != "gungame" else ""), 16, UI.DIM, "Rajdhani-Bold"))
 	top.add_child(UI.spacer())
 	var tl := int(m.time_left)
-	top.add_child(UI.lbl("Kalan Süre  %d:%02d" % [tl / 60, tl % 60], 22, UI.DIM, "Rajdhani-Bold"))
+	var tp := PanelContainer.new()
+	tp.add_theme_stylebox_override("panel", _sbx(Color(1, 1, 1, 0.06), Color(1, 1, 1, 0.12), 8, 10))
+	tp.add_child(UI.lbl("⏱  %d:%02d" % [tl / 60, tl % 60], 26, Color.WHITE, "Teko"))
+	tp.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(tp)
 	var groups: Array = []
 	if m.teams:
 		groups = [["a", GS.TEAMS["a"]], ["b", GS.TEAMS["b"]]]
 	else:
 		groups = [["", "OYUNCULAR"]]
-	var hb := UI.hbox(20)
+	# MVP = highest score overall
+	var mvp = null
+	var best := -1
+	for e in m.combatants:
+		var sc: int = int(e["score"]) if m.mode != "gungame" else int(e["gg"])
+		if sc > best:
+			best = sc; mvp = e
+	var hb := UI.hbox(16)
 	v.add_child(hb)
 	for gtuple in groups:
 		var t: String = gtuple[0]
-		var gv := UI.vbox(3)
-		gv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hb.add_child(gv)
-		var head := UI.hbox(0)
-		var hp := UI.panel(GS.TEAM_COLORS.get(t, UI.ACCENT).darkened(0.4), Color(0, 0, 0, 0), 8, 2)
-		hp.add_child(head)
-		gv.add_child(hp)
-		var title = gtuple[1] + ("   " + str(m.team_score[t]) if t != "" else "")
-		var cols := [[title, 260], ["Svy", 50], ["Ö", 60], ["Ö/L", 60], ["KAFA", 60], ["K/D", 60], ["SKOR", 80], ["Ping", 60]]
-		if m.mode == "gungame":
-			cols[6] = ["SİLAH", 80]
-		for c in cols:
-			var l := UI.lbl(c[0], 18 if c[0] != title else 22, Color.WHITE, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_LEFT if c[0] == title else HORIZONTAL_ALIGNMENT_CENTER)
-			l.custom_minimum_size = Vector2(c[1], 30)
-			head.add_child(l)
+		var tc: Color = GS.TEAM_COLORS.get(t, UI.ACCENT)
+		var card := PanelContainer.new()
+		card.add_theme_stylebox_override("panel", _sbx(Color(0.03, 0.04, 0.06, 0.92), Color(tc.r, tc.g, tc.b, 0.35), 10, 0))
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hb.add_child(card)
+		var gv := UI.vbox(2)
+		card.add_child(gv)
+		# team head: colour strip, name, big score
+		var head := PanelContainer.new()
+		var hs := _sbx(Color(tc.r * 0.35, tc.g * 0.35, tc.b * 0.35, 0.9), Color(0, 0, 0, 0), 10, 0)
+		hs.corner_radius_bottom_left = 0; hs.corner_radius_bottom_right = 0
+		hs.content_margin_left = 16; hs.content_margin_right = 16; hs.content_margin_top = 6; hs.content_margin_bottom = 6
+		head.add_theme_stylebox_override("panel", hs)
+		gv.add_child(head)
+		var hh := UI.hbox(10)
+		head.add_child(hh)
+		var bar := ColorRect.new(); bar.color = tc; bar.custom_minimum_size = Vector2(5, 0)
+		hh.add_child(bar)
 		var list = m.combatants.filter(func(e): return t == "" or e["team"] == t)
+		var alive_n := 0
+		for e in list:
+			if e["node"].alive: alive_n += 1
+		var hv := UI.vbox(-6)
+		hh.add_child(hv)
+		hv.add_child(UI.lbl(str(gtuple[1]), 24, Color.WHITE, "RussoOne-Regular"))
+		hv.add_child(UI.lbl("%d / %d hayatta" % [alive_n, list.size()], 14, Color(1, 1, 1, 0.6), "Rajdhani-Bold"))
+		hh.add_child(UI.spacer())
+		if t != "":
+			hh.add_child(UI.lbl(str(m.team_score[t]), 54, Color.WHITE, "Teko"))
+		# column header
+		var cols := [["OYUNCU", 330], ["SV", 50], ["LEŞ", 56], ["ÖLÜM", 56], ["KAFA", 60], ["K/Ö", 64], ["SKOR", 76], ["PİNG", 60]]
+		if m.mode == "gungame":
+			cols[6] = ["SİLAH", 90]
+		var ch := UI.hbox(0)
+		var chm := MarginContainer.new()
+		chm.add_theme_constant_override("margin_left", 16); chm.add_theme_constant_override("margin_right", 12)
+		chm.add_theme_constant_override("margin_top", 4)
+		chm.add_child(ch)
+		gv.add_child(chm)
+		for c in cols:
+			var l := UI.lbl(c[0], 13, Color(1, 1, 1, 0.45), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_LEFT if c[0] == "OYUNCU" else HORIZONTAL_ALIGNMENT_CENTER)
+			l.custom_minimum_size = Vector2(c[1], 0)
+			ch.add_child(l)
 		list.sort_custom(func(a, b): return (a["score"] > b["score"]) if m.mode != "gungame" else (a["gg"] > b["gg"]))
+		var rows := MarginContainer.new()
+		rows.add_theme_constant_override("margin_left", 8); rows.add_theme_constant_override("margin_right", 8); rows.add_theme_constant_override("margin_bottom", 8)
+		gv.add_child(rows)
+		var rv := UI.vbox(3)
+		rows.add_child(rv)
 		for i in list.size():
 			var e: Dictionary = list[i]
-			var row := UI.hbox(0)
-			var rp := UI.panel(Color(1, 1, 1, 0.04) if not e["is_player"] else Color(1, 0.55, 0.1, 0.22), Color(0, 0, 0, 0), 6, 2)
-			rp.add_child(row)
-			gv.add_child(rp)
 			var alive: bool = e["node"].alive
+			var me: bool = e["is_player"]
+			var rp := PanelContainer.new()
+			var rbg := Color(1, 0.6, 0.15, 0.2) if me else (Color(1, 1, 1, 0.045) if i % 2 == 0 else Color(1, 1, 1, 0.02))
+			rp.add_theme_stylebox_override("panel", _sbx(rbg, Color(1, 0.6, 0.15, 0.6) if me else Color(0, 0, 0, 0), 6, 0))
+			rp.custom_minimum_size = Vector2(0, 38)
+			rv.add_child(rp)
+			var row := UI.hbox(0)
+			var rm := MarginContainer.new()
+			rm.add_theme_constant_override("margin_left", 8); rm.add_theme_constant_override("margin_right", 4)
+			rm.add_child(row)
+			rp.add_child(rm)
+			var fc := Color.WHITE if alive else Color(1, 1, 1, 0.4)
+			if me: fc = Color("ffd08a")
+			# player cell: avatar + name + mvp/dead marks
+			var pc := UI.hbox(8)
+			pc.custom_minimum_size = Vector2(330, 0)
+			row.add_child(pc)
+			var av := PanelContainer.new()
+			var hue := float(abs(hash(str(e["name"]))) % 360) / 360.0
+			av.add_theme_stylebox_override("panel", _sbx(Color.from_hsv(hue, 0.5, 0.45 if alive else 0.2), tc if alive else Color(0, 0, 0, 0), 14, 0))
+			av.custom_minimum_size = Vector2(28, 28)
+			av.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			var al := UI.lbl(str(e["name"]).substr(0, 1).to_upper(), 15, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
+			al.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			av.add_child(al)
+			pc.add_child(av)
+			var ri: Dictionary = GS.rank_info(int(GS.profile.get("rp", 0)) if me else (int(e["lvl"]) * 37) % 3000)
+			var rk := TextureRect.new()
+			rk.texture = ri["icon"]
+			rk.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			rk.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			rk.custom_minimum_size = Vector2(26, 26)
+			rk.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			rk.modulate.a = 1.0 if alive else 0.4
+			pc.add_child(rk)
+			var nl := UI.lbl(str(e["name"]), 19, fc, "Rajdhani-Bold")
+			nl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			nl.clip_text = true
+			nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			pc.add_child(nl)
+			if mvp != null and e == mvp and best > 0:
+				pc.add_child(UI.lbl("★ MVP", 14, UI.GOLD, "Rajdhani-Bold"))
+			if not alive:
+				pc.add_child(UI.lbl("☠", 16, UI.RED, "Rajdhani-Bold"))
 			var kd: float = float(e["kills"]) / max(1.0, float(e["deaths"]))
-			var vals := ["%d. %s%s" % [i + 1, e["name"], "" if alive else "  ☠"], str(e["lvl"]), str(e["kills"]), str(e["deaths"]), str(e["head"]), "%.2f" % kd,
-				str(e["score"]) if m.mode != "gungame" else GS.WEAPONS[GS.GUNGAME_ORDER[min(e["gg"], GS.GUNGAME_ORDER.size() - 1)]]["name"], str(randi_range(18, 45) if not e["is_player"] else 12)]
+			var vals := [str(e["lvl"]), str(e["kills"]), str(e["deaths"]), str(e["head"]), "%.2f" % kd,
+				str(e["score"]) if m.mode != "gungame" else GS.WEAPONS[GS.GUNGAME_ORDER[min(e["gg"], GS.GUNGAME_ORDER.size() - 1)]]["name"],
+				str(12 if me else 18 + (abs(hash(str(e["name"]))) % 30))]
 			for k in vals.size():
-				var l := UI.lbl(vals[k], 20, (Color.WHITE if alive else UI.DIM) if not e["is_player"] else UI.ACCENT2, "Rajdhani-Bold" if k == 0 else "Rajdhani-SemiBold", HORIZONTAL_ALIGNMENT_LEFT if k == 0 else HORIZONTAL_ALIGNMENT_CENTER)
-				l.custom_minimum_size = Vector2(cols[k][1], 28)
+				var vc := fc
+				if k == 4: vc = Color("7dffa8") if kd >= 1.0 else Color("ff8a7a")
+				if k == 4 and not alive: vc.a = 0.5
+				var l := UI.lbl(vals[k], 19 if k != 5 else 21, vc, "Teko" if k in [1, 2, 5] else "Rajdhani-SemiBold", HORIZONTAL_ALIGNMENT_CENTER)
+				l.custom_minimum_size = Vector2(cols[k + 1][1], 0)
+				l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 				row.add_child(l)
+	v.add_child(UI.lbl("TAB bırakınca kapanır   •   Enter: sohbet   •   Y: takım sohbeti", 14, Color(1, 1, 1, 0.35), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
 	board.position = (root.size - board.get_combined_minimum_size()) / 2
 	_ignore_mouse(board)
 
@@ -1197,14 +1392,22 @@ class Minimap extends Control:
 
 
 class ScoreBar extends Control:
-	## top-centre: angled team plates with score + progress to target, timer in the middle
+	## top-centre: two score cards with alive-player pips, timer pill in the middle, thin progress lines
 	var hud
 
-	func _plate(r: Rect2, left: bool) -> PackedVector2Array:
-		var sk := 16.0
-		if left:
-			return PackedVector2Array([r.position, r.position + Vector2(r.size.x, 0), r.position + r.size, r.position + Vector2(sk, r.size.y)])
-		return PackedVector2Array([r.position, r.position + Vector2(r.size.x, 0), r.position + Vector2(r.size.x - sk, r.size.y), r.position + Vector2(0, r.size.y)])
+	static func grad_rect(ci: CanvasItem, r: Rect2, c0: Color, c1: Color, horizontal: bool = true) -> void:
+		var pts := PackedVector2Array([r.position, r.position + Vector2(r.size.x, 0), r.end, r.position + Vector2(0, r.size.y)])
+		var cols := PackedColorArray([c0, c1, c1, c0]) if horizontal else PackedColorArray([c0, c0, c1, c1])
+		ci.draw_polygon(pts, cols)
+
+	func _box(r: Rect2, bg: Color, border: Color = Color(0, 0, 0, 0), rad: int = 6) -> void:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = bg
+		sb.set_corner_radius_all(rad)
+		if border.a > 0:
+			sb.border_color = border
+			sb.set_border_width_all(1)
+		draw_style_box(sb, r)
 
 	func _draw() -> void:
 		var m = hud.match_node
@@ -1214,11 +1417,13 @@ class ScoreBar extends Control:
 		var W := size.x
 		var f: Font = UI.font("Teko")
 		var fb: Font = UI.font("Rajdhani-Bold")
-		var cw := 120.0
 		var cx := W / 2
+		var cw := 112.0
 		var sides: Array = []
 		if m.teams:
-			sides = [[GS.TEAMS["a"], int(m.team_score["a"]), GS.TEAM_COLORS["a"], p.team == "a"], [GS.TEAMS["b"], int(m.team_score["b"]), GS.TEAM_COLORS["b"], p.team == "b"]]
+			var my: String = p.team if p.team != "" else "a"
+			var ot := "b" if my == "a" else "a"
+			sides = [[GS.TEAMS[my], int(m.team_score[my]), GS.TEAM_COLORS[my], my], [GS.TEAMS[ot], int(m.team_score[ot]), GS.TEAM_COLORS[ot], ot]]
 		else:
 			var pe: Dictionary = m.entry(p)
 			var best := 0
@@ -1226,44 +1431,58 @@ class ScoreBar extends Control:
 				if c["node"] != p:
 					best = max(best, int(c["kills"]) if m.mode != "gungame" else int(c["gg"]))
 			var mine: int = int(pe.get("kills", 0)) if m.mode != "gungame" else int(pe.get("gg", 0))
-			sides = [["SEN", mine, Color("3d8bff"), true], ["RAKİP LİDER", best, Color("ff8a1f"), false]]
+			sides = [["SEN", mine, Color("3d9bff"), ""], ["LİDER", best, Color("ff7a2f"), ""]]
 		var target: float = max(float(m.target_score), 1.0) if m.mode != "gungame" else float(GS.GUNGAME_ORDER.size())
-		var pw := (W - cw) / 2 - 6
+		var sw := 150.0
 		for i in 2:
 			var sd: Array = sides[i]
 			var left := i == 0
-			var r := Rect2(0 if left else cx + cw / 2 + 6, 4, pw, 46)
-			draw_colored_polygon(_plate(Rect2(r.position + Vector2(0, 3), r.size), left), Color(0, 0, 0, 0.3))
 			var col: Color = sd[2]
-			draw_colored_polygon(_plate(r, left), col.darkened(0.45 if sd[3] else 0.62))
-			# progress toward target
-			var k: float = clamp(float(sd[1]) / target, 0.0, 1.0)
-			var pr := Rect2(r.position.x, r.position.y + r.size.y - 5, r.size.x * k, 5)
-			if not left:
-				pr.position.x = r.position.x + r.size.x * (1.0 - k)
-			draw_rect(pr, col.lightened(0.2))
-			var name_s: String = sd[0]
-			var sc_s: String = str(sd[1])
+			var r := Rect2(cx - cw / 2 - 6 - sw, 6, sw, 52) if left else Rect2(cx + cw / 2 + 6, 6, sw, 52)
+			_box(Rect2(r.position + Vector2(0, 2), r.size), Color(0, 0, 0, 0.35), Color(0, 0, 0, 0), 8)
+			_box(r, Color(0.03, 0.04, 0.06, 0.78), Color(col.r, col.g, col.b, 0.55), 8)
+			# coloured inner edge toward the timer
+			var edge := Rect2(r.end.x - 4, r.position.y + 6, 4, r.size.y - 12) if left else Rect2(r.position.x, r.position.y + 6, 4, r.size.y - 12)
+			draw_rect(edge, col)
+			var sc_s := str(sd[1])
+			var name_s: String = str(sd[0])
 			if left:
-				draw_string(fb, r.position + Vector2(22, 31), name_s, HORIZONTAL_ALIGNMENT_LEFT, 150, 20, Color(1, 1, 1, 0.92))
-				draw_string(f, r.position + Vector2(r.size.x - 74, 42), sc_s, HORIZONTAL_ALIGNMENT_RIGHT, 64, 50, Color.WHITE)
+				draw_string(f, Vector2(r.end.x - 70, r.position.y + 45), sc_s, HORIZONTAL_ALIGNMENT_RIGHT, 58, 48, Color.WHITE)
+				draw_string(fb, Vector2(r.position.x + 12, r.position.y + 22), name_s, HORIZONTAL_ALIGNMENT_LEFT, 90, 15, col.lightened(0.35))
 			else:
-				draw_string(f, r.position + Vector2(10, 42), sc_s, HORIZONTAL_ALIGNMENT_LEFT, 64, 50, Color.WHITE)
-				draw_string(fb, r.position + Vector2(r.size.x - 172, 31), name_s, HORIZONTAL_ALIGNMENT_RIGHT, 150, 20, Color(1, 1, 1, 0.92))
-		# timer
+				draw_string(f, Vector2(r.position.x + 12, r.position.y + 45), sc_s, HORIZONTAL_ALIGNMENT_LEFT, 58, 48, Color.WHITE)
+				draw_string(fb, Vector2(r.end.x - 102, r.position.y + 22), name_s, HORIZONTAL_ALIGNMENT_RIGHT, 90, 15, col.lightened(0.35))
+			# progress to target
+			var k: float = clamp(float(sd[1]) / target, 0.0, 1.0)
+			var pr := Rect2(r.position.x + 10, r.end.y - 7, (r.size.x - 20), 3)
+			draw_rect(pr, Color(1, 1, 1, 0.1))
+			if left:
+				draw_rect(Rect2(pr.end.x - pr.size.x * k, pr.position.y, pr.size.x * k, 3), col.lightened(0.15))
+			else:
+				draw_rect(Rect2(pr.position.x, pr.position.y, pr.size.x * k, 3), col.lightened(0.15))
+			# alive pips (team modes)
+			if sd[3] != "":
+				var mem: Array = m.combatants.filter(func(e): return e["team"] == sd[3])
+				var n: int = mini(mem.size(), 10)
+				var px0: float = (r.end.x - 12 - n * 11) if left else (r.position.x + 12)
+				for j in n:
+					var al: bool = mem[j]["node"].alive
+					var pc := Vector2(px0 + j * 11 + 4, r.end.y + 9)
+					draw_rect(Rect2(pc - Vector2(4, 4), Vector2(8, 8)), col if al else Color(1, 1, 1, 0.15))
+		# timer pill
 		var tl := int(m.time_left)
-		var hexr := Rect2(cx - cw / 2, 0, cw, 56)
-		var hp := PackedVector2Array([hexr.position + Vector2(12, 0), hexr.position + Vector2(cw - 12, 0), hexr.position + Vector2(cw, 28), hexr.position + Vector2(cw - 12, 56), hexr.position + Vector2(12, 56), hexr.position + Vector2(0, 28)])
-		draw_colored_polygon(hp, Color(0.02, 0.03, 0.05, 0.92))
-		draw_polyline(hp + PackedVector2Array([hp[0]]), Color(1, 0.55, 0.12, 0.9), 2.0, true)
-		var tc := Color.WHITE if tl > 30 else Color(1, 0.3, 0.25)
-		draw_string(f, Vector2(cx - 60, 44), "%d:%02d" % [tl / 60, tl % 60], HORIZONTAL_ALIGNMENT_CENTER, 120, 44, tc)
-		var goal: String = ("HEDEF %d" % int(m.target_score)) if m.mode != "gungame" else "SİLAH %d / %d" % [int(m.entry(p).get("gg", 0)) + 1, GS.GUNGAME_ORDER.size()]
-		draw_string(fb, Vector2(cx - 60, 70), goal, HORIZONTAL_ALIGNMENT_CENTER, 120, 14, Color(1, 1, 1, 0.55))
+		var tr := Rect2(cx - cw / 2, 2, cw, 60)
+		_box(Rect2(tr.position + Vector2(0, 2), tr.size), Color(0, 0, 0, 0.4), Color(0, 0, 0, 0), 10)
+		_box(tr, Color(0.015, 0.02, 0.03, 0.9), Color(1, 1, 1, 0.12), 10)
+		var tc := Color.WHITE if tl > 30 else Color(1, 0.32, 0.28).lerp(Color.WHITE, 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.01))
+		draw_string(f, Vector2(cx - cw / 2, 42), "%d:%02d" % [tl / 60, tl % 60], HORIZONTAL_ALIGNMENT_CENTER, cw, 42, tc)
+		var goal: String = ("İLK %d" % int(m.target_score)) if m.mode != "gungame" else "SİLAH %d/%d" % [int(m.entry(p).get("gg", 0)) + 1, GS.GUNGAME_ORDER.size()]
+		draw_string(fb, Vector2(cx - cw / 2, 56), goal, HORIZONTAL_ALIGNMENT_CENTER, cw, 12, Color(1, 1, 1, 0.5))
+		draw_rect(Rect2(cx - 18, tr.end.y - 2, 36, 2), Color(1, 0.6, 0.2, 0.9))
 
 
 class HealthPanel extends Control:
-	## skewed health / armour block with segmented bar and delayed damage trail
+	## modern health / armour: fading glass plate, big number, slim gradient bar with damage trail and 25-ticks
 	var hud
 
 	func _process(delta: float) -> void:
@@ -1277,60 +1496,59 @@ class HealthPanel extends Control:
 			hud.hp_trail = hud.hp_shown
 		queue_redraw()
 
-	func _sk(r: Rect2, sk: float) -> PackedVector2Array:
-		return PackedVector2Array([r.position + Vector2(sk, 0), r.position + Vector2(r.size.x, 0), r.position + Vector2(r.size.x - sk, r.size.y), r.position + Vector2(0, r.size.y)])
-
 	func _draw() -> void:
 		var p = hud.player
 		if p == null:
 			return
 		var W := size.x; var H := size.y
 		var team_c: Color = GS.TEAM_COLORS.get(p.team, Color(1, 0.55, 0.12))
-		draw_colored_polygon(_sk(Rect2(4, 6, W - 4, H - 6), 18), Color(0, 0, 0, 0.3))
-		draw_colored_polygon(_sk(Rect2(0, 0, W - 4, H - 6), 18), Color(0.025, 0.035, 0.055, 0.82))
-		draw_colored_polygon(_sk(Rect2(0, 0, 6, H - 6), 0), team_c)
+		# glass plate fading to the right
+		ScoreBar.grad_rect(self, Rect2(0, 18, W, H - 18), Color(0.02, 0.025, 0.04, 0.78), Color(0.02, 0.025, 0.04, 0.0))
+		draw_rect(Rect2(0, 18, 3, H - 18), team_c)
+		ScoreBar.grad_rect(self, Rect2(0, 18, W * 0.8, 1), Color(1, 1, 1, 0.25), Color(1, 1, 1, 0))
 		var f: Font = UI.font("Teko")
 		var fb: Font = UI.font("Rajdhani-Bold")
 		var hp := int(ceil(p.health))
 		var low: bool = hp < 30
-		var hpc := Color(1, 0.28, 0.22) if low else Color.WHITE
-		if low:
-			hpc = hpc.lerp(Color.WHITE, 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.012))
-		# cross icon
-		var ic := Vector2(36, 50)
-		draw_rect(Rect2(ic + Vector2(-5, -15), Vector2(10, 30)), hpc)
-		draw_rect(Rect2(ic + Vector2(-15, -5), Vector2(30, 10)), hpc)
-		draw_string(f, Vector2(58, 76), str(hp), HORIZONTAL_ALIGNMENT_LEFT, -1, 74, hpc)
-		# segmented health bar
-		var bx := 160.0; var by := 26.0; var bw := W - bx - 34.0; var bh := 18.0
-		var segs := 10
-		var gap := 4.0
-		var sw := (bw - gap * (segs - 1)) / segs
-		for i in segs:
-			var x := bx + i * (sw + gap)
-			var r := Rect2(x, by, sw, bh)
-			draw_colored_polygon(_sk(r, 5), Color(1, 1, 1, 0.08))
-			var seg_lo := i * 10.0
-			var tr: float = clamp((hud.hp_trail - seg_lo) / 10.0, 0.0, 1.0)
-			var fl: float = clamp((hud.hp_shown - seg_lo) / 10.0, 0.0, 1.0)
-			if tr > 0:
-				draw_colored_polygon(_sk(Rect2(x, by, sw * tr, bh), 5 * tr), Color(1, 0.85, 0.6, 0.7))
-			if fl > 0:
-				var col := Color("38e07b").lerp(Color("ffcf3d"), clamp((70.0 - hud.hp_shown) / 40.0, 0.0, 1.0)).lerp(Color("ff3b3b"), clamp((35.0 - hud.hp_shown) / 25.0, 0.0, 1.0))
-				draw_colored_polygon(_sk(Rect2(x, by, sw * fl, bh), 5 * fl), col)
-				draw_rect(Rect2(x + 3, by + 2, sw * fl - 6, 3), Color(1, 1, 1, 0.25))
-		# armour
-		var ay := by + bh + 12
-		var ar: float = clamp(float(p.armor) / 100.0, 0.0, 1.0)
-		draw_colored_polygon(_sk(Rect2(bx, ay, bw, 9), 4), Color(1, 1, 1, 0.07))
-		draw_colored_polygon(_sk(Rect2(bx, ay, bw * ar, 9), 4), Color("4aa3ff"))
-		# shield icon + value
-		var sc := Vector2(bx + bw + 16, ay + 4)
-		draw_colored_polygon(PackedVector2Array([sc + Vector2(-7, -7), sc + Vector2(7, -7), sc + Vector2(7, 1), sc + Vector2(0, 9), sc + Vector2(-7, 1)]), Color("4aa3ff"))
-		draw_string(fb, Vector2(bx, ay + 34), "ZIRH %d" % int(p.armor), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.55, 0.75, 1, 0.9))
+		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.012)
+		var hpc := Color(1, 0.3, 0.26).lerp(Color.WHITE, pulse * 0.4) if low else Color.WHITE
+		# name + team on top
 		var nm: String = str(GS.profile["name"])
 		var tn: String = GS.TEAMS.get(p.team, "") if p.team != "" else ""
-		draw_string(fb, Vector2(bx + 90, ay + 34), nm + ("   " + tn if tn != "" else ""), HORIZONTAL_ALIGNMENT_LEFT, bw - 80, 17, team_c.lightened(0.2))
+		draw_string(fb, Vector2(4, 12), nm.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, 220, 15, Color(1, 1, 1, 0.85))
+		if tn != "":
+			draw_string(fb, Vector2(4 + fb.get_string_size(nm.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x + 10, 12), tn, HORIZONTAL_ALIGNMENT_LEFT, 120, 13, team_c.lightened(0.3))
+		# plus icon + number
+		var ic := Vector2(26, H - 38)
+		draw_rect(Rect2(ic + Vector2(-3.5, -11), Vector2(7, 22)), hpc)
+		draw_rect(Rect2(ic + Vector2(-11, -3.5), Vector2(22, 7)), hpc)
+		draw_string(f, Vector2(44, H - 14), str(hp), HORIZONTAL_ALIGNMENT_LEFT, 100, 70, hpc)
+		# health bar
+		var bx := 150.0; var bw := W - bx - 20.0; var by := H - 58.0; var bh := 12.0
+		var bgsb := StyleBoxFlat.new(); bgsb.bg_color = Color(1, 1, 1, 0.09); bgsb.set_corner_radius_all(3)
+		draw_style_box(bgsb, Rect2(bx, by, bw, bh))
+		var tr: float = clampf(hud.hp_trail / 100.0, 0, 1)
+		var fl: float = clampf(hud.hp_shown / 100.0, 0, 1)
+		if tr > fl:
+			draw_rect(Rect2(bx + bw * fl, by, bw * (tr - fl), bh), Color(1, 0.9, 0.75, 0.75))
+		var c1 := Color("2fd67a").lerp(Color("ffc93d"), clamp((70.0 - hud.hp_shown) / 40.0, 0.0, 1.0)).lerp(Color("ff3d3d"), clamp((35.0 - hud.hp_shown) / 25.0, 0.0, 1.0))
+		if fl > 0:
+			ScoreBar.grad_rect(self, Rect2(bx, by, bw * fl, bh), c1.darkened(0.25), c1.lightened(0.1))
+			draw_rect(Rect2(bx, by, bw * fl, 3), Color(1, 1, 1, 0.22))
+			if low:
+				draw_rect(Rect2(bx - 2, by - 2, bw * fl + 4, bh + 4), Color(1, 0.2, 0.2, 0.25 * pulse), false, 2.0)
+		for t in [0.25, 0.5, 0.75]:
+			draw_rect(Rect2(bx + bw * t - 1, by, 2, bh), Color(0.02, 0.025, 0.04, 0.9))
+		# armour bar
+		var ay := by + bh + 9
+		var ar: float = clamp(float(p.armor) / 100.0, 0.0, 1.0)
+		draw_style_box(bgsb, Rect2(bx, ay, bw, 6))
+		if ar > 0:
+			ScoreBar.grad_rect(self, Rect2(bx, ay, bw * ar, 6), Color("2f7fd6"), Color("6cc0ff"))
+		var sc := Vector2(bx + 6, ay + 22)
+		draw_colored_polygon(PackedVector2Array([sc + Vector2(-6, -6), sc + Vector2(6, -6), sc + Vector2(6, 1), sc + Vector2(0, 7), sc + Vector2(-6, 1)]), Color("5aaeff"))
+		draw_string(fb, Vector2(bx + 18, ay + 28), "ZIRH  %d" % int(p.armor), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.65, 0.82, 1, 0.9))
+		draw_string(fb, Vector2(bx + bw - 120, ay + 28), "CAN  %d / 100" % hp, HORIZONTAL_ALIGNMENT_RIGHT, 120, 15, Color(1, 1, 1, 0.5))
 
 
 class AmmoPanel extends Control:
@@ -1370,9 +1588,9 @@ class AmmoPanel extends Control:
 		if p == null or p.cur == "":
 			return
 		var W := size.x; var H := size.y
-		draw_colored_polygon(_sk(Rect2(4, 6, W - 4, H - 6), 18), Color(0, 0, 0, 0.3))
-		draw_colored_polygon(_sk(Rect2(0, 0, W - 4, H - 6), 18), Color(0.025, 0.035, 0.055, 0.82))
-		draw_rect(Rect2(W - 10, 0, 6, H - 6), Color(1, 0.55, 0.12))
+		ScoreBar.grad_rect(self, Rect2(0, 0, W, H - 6), Color(0.02, 0.025, 0.04, 0.0), Color(0.02, 0.025, 0.04, 0.8))
+		draw_rect(Rect2(W - 3, 0, 3, H - 6), Color(1, 0.55, 0.12))
+		ScoreBar.grad_rect(self, Rect2(W * 0.2, 0, W * 0.8, 1), Color(1, 1, 1, 0), Color(1, 1, 1, 0.25))
 		var f: Font = UI.font("Teko")
 		var fb: Font = UI.font("Rajdhani-Bold")
 		var w: Dictionary = p.wdata

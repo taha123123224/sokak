@@ -666,8 +666,9 @@ func stats_for(id: String, lvl: int = -1) -> Dictionary:
 func default_settings() -> Dictionary:
 	return {
 		"sens": 1.0, "ads_sens": 0.8, "scope_sens": 0.6, "invert_y": false, "fov": 80.0,
-		"quality": "ultra", "resolution_scale": 1.0, "upscaler": "fsr2", "fullscreen": true, "vsync": false, "fps_cap": 0,
-		"msaa": 2, "taa": false, "fxaa": true, "shadows": 3, "ssao": true, "ssil": true, "ssr": true, "sdfgi": false, "glow": true, "volumetric": true,
+		"quality": "high", "resolution_scale": 1.0, "upscaler": "fsr2", "fullscreen": true, "vsync": false, "fps_cap": 0,
+		"msaa": 2, "taa": false, "fxaa": true, "shadows": 2, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false,
+		"dyn_res": true, "dyn_target": 60,
 		"motion_blur": false, "draw_distance": 1.0, "sharpen": 0.3, "brightness": 1.0, "show_fps": true, "announcer": true,
 		"vol_master": 0.8, "vol_sfx": 1.0, "vol_music": 0.5, "vol_amb": 0.6, "vol_voice": 1.0, "voice_on": true,
 		"xh_style": 0, "xh_color": "3dff8a", "xh_size": 7.0, "xh_gap": 5.0, "xh_thick": 2.0, "xh_dot": false, "xh_outline": true, "xh_dynamic": true, "xh_alpha": 1.0,
@@ -683,6 +684,14 @@ func load_settings() -> void:
 		if d is Dictionary:
 			for k in d.keys():
 				settings[k] = d[k]
+	# v2.7: one-time automatic quality pick (older installs defaulted to ULTRA, too heavy for many PCs)
+	if not bool(settings.get("perf_v27", false)):
+		var tier := detect_tier()
+		apply_preset(tier)
+		settings["dyn_res"] = true
+		settings["perf_v27"] = true
+		settings["auto_tier"] = tier
+		save_settings.call_deferred()
 
 func save_settings() -> void:
 	var f := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
@@ -693,11 +702,27 @@ func save_settings() -> void:
 
 const QUALITY_PRESETS := {
 	"low": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 0, "ssao": false, "ssil": false, "ssr": false, "sdfgi": false, "glow": false, "volumetric": false, "resolution_scale": 0.75, "draw_distance": 0.6},
-	"medium": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 1, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false, "resolution_scale": 0.9, "draw_distance": 0.8},
-	"high": {"msaa": 2, "fxaa": true, "taa": false, "shadows": 2, "ssao": true, "ssil": false, "ssr": true, "sdfgi": false, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 1.0},
-	"ultra": {"msaa": 4, "fxaa": true, "taa": false, "shadows": 3, "ssao": true, "ssil": true, "ssr": true, "sdfgi": true, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 1.0},
+	"medium": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 1, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false, "resolution_scale": 1.0, "draw_distance": 0.8},
+	"high": {"msaa": 2, "fxaa": true, "taa": false, "shadows": 2, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false, "resolution_scale": 1.0, "draw_distance": 1.0},
+	"ultra": {"msaa": 2, "fxaa": true, "taa": false, "shadows": 3, "ssao": true, "ssil": true, "ssr": true, "sdfgi": false, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 1.0},
 	"uhd": {"msaa": 4, "fxaa": true, "taa": false, "shadows": 4, "ssao": true, "ssil": true, "ssr": true, "sdfgi": true, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 1.3},
 }
+
+## picks a quality preset from the graphics card (runs once per install / after the v2.7 update)
+func detect_tier() -> String:
+	var n := RenderingServer.get_video_adapter_name().to_lower()
+	var t := RenderingServer.get_video_adapter_type()
+	if t == RenderingDevice.DEVICE_TYPE_INTEGRATED_GPU or t == RenderingDevice.DEVICE_TYPE_CPU or n.contains("llvmpipe") or n.contains("basic render") \
+			or n.contains("intel") and not n.contains("arc"):
+		return "low"
+	var re := RegEx.new()
+	for pat in [["rtx\\s*(40|50)\\d\\d", "ultra"], ["rtx\\s*30[6-9]0", "ultra"], ["rx\\s*(6[7-9]|7[6-9]|9[0-9])\\d\\d", "ultra"],
+			["rtx", "high"], ["gtx\\s*16\\d\\d", "high"], ["gtx\\s*10[78]0", "high"], ["rx\\s*(5[6-7]|6[0-6]|7[0-5])\\d\\d", "high"], ["arc", "high"],
+			["gtx\\s*(10[56]0|9[5-8]0)", "medium"], ["rx\\s*(4[7-8]|5[5-9])0", "medium"], ["rx\\s*5[0-5]00", "medium"], ["vega", "medium"]]:
+		re.compile(pat[0])
+		if re.search(n):
+			return pat[1]
+	return "medium" if t == RenderingDevice.DEVICE_TYPE_DISCRETE_GPU else "low"
 
 func apply_preset(name: String) -> void:
 	settings["quality"] = name
@@ -706,6 +731,9 @@ func apply_preset(name: String) -> void:
 
 func apply_settings() -> void:
 	var win := get_window()
+	var md := str(settings.get("mic_device", ""))
+	if md != "" and md in AudioServer.get_input_device_list():
+		AudioServer.input_device = md
 	if settings["fullscreen"]:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 	elif DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN:

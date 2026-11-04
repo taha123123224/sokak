@@ -1,33 +1,33 @@
 {
-	"version": "2.6.0",
-	"build": 26,
+	"version": "2.7.0",
+	"build": 27,
 	"parts": [
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v26.pck.part00",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v27.pck.part00",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v26.pck.part01",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v27.pck.part01",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v26.pck.part02",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v27.pck.part02",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v26.pck.part03",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v27.pck.part03",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v26.pck.part04",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v27.pck.part04",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v26.pck.part05",
-			"size": 35785720
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v27.pck.part05",
+			"size": 58576132
 		}
 	],
-	"pck_size": 507644920,
+	"pck_size": 530435332,
 	"installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
-	"notes": "Çanakkale ve İnşaat haritaları, AWM/RPK-16/Vityaz/Micro UZI/BR-7 Kuzgun/M1911, rütbe sistemi, yönetici paneli, oyun içi yazılı + sesli sohbet, yeni oda/çanta/market/kasa tasarımı, 12 yeni stil."
+	"notes": "Yeni ışık ve renkler (daha doğal), İnşaat/Çanakkale grafikleri, Çanakkale çimenleri, modern can barı/skor/TAB tablosu, otomatik kalite + dinamik çözünürlük (yüksek FPS), AMD/eski kart düzeltmesi (DirectX 12 / uyumluluk modu), Enter ile sohbet + sesli sohbet bilgisi, odadan atılma hatası düzeldi, yeni yönetim paneli, güvenlik iyileştirmeleri."
 }

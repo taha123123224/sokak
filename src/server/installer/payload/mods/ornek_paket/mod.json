@@ -1,0 +1,61 @@
+{
+ "id": "ornek_paket",
+ "name": "Örnek Eklenti Paketi",
+ "author": "SOKAK",
+ "version": "1.0",
+ "desc": "Yeni silah, stil, karakter ve kasa ekleyen örnek eklenti. Düzenleyip kendi eklentini yap!",
+ "weapons": {
+  "ak_kizil": {
+   "base": "ak47",
+   "name": "AK-47 Kızıl Kurt",
+   "dmg": 35,
+   "rpm": 620,
+   "price": 4000,
+   "cls": "Makinalı"
+  },
+  "mp5_hiz": {
+   "base": "mp5",
+   "name": "MP5 Şimşek",
+   "rpm": 900,
+   "dmg": 21,
+   "price": 3000
+  }
+ },
+ "skins": {
+  "pembe": {
+   "name": "Pembe Panter",
+   "price": 900,
+   "rarity": 1,
+   "color": "#ff5fb0"
+  }
+ },
+ "characters": {
+  "ajan2": {
+   "base": "patron",
+   "name": "Gizli Ajan",
+   "team": "a",
+   "price": 0,
+   "desc": "Eklentiden gelen karakter"
+  }
+ },
+ "crates": {
+  "ornek": {
+   "name": "Eklenti Kasası",
+   "price": 1200,
+   "color": "#ff5fb0",
+   "desc": "Örnek eklenti kasası",
+   "skins": [
+    "pembe",
+    "kamuflaj",
+    "kizil"
+   ],
+   "weapons": [
+    "ak_kizil",
+    "mp5_hiz"
+   ],
+   "chars": [
+    "ajan2"
+   ]
+  }
+ }
+}

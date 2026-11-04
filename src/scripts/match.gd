@@ -198,6 +198,8 @@ func _build() -> void:
 	for c in combatants:
 		_spawn(c, true)
 	await _progress(92, "Efektler ve gölgelendiriciler hazırlanıyor...")
+	if GRASS_MAPS.has(map_id) and str(GS.settings.get("quality", "high")) != "low":
+		await _scatter_grass(GRASS_MAPS[map_id])
 	await _prewarm()
 	await _progress(100, "Hazır!")
 	SFX.play_music("music_match", -16)
@@ -296,12 +298,13 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	sky = Sky.new()
 	sky.radiance_size = Sky.RADIANCE_SIZE_512 if int(s["shadows"]) >= 3 else Sky.RADIANCE_SIZE_256
 	sun = DirectionalLight3D.new()
-	# bright, colourful, high sun for every map (narrow streets need a steep sun)
+	# natural, filmic light (Zula-like): warm key sun, sky-blue ambient in the shadows, deep contact shadows,
+	# colours kept realistic (no washed-out white, no candy saturation)
 	var P := {
-		"day":      {"elev": -58.0, "az": 35.0, "sun": Color(1.0, 0.96, 0.88), "se": 2.8, "top": Color("4579bd"), "hor": Color("a8d0f5"), "amb": Color(0.74, 0.74, 0.76), "ae": 1.1, "fog": Color("b6d3f0"), "exp": 1.0, "sat": 0.86, "fill": Color(0.85, 0.85, 0.88)},
-		"golden":   {"elev": -38.0, "az": 220.0, "sun": Color(1.0, 0.84, 0.62), "se": 2.6, "top": Color("3a7cd0"), "hor": Color("f2c79a"), "amb": Color(0.72, 0.66, 0.62), "ae": 1.05, "fog": Color("f0cfa8"), "exp": 0.98, "sat": 0.88, "fill": Color(0.85, 0.8, 0.82)},
-		"sunset":   {"elev": -24.0, "az": 280.0, "sun": Color(1.0, 0.72, 0.48), "se": 2.3, "top": Color("2f5fae"), "hor": Color("ffb27a"), "amb": Color(0.7, 0.6, 0.62), "ae": 1.0, "fog": Color("f5b48a"), "exp": 0.95, "sat": 0.9, "fill": Color(0.8, 0.72, 0.8)},
-		"overcast": {"elev": -55.0, "az": 120.0, "sun": Color(1.0, 0.97, 0.92), "se": 2.4, "top": Color("4a7fbf"), "hor": Color("c4dcf0"), "amb": Color(0.75, 0.75, 0.77), "ae": 1.2, "fog": Color("c8dcee"), "exp": 1.0, "sat": 0.84, "fill": Color(0.85, 0.86, 0.9)},
+		"day":      {"elev": -52.0, "az": 35.0, "sun": Color(1.0, 0.93, 0.82), "se": 2.3, "top": Color("4a76ad"), "hor": Color("c2cfdc"), "amb": Color(0.72, 0.73, 0.76), "ae": 0.85, "fog": Color("bfcad6"), "exp": 0.97, "sat": 0.93, "fill": Color(0.8, 0.84, 0.92)},
+		"golden":   {"elev": -36.0, "az": 220.0, "sun": Color(1.0, 0.83, 0.62), "se": 2.3, "top": Color("4570a8"), "hor": Color("dcbf9f"), "amb": Color(0.72, 0.7, 0.7), "ae": 0.82, "fog": Color("d9c0a4"), "exp": 0.96, "sat": 1.0, "fill": Color(0.7, 0.75, 0.92)},
+		"sunset":   {"elev": -22.0, "az": 280.0, "sun": Color(1.0, 0.74, 0.52), "se": 2.15, "top": Color("41689f"), "hor": Color("e0ae8e"), "amb": Color(0.7, 0.66, 0.68), "ae": 0.8, "fog": Color("d9ab8e"), "exp": 0.95, "sat": 0.98, "fill": Color(0.62, 0.66, 0.9)},
+		"overcast": {"elev": -55.0, "az": 120.0, "sun": Color(1.0, 0.96, 0.9), "se": 1.9, "top": Color("5a7fa8"), "hor": Color("c0ccd8"), "amb": Color(0.7, 0.72, 0.76), "ae": 0.75, "fog": Color("c2ccd6"), "exp": 1.0, "sat": 0.92, "fill": Color(0.8, 0.84, 0.9)},
 	}
 	var c: Dictionary = P.get(preset, P["day"])
 	sun.rotation_degrees = Vector3(c["elev"], c["az"], 0)
@@ -314,7 +317,7 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	sun.shadow_bias = 0.03
 	sun.shadow_normal_bias = 1.2
 	sun.shadow_blur = 1.0
-	sun.shadow_opacity = 0.82
+	sun.shadow_opacity = 0.93
 	sun.light_angular_distance = 0.5
 	var sm := ProceduralSkyMaterial.new()
 	sm.sky_top_color = c["top"]
@@ -325,7 +328,7 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	# small, crisp sun disc (a 25° halo washed out the whole sky at sunset)
 	sm.sun_angle_max = 7
 	sm.sun_curve = 0.18
-	sm.sky_energy_multiplier = 1.1
+	sm.sky_energy_multiplier = 1.0
 	sm.ground_energy_multiplier = 0.6
 	sm.sky_cover = load("res://assets/tex/clouds.png") if ResourceLoader.exists("res://assets/tex/clouds.png") else null
 	sm.sky_cover_modulate = Color(1, 1, 1, 0.9)
@@ -334,15 +337,15 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	var fill := DirectionalLight3D.new()
 	fill.rotation_degrees = Vector3(-30, float(c["az"]) + 180.0, 0)
 	fill.light_color = c["fill"]
-	fill.light_energy = 0.55
-	fill.light_specular = 0.15
+	fill.light_energy = 0.3
+	fill.light_specular = 0.05
 	fill.shadow_enabled = false
 	add_child(fill)
 	e.background_mode = Environment.BG_SKY
 	e.sky = sky
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	e.ambient_light_color = c["amb"]
-	e.ambient_light_sky_contribution = 0.35
+	e.ambient_light_sky_contribution = 0.5
 	e.ambient_light_energy = c["ae"]
 	e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	e.tonemap_mode = Environment.TONE_MAPPER_ACES
@@ -353,15 +356,15 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	e.fog_mode = Environment.FOG_MODE_DEPTH
 	e.fog_light_color = c["fog"]
 	e.fog_light_energy = 1.0
-	e.fog_density = 0.55
-	e.fog_depth_begin = 70.0
+	e.fog_density = 0.6
+	e.fog_depth_begin = 45.0
 	e.fog_depth_end = 520.0 * float(s["draw_distance"])
 	e.fog_depth_curve = 2.0
-	e.fog_sun_scatter = 0.06
+	e.fog_sun_scatter = 0.12
 	e.fog_sky_affect = 0.0
 	e.ssao_enabled = bool(s["ssao"])
-	e.ssao_radius = 1.2; e.ssao_intensity = 1.45; e.ssao_power = 1.45; e.ssao_detail = 0.9; e.ssao_horizon = 0.06
-	e.ssao_sharpness = 0.98; e.ssao_light_affect = 0.06; e.ssao_ao_channel_affect = 0.25
+	e.ssao_radius = 1.4; e.ssao_intensity = 2.3; e.ssao_power = 1.6; e.ssao_detail = 1.0; e.ssao_horizon = 0.06
+	e.ssao_sharpness = 0.98; e.ssao_light_affect = 0.18; e.ssao_ao_channel_affect = 0.4
 	e.ssil_enabled = bool(s["ssil"])
 	e.ssil_radius = 4.0; e.ssil_intensity = 1.25; e.ssil_sharpness = 0.98; e.ssil_normal_rejection = 1.0
 	e.ssr_enabled = bool(s["ssr"])
@@ -385,7 +388,7 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	e.volumetric_fog_sky_affect = 0.0
 	e.adjustment_enabled = true
 	e.adjustment_brightness = 1.0
-	e.adjustment_contrast = 1.06
+	e.adjustment_contrast = 1.1
 	e.adjustment_saturation = c["sat"]
 	e.adjustment_color_correction = _grade_lut()
 	world_env.environment = e
@@ -509,7 +512,138 @@ func world_to_minimap(p: Vector3) -> Vector2:
 # ---------------------------------------------------------------- loop
 var test_follow: Array = []
 
+## dynamic resolution: keeps the frame rate up on weaker PCs by lowering the 3D render scale (FSR upscales it back),
+## and raises it again when there is headroom. The HUD / text always stay at full resolution.
+var _dr_acc := 0.0
+var _dr_n := 0
+var _dr_scale := -1.0
+func _dyn_res(delta: float) -> void:
+	if not bool(GS.settings.get("dyn_res", true)) or paused or loading != null and is_instance_valid(loading):
+		return
+	_dr_acc += delta
+	_dr_n += 1
+	if _dr_acc < 1.5:
+		return
+	var fps := _dr_n / _dr_acc
+	_dr_acc = 0.0; _dr_n = 0
+	var vp := get_viewport()
+	var user_s := float(GS.settings.get("resolution_scale", 1.0))
+	if _dr_scale < 0:
+		_dr_scale = user_s
+	var target := float(GS.settings.get("dyn_target", 60))
+	var old := _dr_scale
+	if fps < target * 0.92:
+		_dr_scale = maxf(0.6, _dr_scale - (0.1 if fps < target * 0.7 else 0.05))
+	elif fps > target * 1.35 and _dr_scale < user_s:
+		_dr_scale = minf(user_s, _dr_scale + 0.05)
+	if absf(old - _dr_scale) > 0.001:
+		vp.scaling_3d_scale = _dr_scale
+		if _dr_scale < 0.99:
+			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR
+			vp.fsr_sharpness = 0.25
+		else:
+			GS.apply_settings()
+
+# ---------------------------------------------------------------- grass
+## maps that get real grass tufts on open ground. exclude = rectangles in map (Blender) coordinates x0,y0,x1,y1
+const GRASS_MAPS := {
+	"canakkale": {"step": 0.85, "tint": Color(0.86, 0.8, 0.55), "exclude": [[-11.5, -50, -4.5, 50], [-6, -35, 90, -25], [0, 6, 44, 38]]},
+}
+const GRASS_SHADER := """
+shader_type spatial;
+render_mode cull_disabled, depth_draw_opaque, specular_disabled;
+uniform sampler2D tex : source_color, filter_linear_mipmap, repeat_disable;
+uniform vec4 tint : source_color = vec4(1.0);
+uniform float fade_end = 38.0;
+varying float vfade;
+void vertex() {
+	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	float h = clamp(UV.y < 0.5 ? 1.0 : 0.0, 0.0, 1.0);
+	float w = sin(TIME * 1.7 + wp.x * 0.35 + wp.z * 0.27) * 0.08 + sin(TIME * 3.1 + wp.x * 1.3) * 0.025;
+	VERTEX.x += w * h;
+	VERTEX.z += w * 0.6 * h;
+	NORMAL = vec3(0.0, 1.0, 0.0);
+	vfade = 1.0 - smoothstep(fade_end * 0.75, fade_end, length(wp - CAMERA_POSITION_WORLD));
+}
+void fragment() {
+	vec4 t = texture(tex, UV);
+	ALBEDO = t.rgb * tint.rgb * mix(0.72, 1.0, 1.0 - UV.y);
+	ALPHA = t.a * vfade;
+	ALPHA_SCISSOR_THRESHOLD = 0.5;
+	ROUGHNESS = 0.95;
+	BACKLIGHT = vec3(0.25, 0.22, 0.1);
+}
+"""
+
+func _scatter_grass(cfg: Dictionary) -> void:
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var space := get_world_3d().direct_space_state
+	var b: Array = bounds
+	var step: float = float(cfg["step"]) * (1.0 if str(GS.settings.get("quality", "high")) != "medium" else 1.35)
+	# two crossed quads, 0.55 m tall
+	var am := ArrayMesh.new()
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for k in 2:
+		var a := PI * 0.5 * k + 0.4
+		var d := Vector3(cos(a), 0, sin(a)) * 0.42
+		var v0 := -d; var v1 := d
+		var hgt := Vector3(0, 0.55, 0)
+		for tri in [[v0, Vector2(0, 1)], [v1, Vector2(1, 1)], [v1 + hgt, Vector2(1, 0)], [v0, Vector2(0, 1)], [v1 + hgt, Vector2(1, 0)], [v0 + hgt, Vector2(0, 0)]]:
+			st.set_uv(tri[1]); st.set_normal(Vector3.UP); st.add_vertex(tri[0])
+	st.commit(am)
+	var mat := ShaderMaterial.new()
+	var sh := Shader.new(); sh.code = GRASS_SHADER
+	mat.shader = sh
+	mat.set_shader_parameter("tex", load("res://assets/tex/grass_tuft.png"))
+	mat.set_shader_parameter("tint", cfg["tint"])
+	am.surface_set_material(0, mat)
+	var chunks := {}
+	var rng := RandomNumberGenerator.new(); rng.seed = 77
+	var x: float = b[0]
+	var excl: Array = cfg["exclude"]
+	while x < float(b[2]):
+		var y: float = b[1]
+		while y < float(b[3]):
+			var px := x + rng.randf_range(-0.4, 0.4) * step
+			var py := y + rng.randf_range(-0.4, 0.4) * step
+			y += step
+			var skip := false
+			for r in excl:
+				if px > r[0] and px < r[2] and py > r[1] and py < r[3]:
+					skip = true; break
+			if skip:
+				continue
+			var q := PhysicsRayQueryParameters3D.create(Vector3(px, 40, -py), Vector3(px, -5, -py))
+			var hit := space.intersect_ray(q)
+			if hit.is_empty() or hit["position"].y > 0.25 or hit["normal"].y < 0.85:
+				continue
+			var key := Vector2i(int(floor(px / 16.0)), int(floor(py / 16.0)))
+			if not chunks.has(key):
+				chunks[key] = []
+			var tr := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(0.7, 1.35)), hit["position"])
+			chunks[key].append(tr)
+		x += step
+	var n := 0
+	for key in chunks:
+		var arr: Array = chunks[key]
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = am
+		mm.instance_count = arr.size()
+		for i in arr.size():
+			mm.set_instance_transform(i, arr[i])
+		var mmi := MultiMeshInstance3D.new()
+		mmi.multimesh = mm
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mmi.visibility_range_end = 48.0
+		add_child(mmi)
+		n += arr.size()
+	print("GRASS ", n)
+
 func _process(delta: float) -> void:
+	_dyn_res(delta)
 	if world_env and world_env.environment:  # live brightness slider
 		world_env.environment.tonemap_exposure = env_exp * float(GS.settings.get("brightness", 1.0))
 	if test_follow.size() == 2 and is_instance_valid(test_follow[1]):
@@ -541,15 +675,33 @@ func _process(delta: float) -> void:
 			time_left = 0
 			end_match()
 
-func _unhandled_input(e: InputEvent) -> void:
-	# text chat (T = everyone, Y = team) and push-to-talk voice (V, online only)
-	if hud and not hud.typing and not paused and not ended and (e.is_action_pressed("chat") or e.is_action_pressed("team_chat")):
-		hud.open_chat(e.is_action_pressed("team_chat"))
-		get_viewport().set_input_as_handled()
+func _input(e: InputEvent) -> void:
+	# text chat (Enter / T = everyone, Y = team) and push-to-talk voice (V basılı tut, online)
+	# handled in _input (before any UI / player code) so nothing can swallow the keys
+	if hud == null or hud.typing or paused or ended:
 		return
-	if net and e.is_action("voice") and not (hud and hud.typing):
+	if e is InputEventKey and e.pressed and not e.echo:
+		var enter: bool = e.keycode == KEY_ENTER or e.keycode == KEY_KP_ENTER
+		if enter or e.is_action_pressed("chat") or e.is_action_pressed("team_chat"):
+			if sab and sab.has_method("is_typing") and sab.is_typing():
+				return
+			hud.open_chat(e.is_action_pressed("team_chat") and not enter)
+			get_viewport().set_input_as_handled()
+			return
+	if e is InputEventKey and not e.echo and e.is_action("voice"):
+		if not net:
+			if e.is_pressed():
+				hud.voice_notice("Sesli sohbet sadece ÇEVRİMİÇİ odalarda çalışır (bot maçında konuşacak kimse yok).")
+			return
 		Voice.enabled = bool(GS.settings.get("voice_on", true))
+		if e.is_pressed() and not Voice.enabled:
+			hud.voice_notice("Sesli sohbet kapalı — Ayarlar > Ses bölümünden açabilirsin.")
+			return
 		Voice.set_talking(e.is_pressed())
+		if e.is_pressed() and not Voice.talking:
+			hud.voice_notice("Mikrofon bulunamadı veya izin yok — Windows Ayarlar > Gizlilik > Mikrofon'dan izin ver.")
+
+func _unhandled_input(e: InputEvent) -> void:
 	if e.is_action_pressed("pause") and not ended and player != null:
 		if hud and hud.buy_open:
 			hud.toggle_buy(false)
@@ -926,6 +1078,9 @@ func leave() -> void:
 		main.go_menu("lobby")
 
 func test_hook(i: int) -> void:
+	if i == 23:
+		hud.force_board = true
+		return
 	if i == 1:
 		var c := Camera3D.new()
 		c.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF

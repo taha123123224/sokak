@@ -24,8 +24,33 @@ export default {
     }
     if (!m) return new Response("not found", { status: 404 });
     if (req.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
+    // ---- identity: the player must send a valid Supabase login token; id + name come from the server, not the client
+    const auth = req.headers.get("Authorization") || "";
+    const tok = auth.startsWith("Bearer ") ? auth.slice(7) : (url.searchParams.get("tok") || "");
+    if (!tok || tok.length > 4096) return new Response("Oyunu güncelle ve tekrar giriş yap", { status: 401 });
+    const H = { apikey: env.SUPABASE_KEY, Authorization: "Bearer " + tok };
+    let uid = "", name = "";
+    try {
+      const ur = await fetch(env.SUPABASE_URL + "/auth/v1/user", { headers: H });
+      if (!ur.ok) return new Response("Oturum geçersiz, tekrar giriş yap", { status: 401 });
+      uid = String((await ur.json()).id || "");
+      const pr = await fetch(env.SUPABASE_URL + "/rest/v1/profiles?select=username,banned_until&id=eq." + encodeURIComponent(uid), { headers: H });
+      const rows = pr.ok ? await pr.json() : [];
+      if (!rows.length) return new Response("Profil bulunamadı", { status: 403 });
+      const b = rows[0].banned_until;
+      if (b && (b === "infinity" || Date.parse(b) > Date.now())) return new Response("Hesabın yasaklandı", { status: 403 });
+      name = String(rows[0].username || "Oyuncu").slice(0, 20);
+    } catch (e) {
+      return new Response("Doğrulama sunucusuna ulaşılamadı", { status: 503 });
+    }
+    if (!uid) return new Response("Oturum geçersiz", { status: 401 });
+    const fwd = new URL(req.url);
+    fwd.search = "";
+    fwd.searchParams.set("id", uid);
+    fwd.searchParams.set("name", name);
+    fwd.searchParams.set("k", env.SUPABASE_KEY.slice(-12));   // marks the request as coming through this worker
     const id = env.ROOMS.idFromName(m[1].toUpperCase());
-    return env.ROOMS.get(id).fetch(req);
+    return env.ROOMS.get(id).fetch(new Request(fwd.toString(), req));
   },
 };
 
@@ -34,6 +59,9 @@ const MAX_PLAYERS = 10;
 export class Room {
   constructor(state, env) {
     this.state = state;
+    this.env = env;
+    this.flood = new Map();   // socket -> {t, n}
+    this.chatT = new Map();   // player id -> last chat ms
   }
 
   members() {
@@ -57,6 +85,7 @@ export class Room {
 
   async fetch(req) {
     const url = new URL(req.url);
+    if (url.searchParams.get("k") !== String(this.env.SUPABASE_KEY || "").slice(-12)) return new Response("forbidden", { status: 403 });
     const pid = (url.searchParams.get("id") || "").slice(0, 64);
     const name = (url.searchParams.get("name") || "Oyuncu").slice(0, 20);
     if (!pid) return new Response("missing id", { status: 400 });
@@ -79,15 +108,41 @@ export class Room {
   async webSocketMessage(ws, msg) {
     const me = ws.deserializeAttachment();
     if (!me) return;
+    // ---- flood guard: more than 90 messages in one second = disconnect
+    const now = Date.now();
+    const f = this.flood.get(ws) || { t: now, n: 0 };
+    if (now - f.t > 1000) { f.t = now; f.n = 0; }
+    f.n += 1;
+    this.flood.set(ws, f);
+    if (f.n > 90) { try { ws.close(4004, "flood"); } catch (e) {} return; }
     if (typeof msg !== "string") {
-      // binary state packets: forward unchanged to everyone else (sender id is inside the packet)
+      // binary = voice only: 'V', id length, id, samples. The id inside must be the sender's own id.
+      const b = new Uint8Array(msg);
+      if (b.length < 3 || b.length > 4096 || b[0] !== 0x56) return;
+      const l = b[1];
+      if (b.length < 2 + l) return;
+      const sid = new TextDecoder().decode(b.subarray(2, 2 + l));
+      if (sid !== me.id) return;
       for (const o of this.state.getWebSockets()) if (o !== ws) { try { o.send(msg); } catch (e) {} }
       return;
     }
+    if (msg.length > 16384) return;
     let data;
     try { data = JSON.parse(msg); } catch (e) { return; }
+    if (!data || typeof data !== "object" || Array.isArray(data)) return;
     if (data.t === "ping") { this.send(ws, { t: "pong", ts: data.ts }); return; }
     data.from = me.id;
+    // only the relay may send system messages; only the host may start / configure / end the match
+    if (data.t === "sys" || data.t === "welcome" || data.t === "joined" || data.t === "left") return;
+    if ((data.t === "start" || data.t === "cfg" || data.t === "end") && me.id !== this.hostId()) return;
+    if (data.t === "chat") {
+      const last = this.chatT.get(me.id) || 0;
+      if (now - last < 600) return;                       // max ~1.6 messages / second
+      this.chatT.set(me.id, now);
+      data.n = me.name;                                   // real account name, can't be faked
+      data.m = String(data.m || "").slice(0, 120);
+      if (!data.m.trim()) return;
+    }
     if (data.t === "hit") {
       const ok = this.checkHit(ws, me, data);
       if (!ok) return;
@@ -129,6 +184,7 @@ export class Room {
   async webSocketError(ws) { this.leave(ws); }
 
   leave(ws) {
+    this.flood.delete(ws);
     const me = ws.deserializeAttachment();
     try { ws.close(); } catch (e) {}
     if (!me) return;

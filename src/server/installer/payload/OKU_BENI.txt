@@ -1,0 +1,24 @@
+SOKAK: Operasyon — Windows
+==========================
+Çalıştırma: SOKAK.exe (SOKAK.pck aynı klasörde olmalı)
+Gereksinim: Windows 10/11 64-bit, Vulkan destekli ekran kartı (güncel sürücü)
+
+Kontroller (Ayarlar > Tuşlar'dan değiştirilebilir)
+  WASD hareket · Shift koş · Ctrl eğil · Space zıpla · Sol tık ateş · Sağ tık nişan
+  R doldur · 1-4 silah · G/4 bomba (basılı tut: nişan, bırak: at) · V bıçak
+  B satın alma menüsü · Tab skor tablosu · Esc menü
+
+Yenilikler (bu sürüm)
+  • Botlar silahı gerçekçi tutuyor: dipçik omuzda, iki el silahta (kopma/kayma yok)
+  • Gerçek silah kayıtlarından yeni atış sesleri, uzak atış yankısı, susturucu, şarjör/sürgü sesleri
+  • Yapay zeka anons sesi (Headshot!, Double kill!...) - Ayarlar > Ses'ten kapatılabilir
+  • Yeni silahlar: AUG A3, Vector .45, M249 SAW
+  • Her silahın farklı zırh delme, duvar delme, menzil düşüşü ve özel yeteneği var
+  • Silah eklentileri: susturucu, kompansatör, holografik nişangah, uzatılmış şarjör, ön tutamak, lazer
+    (Eklenti Paketi kasasından çıkar veya Market > Eklentiler; takmak için Çanta > Özelleştir)
+  • Animasyonlu kasa açılışı, yükseltilmiş silahlarda seviye renk parlaması
+  • İNCELE: silah tam ekran, fareyle döndür / tekerlekle yakınlaştır
+  • Yeni lobi üst barı, daha doğal ve göz yormayan renkler, parlaklık ayarı (Ayarlar > Görüntü)
+  • Gemi haritası üst kat görüntü hatası düzeltildi
+
+Eklentiler (mod): mods klasörüne bak (mods/README.txt)
