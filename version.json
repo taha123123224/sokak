@@ -1,25 +1,25 @@
 {
-	"version": "2.4.0",
-	"build": 24,
+	"version": "2.5.0",
+	"build": 25,
 	"parts": [
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v24.pck.part00",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v25.pck.part00",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v24.pck.part01",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v25.pck.part01",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v24.pck.part02",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v25.pck.part02",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v24.pck.part03",
-			"size": 53055988
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v25.pck.part03",
+			"size": 84298992
 		}
 	],
-	"pck_size": 336171508,
+	"pck_size": 367414512,
 	"installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
-	"notes": "Sabotaj modu, canlı sıralama, Bot/Çevrimiçi mod seçimi, sunucu taraflı hile koruması, yeni geri tepme, dürbün düzeltmesi ve yeni yükseltme efekti."
+	"notes": "Grafik yenilemesi (renk ayarı, gölge/AO, yansıma), yeni AK-47/AWP/FN 502/Remington 870 modelleri, sol el tutuş düzeltmesi, CS tarzı öldürme bildirimi, F ile modern inceleme, bıçakta sağ tık ağır saldırı, süreli/süresiz kasa silahları."
 }

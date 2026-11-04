@@ -23,9 +23,24 @@ func _ready() -> void:
 	env.background_mode = Environment.BG_CLEAR_COLOR
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.6, 0.65, 0.75)
-	env.ambient_light_energy = 0.6
+	env.ambient_light_energy = 0.55
+	# studio sky used only for reflections: metal, clearcoat and gold skins catch real highlights
+	var sky := Sky.new()
+	var sm := ProceduralSkyMaterial.new()
+	sm.sky_top_color = Color(0.55, 0.62, 0.75); sm.sky_horizon_color = Color(0.95, 0.92, 0.88)
+	sm.ground_bottom_color = Color(0.08, 0.08, 0.1); sm.ground_horizon_color = Color(0.45, 0.42, 0.4)
+	sm.sky_energy_multiplier = 1.3
+	sky.sky_material = sm
+	sky.radiance_size = Sky.RADIANCE_SIZE_256
+	env.sky = sky
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	env.ssao_enabled = true
+	env.ssao_radius = 0.08; env.ssao_intensity = 1.4; env.ssao_detail = 1.0
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
-	env.tonemap_exposure = 1.2
+	env.tonemap_exposure = 1.25
+	env.adjustment_enabled = true
+	env.adjustment_contrast = 1.06
+	env.adjustment_saturation = 1.08
 	cam = Camera3D.new()
 	cam.environment = env
 	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
@@ -39,6 +54,12 @@ func _ready() -> void:
 	l2.light_energy = 1.2
 	l2.light_color = Color(1, 0.7, 0.45)
 	vp.add_child(l2)
+	var l3 := DirectionalLight3D.new()     # cool top rim
+	l3.rotation_degrees = Vector3(-70, 180, 0)
+	l3.light_energy = 0.9
+	l3.light_color = Color(0.7, 0.85, 1.0)
+	l3.light_specular = 1.5
+	vp.add_child(l3)
 	holder = Node3D.new()
 	vp.add_child(holder)
 

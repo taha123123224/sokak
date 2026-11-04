@@ -1024,7 +1024,11 @@ func _weapon_card(id: String, selected: bool, cb: Callable, price: int = -1) -> 
 	if price < 0:
 		bh.add_child(_lvl_pips(lvl, 14))
 		bh.add_child(UI.spacer())
-		bh.add_child(UI.lbl("Süresiz", 15, UI.DIM, "Rajdhani-SemiBold"))
+		var tl: String = GS.wtime_label(id)
+		if tl == "":
+			bh.add_child(UI.lbl("∞ Süresiz", 15, UI.DIM, "Rajdhani-SemiBold"))
+		else:
+			bh.add_child(UI.lbl("⏱ " + tl, 16, Color("ff9a4a"), "Rajdhani-Bold"))
 	else:
 		var bl: Dictionary = GS.ball(id)
 		if bl.has("ability"):
@@ -1344,8 +1348,8 @@ func _page_market() -> void:
 		"silah":
 			var any := false
 			for id in GS.WEAPONS.keys():
-				if GS.owned(id):
-					continue
+				if GS.owned(id) and GS.wtime_left(id) <= 0.0:
+					continue      # timed (crate) weapons stay buyable: buying makes them permanent
 				any = true
 				var price: int = GS.WEAPONS[id]["price"]
 				grid.add_child(_weapon_card(id, false, func(): _buy_weapon(id), price))
@@ -1804,7 +1808,9 @@ func _item_display(it: Dictionary) -> Dictionary:
 		"part":
 			d["label"] = "EKLENTİ: " + str(GS.PARTS.get(it["id"], {}).get("name", it["id"])); d["color"] = Color("7dff6a"); d["rarity"] = 2
 		"weapon":
-			d["label"] = "SİLAH: " + str(GS.WEAPONS.get(it["id"], {}).get("name", it["id"])); d["color"] = Color("ff5a5a"); d["rarity"] = 3
+			var dd := int(it.get("days", 0))
+			d["label"] = "SİLAH: " + str(GS.WEAPONS.get(it["id"], {}).get("name", it["id"])) + ("  •  SÜRESİZ" if dd == 0 else "  •  %d GÜN" % dd) + ("  (süre uzatıldı)" if it.get("ext", false) else "")
+			d["color"] = Color("ff5a5a") if dd == 0 else Color("ff9a4a"); d["rarity"] = 3 if dd == 0 else 2
 		"char":
 			d["label"] = "KARAKTER: " + str(GS.CHARACTERS.get(it["id"], {}).get("name", it["id"])); d["color"] = Color("ff4df0"); d["rarity"] = 3
 		_:

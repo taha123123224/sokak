@@ -26,6 +26,8 @@ var WEAPONS := {
 	"revolver": {"name": "Magnum .357", "cat": "tabanca", "cls": "Tabanca", "dmg": 62, "rpm": 150, "mag": 6, "reserve": 36, "reload": 2.3, "spread": 0.02, "ads_spread": 0.003, "move": 0.04, "recoil": 0.06, "hrec": 0.012, "auto": false, "range": 120.0, "speed": 1.05, "price": 2600, "snd": "shot_revolver", "zoom": 1.25, "head": 2.7},
 	"glock":  {"name": "Glock 17", "cat": "tabanca", "cls": "Tabanca", "dmg": 24, "rpm": 420, "mag": 17, "reserve": 68, "reload": 1.6, "spread": 0.02, "ads_spread": 0.006, "move": 0.015, "recoil": 0.02, "hrec": 0.006, "auto": false, "range": 80.0, "speed": 1.08, "price": 0, "snd": "shot_pistol", "zoom": 1.15, "head": 2.5},
 	"deagle": {"name": "Deagle .50", "cat": "tabanca", "cls": "Tabanca", "dmg": 54, "rpm": 210, "mag": 7, "reserve": 35, "reload": 1.9, "spread": 0.022, "ads_spread": 0.004, "move": 0.04, "recoil": 0.055, "hrec": 0.012, "auto": false, "range": 120.0, "speed": 1.05, "price": 1800, "snd": "shot_deagle", "zoom": 1.2, "head": 2.6},
+	"r870":   {"name": "870 Pompalı", "cat": "ana", "cls": "Pompalı", "dmg": 19, "rpm": 62, "mag": 6, "reserve": 30, "reload": 0.6, "spread": 0.068, "ads_spread": 0.05, "move": 0.02, "recoil": 0.075, "hrec": 0.02, "auto": false, "range": 45.0, "pellets": 8, "speed": 0.97, "price": 2800, "snd": "shot_shotgun", "zoom": 1.15, "head": 1.6, "shell_reload": true},
+	"fn502":  {"name": "FN 502 Taktik", "cat": "tabanca", "cls": "Tabanca", "dmg": 21, "rpm": 480, "mag": 15, "reserve": 60, "reload": 1.5, "spread": 0.017, "ads_spread": 0.004, "move": 0.012, "recoil": 0.014, "hrec": 0.005, "auto": false, "range": 75.0, "speed": 1.08, "price": 1400, "snd": "shot_pistol", "zoom": 1.2, "head": 2.5, "silenced": true},
 	"knife":  {"name": "Savaş Bıçağı", "cat": "bicak", "cls": "Bıçak", "dmg": 55, "rpm": 110, "melee": true, "speed": 1.15, "price": 0, "head": 1.0},
 	"karambit": {"name": "Karambit", "cat": "bicak", "cls": "Bıçak", "dmg": 60, "rpm": 130, "melee": true, "speed": 1.17, "price": 2000, "head": 1.0},
 	"frag":   {"name": "El Bombası MK3", "cat": "bomba", "cls": "Bomba", "dmg": 130, "count": 2, "throwable": true, "speed": 1.1, "price": 0, "head": 1.0},
@@ -53,7 +55,7 @@ var CRATES := {
 	"sokak": {"name": "Sokak Kasası", "price": 1000, "color": Color("ff8a1f"), "desc": "Her şeyden biraz: malzeme, altın, stiller.",
 		"skins": ["kamuflaj", "kar", "dijital", "gece", "neon", "kizil", "galaksi", "altin"], "weapons": [], "chars": []},
 	"operasyon": {"name": "Operasyon Kasası", "price": 2000, "color": Color("4fb3ff"), "desc": "Taktik stiller ve yeni silah şansı (AUG, Vector, SCAR-H, UMP-45).",
-		"skins": ["dijital", "karbon", "kar", "kamuflaj", "gece", "buz"], "weapons": ["aug", "vector", "scar", "ump45", "m4a1", "p90"], "chars": ["asker2", "asker3"]},
+		"skins": ["dijital", "karbon", "kar", "kamuflaj", "gece", "buz"], "weapons": ["aug", "vector", "scar", "ump45", "m4a1", "p90", "r870", "fn502"], "chars": ["asker2", "asker3"]},
 	"eklenti": {"name": "Eklenti Paketi", "price": 1500, "color": Color("7dff6a"), "desc": "Silah eklentileri: susturucu, nişangah, şarjör, tutamak, lazer.",
 		"skins": ["karbon", "dijital"], "weapons": [], "chars": [], "parts": ["sus", "kompen", "optik", "sarjor", "tutamak", "lazer"]},
 	"osmanli": {"name": "Osmanlı Kasası", "price": 2500, "color": Color("2fb6a8"), "desc": "Çini ve turkuaz desenler, Magnum ve Patron karakteri şansı.",
@@ -76,6 +78,8 @@ const BALLISTICS := {
 	"p90":    {"ap": 0.4, "pen": 0.12, "f0": 16.0, "f1": 50.0, "fmin": 0.62, "limb": 0.8, "ability": "50'lik şarjör, zırh delici 5.7 mm"},
 	"ump45":  {"ap": 0.15, "pen": 0.05, "f0": 12.0, "f1": 40.0, "fmin": 0.62, "limb": 0.85, "abil": "slow", "ability": "Yavaşlatan .45 mermi: vurulan hedef yavaşlar"},
 	"vector": {"ap": 0.1, "pen": 0.0, "f0": 10.0, "f1": 30.0, "fmin": 0.55, "limb": 0.85, "ability": "Dakikada 1150 atış: yakın mesafenin kralı"},
+	"r870":   {"ap": 0.1, "pen": 0.0, "f0": 7.0, "f1": 26.0, "fmin": 0.25, "limb": 0.9, "ability": "Sıkı saçma: pompalılar arasında en uzun menzil"},
+	"fn502":  {"ap": 0.15, "pen": 0.0, "f0": 14.0, "f1": 40.0, "fmin": 0.65, "limb": 0.8, "ability": "Namlu ucu susturuculu: haritada görünmezsin"},
 	"spas":   {"ap": 0.1, "pen": 0.0, "f0": 6.0, "f1": 22.0, "fmin": 0.22, "limb": 0.9, "ability": "Yakın mesafede tek atışta öldürür"},
 	"awp":    {"ap": 0.95, "pen": 0.65, "f0": 400.0, "f1": 500.0, "fmin": 1.0, "limb": 0.85, "ability": "Gövdeden tek atış, duvar deler"},
 	"kar98":  {"ap": 0.85, "pen": 0.5, "f0": 400.0, "f1": 500.0, "fmin": 1.0, "limb": 0.8, "ability": "Hızlı sürgü, kafadan kesin ölüm"},
@@ -459,6 +463,9 @@ func sanitize_profile() -> void:
 	for k2 in ["parts", "wparts", "crates2"]:
 		if not (profile.get(k2) is Dictionary):
 			profile[k2] = {}
+	Econ.expire(profile, Time.get_unix_time_from_system())
+	if not (profile.get("expired") is Dictionary):
+		profile["expired"] = {}
 	for st in profile["sets"]:
 		for c in (st as Dictionary).keys():
 			if not owned(str(st[c])):
@@ -535,6 +542,23 @@ func owned(id: String) -> bool:
 
 func wlvl(id: String) -> int:
 	return int(profile["owned"][id]["lvl"]) if owned(id) else 0
+
+## seconds left on a timed (crate) weapon; 0 = permanent / not owned
+func wtime_left(id: String) -> float:
+	if not owned(id):
+		return 0.0
+	var e := float(profile["owned"][id].get("exp", 0))
+	return maxf(e - Time.get_unix_time_from_system(), 1.0) if e > 0.0 else 0.0
+
+func wtime_label(id: String) -> String:
+	var t := wtime_left(id)
+	if t <= 0.0:
+		return ""
+	if t >= 86400.0:
+		return "%d GÜN" % int(ceil(t / 86400.0))
+	if t >= 3600.0:
+		return "%d SAAT" % int(ceil(t / 3600.0))
+	return "%d DK" % int(ceil(t / 60.0))
 
 func wskin(id: String) -> String:
 	return str(profile["owned"][id]["skin"]) if owned(id) else "std"
@@ -660,6 +684,18 @@ func apply_settings() -> void:
 	var sizes := [1024, 2048, 4096, 4096, 8192]
 	RenderingServer.directional_shadow_atlas_set_size(sizes[clamp(sh, 0, 4)], true)
 	RenderingServer.directional_soft_shadow_filter_set_quality([RenderingServer.SHADOW_QUALITY_HARD, RenderingServer.SHADOW_QUALITY_SOFT_LOW, RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM, RenderingServer.SHADOW_QUALITY_SOFT_HIGH, RenderingServer.SHADOW_QUALITY_SOFT_ULTRA][clamp(sh, 0, 4)])
+	# post-process quality tiers (AO / indirect light / reflections)
+	var qi: int = ["low", "medium", "high", "ultra", "uhd"].find(str(settings.get("quality", "ultra")))
+	if qi < 0: qi = 3
+	var rq: int = [RenderingServer.ENV_SSAO_QUALITY_VERY_LOW, RenderingServer.ENV_SSAO_QUALITY_LOW, RenderingServer.ENV_SSAO_QUALITY_MEDIUM, RenderingServer.ENV_SSAO_QUALITY_HIGH, RenderingServer.ENV_SSAO_QUALITY_ULTRA][qi]
+	RenderingServer.environment_set_ssao_quality(rq, qi < 3, 0.5, 2 if qi < 3 else 3, 50.0, 300.0)
+	RenderingServer.environment_set_ssil_quality(rq, qi < 4, 0.5, 4, 50.0, 300.0)
+	RenderingServer.environment_set_ssr_roughness_quality([RenderingServer.ENV_SSR_ROUGHNESS_QUALITY_DISABLED, RenderingServer.ENV_SSR_ROUGHNESS_QUALITY_LOW, RenderingServer.ENV_SSR_ROUGHNESS_QUALITY_MEDIUM, RenderingServer.ENV_SSR_ROUGHNESS_QUALITY_HIGH, RenderingServer.ENV_SSR_ROUGHNESS_QUALITY_HIGH][qi])
+	RenderingServer.environment_glow_set_use_bicubic_upscale(qi >= 2)
+	# removes sparkling specular aliasing on metal (gun barrels, rails, roofs)
+	RenderingServer.screen_space_roughness_limiter_set_active(qi >= 2, 0.25, 0.18)
+	RenderingServer.environment_set_volumetric_fog_volume_size(64 if qi < 3 else 96, 64 if qi < 3 else 96)
+	RenderingServer.environment_set_volumetric_fog_filter_active(qi >= 2)
 	# audio buses
 	_set_bus("Master", settings["vol_master"])
 	_set_bus("SFX", settings["vol_sfx"])

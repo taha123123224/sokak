@@ -71,6 +71,40 @@ begin
 end $$;
 
 -- ---------- ana işlem fonksiyonu ----------
+-- timed crate weapons: owned->w->exp (unix seconds). Expired ones move to p->expired (level/skins kept)
+create or replace function public._expire(p jsonb, nowt float8) returns jsonb language plpgsql as $$
+declare w text; d jsonb; i int; sl text; cnt int := 0;
+begin
+  if not (p ? 'expired') or jsonb_typeof(p->'expired') <> 'object' then p := jsonb_set(p, '{expired}', '{}'); end if;
+  for w, d in select key, value from jsonb_each(p->'owned') loop
+    if coalesce((d->>'exp')::float8, 0) > 0 and (d->>'exp')::float8 <= nowt then
+      p := jsonb_set(p, array['expired', w], d - 'exp');
+      p := p #- array['owned', w];
+      cnt := cnt + 1;
+    end if;
+  end loop;
+  if cnt > 0 and jsonb_typeof(p->'sets') = 'array' then
+    for i in 0 .. jsonb_array_length(p->'sets') - 1 loop
+      foreach sl in array array['ana', 'tabanca', 'bicak', 'bomba'] loop
+        if (p->'sets'->i) ? sl and not (p->'owned' ? (p->'sets'->i->>sl)) then
+          p := jsonb_set(p, array['sets', i::text, sl], to_jsonb((jsonb_build_object('ana','ak47','tabanca','glock','bicak','knife','bomba','frag'))->>sl));
+        end if;
+      end loop;
+    end loop;
+  end if;
+  return p;
+end $$;
+
+create or replace function public._give_weapon(p jsonb, w text, expt float8) returns jsonb language plpgsql as $$
+declare d jsonb;
+begin
+  if not (p ? 'expired') or jsonb_typeof(p->'expired') <> 'object' then p := jsonb_set(p, '{expired}', '{}'); end if;
+  d := coalesce(p->'expired'->w, '{"lvl":0,"skins":["std"],"skin":"std"}'::jsonb);
+  p := p #- array['expired', w];
+  if expt > 0 then d := d || jsonb_build_object('exp', floor(expt)); else d := d - 'exp'; end if;
+  return jsonb_set(p, array['owned', w], d);
+end $$;
+
 create or replace function public.sokak_act(a text, args jsonb default '{}'::jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
@@ -89,19 +123,21 @@ begin
   nowt := extract(epoch from clock_timestamp());
   if not (p ? 'parts') or jsonb_typeof(p->'parts') <> 'object' then p := jsonb_set(p, '{parts}', '{}'); end if;
   if not (p ? 'chars') or jsonb_typeof(p->'chars') <> 'array' then p := jsonb_set(p, '{chars}', '["takim","deri","asker1"]'); end if;
+  p := _expire(p, nowt);
 
   case a
   when 'buy_weapon' then
     id := args->>'id';
     if cat->'weapons'->id is null or (cat->'weapons'->id->>'throwable')::boolean or _si(cat, array['weapons', id, 'price']) <= 0 then
       raise exception 'Bu silah satılmıyor'; end if;
-    if p->'owned' ? id then raise exception 'Bu silaha zaten sahipsin'; end if;
+    if p->'owned' ? id and coalesce((p->'owned'->id->>'exp')::float8, 0) <= 0 then raise exception 'Bu silaha zaten sahipsin'; end if;
     price := _si(cat, array['weapons', id, 'price']);
     select f into k from jsonb_array_elements_text(cat->'featured') with ordinality as x(f, o)
       where not (p->'owned' ? f) order by o limit 1;
     if k = id then price := floor(price * 0.8); end if;
     p := _pay(p, price);
-    p := jsonb_set(p, array['owned', id], '{"lvl":0,"skins":["std"],"skin":"std"}');
+    if p->'owned' ? id then p := jsonb_set(p, array['owned', id], (p->'owned'->id) - 'exp');
+    else p := _give_weapon(p, id, 0); end if;
     res := jsonb_build_object('id', id, 'price', price);
 
   when 'buy_skin' then
@@ -160,8 +196,10 @@ begin
        and random() < (case when t = 'eklenti' then 0.85 else 0.12 end) then
       it := jsonb_build_object('type', 'part', 'id', _pick(cat->'crates'->t->'parts'));
     end if;
-    if it is null and jsonb_array_length(coalesce(cat->'crates'->t->'weapons', '[]')) > 0 and random() < 0.10 then
-      it := jsonb_build_object('type', 'weapon', 'id', _pick(cat->'crates'->t->'weapons'));
+    if it is null and jsonb_array_length(coalesce(cat->'crates'->t->'weapons', '[]')) > 0 and random() < 0.14 then
+      r := random();
+      it := jsonb_build_object('type', 'weapon', 'id', _pick(cat->'crates'->t->'weapons'),
+        'days', case when r < 0.15 then 0 when r < 0.45 then 30 when r < 0.8 then 7 else 3 end);
     end if;
     if it is null and jsonb_array_length(coalesce(cat->'crates'->t->'chars', '[]')) > 0 and random() < 0.06 then
       it := jsonb_build_object('type', 'char', 'id', _pick(cat->'crates'->t->'chars'));
@@ -198,11 +236,16 @@ begin
         p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + _si(it, '{dup}')));
       end if;
     when 'weapon' then
-      if p->'owned' ? (it->>'id') then
-        it := it || jsonb_build_object('dup', _si(cat, array['weapons', it->>'id', 'price']) / 2);
+      wid := it->>'id'; nl := _si(it, '{days}')::int; price := _si(cat, array['weapons', wid, 'price']);
+      if p->'owned' ? wid and coalesce((p->'owned'->wid->>'exp')::float8, 0) <= 0 then
+        it := it || jsonb_build_object('dup', case when nl = 0 then price / 2 else greatest(150, price * nl / 90) end);
         p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + _si(it, '{dup}')));
+      elsif p->'owned' ? wid then
+        if nl = 0 then p := jsonb_set(p, array['owned', wid], (p->'owned'->wid) - 'exp');
+        else p := jsonb_set(p, array['owned', wid, 'exp'], to_jsonb(floor(greatest((p->'owned'->wid->>'exp')::float8, nowt) + nl * 86400))); end if;
+        it := it || '{"ext":true}'::jsonb;
       else
-        p := jsonb_set(p, array['owned', it->>'id'], '{"lvl":0,"skins":["std"],"skin":"std"}');
+        p := _give_weapon(p, wid, case when nl = 0 then 0 else nowt + nl * 86400 end);
       end if;
     when 'char' then
       if (p->'chars') ? (it->>'id') then

@@ -65,15 +65,56 @@ static func _add_xp(p: Dictionary, amount: int) -> int:
 		p["crates"] = int(p.get("crates", 0)) + 1
 	return ups
 
+const SLOT_DEFAULT := {"ana": "ak47", "tabanca": "glock", "bicak": "knife", "bomba": "frag"}
+const DAY := 86400.0
+
+## Timed crate weapons: owned[w]["exp"] = unix time (0/missing = permanent).
+## Expired weapons move to p["expired"] (level and skins are kept if the weapon comes back).
+static func expire(p: Dictionary, now: float) -> Array:
+	var gone: Array = []
+	var own: Dictionary = p.get("owned", {})
+	for w in own.keys():
+		var e := float((own[w] as Dictionary).get("exp", 0))
+		if e > 0.0 and e <= now:
+			gone.append(w)
+	if gone.is_empty():
+		return gone
+	var ex: Dictionary = p.get("expired", {})
+	for w in gone:
+		var d: Dictionary = own[w]
+		d.erase("exp")
+		ex[w] = d
+		own.erase(w)
+	p["expired"] = ex
+	for st in p.get("sets", []):
+		for slot in SLOT_DEFAULT.keys():
+			if (st as Dictionary).has(slot) and not own.has(str(st[slot])):
+				st[slot] = SLOT_DEFAULT[slot]
+	return gone
+
+static func _give_weapon(p: Dictionary, id: String, exp_t: float) -> void:
+	var ex: Dictionary = p.get("expired", {})
+	var d: Dictionary = ex.get(id, {"lvl": 0, "skins": ["std"], "skin": "std"})
+	ex.erase(id)
+	if exp_t > 0.0:
+		d["exp"] = exp_t
+	else:
+		d.erase("exp")
+	p["owned"][id] = d
+
+static func is_timed(p: Dictionary, id: String) -> bool:
+	return _owned(p, id) and float(p["owned"][id].get("exp", 0)) > 0.0
+
 ## Perform one action on profile p (mutated in place). cat = catalog dictionary (see catalog()).
 static func act(p: Dictionary, cat: Dictionary, a: String, args: Dictionary, now: float) -> Dictionary:
+	expire(p, now)
 	match a:
 		"buy_weapon":
 			var id := str(args.get("id", ""))
 			var wd: Dictionary = cat["weapons"].get(id, {})
 			if wd.is_empty() or wd["throwable"] or int(wd["price"]) <= 0:
 				return _err("Bu silah satılmıyor")
-			if _owned(p, id):
+			if _owned(p, id) and not is_timed(p, id):
 				return _err("Bu silaha zaten sahipsin")
 			var price := int(wd["price"])
 			var feat := ""
@@ -84,7 +125,10 @@ static func act(p: Dictionary, cat: Dictionary, a: String, args: Dictionary, now
 				price = int(price * 0.8)
 			if not _pay_gold(p, price):
 				return _err("Yetersiz altın!")
-			p["owned"][id] = {"lvl": 0, "skins": ["std"], "skin": "std"}
+			if _owned(p, id):
+				p["owned"][id].erase("exp")      # timed -> permanent, keeps level & skins
+			else:
+				_give_weapon(p, id, 0.0)
 			return _ok({"id": id, "price": price})
 		"buy_skin":
 			var wid := str(args.get("wid", ""))
@@ -152,7 +196,7 @@ static func act(p: Dictionary, cat: Dictionary, a: String, args: Dictionary, now
 			elif not _pay_gold(p, int(cat["crates"][t]["price"])):
 				return _err("Yetersiz altın!")
 			var it := _roll(p, cat, t)
-			_grant(p, cat, it)
+			_grant(p, cat, it, now)
 			return _ok(it)
 		"upgrade":
 			var wid := str(args.get("wid", ""))
@@ -234,8 +278,10 @@ static func _roll(p: Dictionary, cat: Dictionary, t: String) -> Dictionary:
 	if parts.size() > 0 and randf() < (0.85 if t == "eklenti" else 0.12):
 		return {"type": "part", "id": parts[randi() % parts.size()]}
 	var ws: Array = cd.get("weapons", [])
-	if ws.size() > 0 and randf() < 0.10:
-		return {"type": "weapon", "id": ws[randi() % ws.size()]}
+	if ws.size() > 0 and randf() < 0.14:
+		var r2 := randf()
+		var days: int = 0 if r2 < 0.15 else (30 if r2 < 0.45 else (7 if r2 < 0.8 else 3))
+		return {"type": "weapon", "id": ws[randi() % ws.size()], "days": days}
 	var chs: Array = cd.get("chars", [])
 	if chs.size() > 0 and randf() < 0.06:
 		return {"type": "char", "id": chs[randi() % chs.size()]}
@@ -259,7 +305,7 @@ static func _roll(p: Dictionary, cat: Dictionary, t: String) -> Dictionary:
 			sk2 = pool[i]; break
 	return {"type": "skin", "wid": wid, "id": sk2}
 
-static func _grant(p: Dictionary, cat: Dictionary, it: Dictionary) -> void:
+static func _grant(p: Dictionary, cat: Dictionary, it: Dictionary, now: float) -> void:
 	match it["type"]:
 		"part":
 			var pp: Dictionary = p.get("parts", {})
@@ -277,11 +323,19 @@ static func _grant(p: Dictionary, cat: Dictionary, it: Dictionary) -> void:
 				it["dup"] = int(cat["skins"][it["id"]]["price"]) / 2
 				p["gold"] = _gold(p) + int(it["dup"])
 		"weapon":
-			if _owned(p, it["id"]):
-				it["dup"] = int(cat["weapons"][it["id"]]["price"]) / 2
+			var days := int(it.get("days", 0))
+			var wpr := int(cat["weapons"][it["id"]]["price"])
+			if _owned(p, it["id"]) and not is_timed(p, it["id"]):
+				it["dup"] = wpr / 2 if days == 0 else maxi(150, wpr * days / 90)
 				p["gold"] = _gold(p) + int(it["dup"])
+			elif _owned(p, it["id"]):
+				if days == 0:
+					p["owned"][it["id"]].erase("exp")
+				else:
+					p["owned"][it["id"]]["exp"] = maxf(float(p["owned"][it["id"]]["exp"]), now) + days * DAY
+				it["ext"] = true
 			else:
-				p["owned"][it["id"]] = {"lvl": 0, "skin": "std", "skins": ["std"]}
+				_give_weapon(p, it["id"], 0.0 if days == 0 else now + days * DAY)
 		"char":
 			var own: Array = p.get("chars", FREE_CHARS.duplicate())
 			if own.has(it["id"]):

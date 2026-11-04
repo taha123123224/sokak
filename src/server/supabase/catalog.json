@@ -99,7 +99,9 @@
 				"scar",
 				"ump45",
 				"m4a1",
-				"p90"
+				"p90",
+				"r870",
+				"fn502"
 			]
 		},
 		"osmanli": {
@@ -352,7 +354,9 @@
 				"m249",
 				"revolver",
 				"glock",
-				"deagle"
+				"deagle",
+				"r870",
+				"fn502"
 			],
 			"price": 700,
 			"slot": "namlu"
@@ -373,7 +377,9 @@
 				"m249",
 				"revolver",
 				"glock",
-				"deagle"
+				"deagle",
+				"r870",
+				"fn502"
 			],
 			"price": 850,
 			"slot": "alt"
@@ -403,7 +409,9 @@
 				"m249",
 				"revolver",
 				"glock",
-				"deagle"
+				"deagle",
+				"r870",
+				"fn502"
 			],
 			"price": 1000,
 			"slot": "sarjor"
@@ -423,7 +431,8 @@
 				"m249",
 				"revolver",
 				"glock",
-				"deagle"
+				"deagle",
+				"fn502"
 			],
 			"price": 900,
 			"slot": "namlu"
@@ -441,7 +450,8 @@
 				"ump45",
 				"aug",
 				"vector",
-				"m249"
+				"m249",
+				"r870"
 			],
 			"price": 750,
 			"slot": "alt"
@@ -547,6 +557,16 @@
 			"rpm": 210.0,
 			"throwable": false
 		},
+		"fn502": {
+			"cat": "tabanca",
+			"dmg": 21.0,
+			"head": 2.5,
+			"melee": false,
+			"pellets": 1,
+			"price": 1400,
+			"rpm": 480.0,
+			"throwable": false
+		},
 		"frag": {
 			"cat": "bomba",
 			"dmg": 130.0,
@@ -635,6 +655,16 @@
 			"pellets": 1,
 			"price": 3200,
 			"rpm": 900.0,
+			"throwable": false
+		},
+		"r870": {
+			"cat": "ana",
+			"dmg": 19.0,
+			"head": 1.6,
+			"melee": false,
+			"pellets": 8,
+			"price": 2800,
+			"rpm": 62.0,
 			"throwable": false
 		},
 		"revolver": {

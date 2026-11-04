@@ -294,7 +294,7 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	world_env = WorldEnvironment.new()
 	var e := Environment.new()
 	sky = Sky.new()
-	sky.radiance_size = Sky.RADIANCE_SIZE_256
+	sky.radiance_size = Sky.RADIANCE_SIZE_512 if int(s["shadows"]) >= 3 else Sky.RADIANCE_SIZE_256
 	sun = DirectionalLight3D.new()
 	# bright, colourful, high sun for every map (narrow streets need a steep sun)
 	var P := {
@@ -360,11 +360,12 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	e.fog_sun_scatter = 0.06
 	e.fog_sky_affect = 0.0
 	e.ssao_enabled = bool(s["ssao"])
-	e.ssao_radius = 1.0; e.ssao_intensity = 1.1; e.ssao_power = 1.3; e.ssao_detail = 0.5; e.ssao_light_affect = 0.0
+	e.ssao_radius = 1.2; e.ssao_intensity = 1.45; e.ssao_power = 1.45; e.ssao_detail = 0.9; e.ssao_horizon = 0.06
+	e.ssao_sharpness = 0.98; e.ssao_light_affect = 0.06; e.ssao_ao_channel_affect = 0.25
 	e.ssil_enabled = bool(s["ssil"])
-	e.ssil_radius = 4.0; e.ssil_intensity = 1.0
+	e.ssil_radius = 4.0; e.ssil_intensity = 1.25; e.ssil_sharpness = 0.98; e.ssil_normal_rejection = 1.0
 	e.ssr_enabled = bool(s["ssr"])
-	e.ssr_max_steps = 56; e.ssr_fade_in = 0.15; e.ssr_fade_out = 2.0; e.ssr_depth_tolerance = 0.3
+	e.ssr_max_steps = 64 if int(s["shadows"]) >= 3 else 40; e.ssr_fade_in = 0.15; e.ssr_fade_out = 2.0; e.ssr_depth_tolerance = 0.3
 	e.sdfgi_enabled = bool(s["sdfgi"])
 	if e.sdfgi_enabled:
 		e.sdfgi_use_occlusion = true
@@ -372,7 +373,9 @@ func _setup_env(env_cfg: Dictionary) -> void:
 		e.sdfgi_energy = 1.0
 		e.sdfgi_bounce_feedback = 0.6
 	e.glow_enabled = bool(s["glow"])
-	e.glow_intensity = 0.45; e.glow_strength = 0.95; e.glow_bloom = 0.0; e.glow_hdr_threshold = 1.45
+	e.glow_intensity = 0.5; e.glow_strength = 0.95; e.glow_bloom = 0.025; e.glow_hdr_threshold = 1.25
+	e.glow_hdr_scale = 2.2; e.glow_mix = 0.06
+	e.set_glow_level(0, 0.0); e.set_glow_level(1, 0.6); e.set_glow_level(2, 1.0); e.set_glow_level(3, 0.8); e.set_glow_level(4, 0.4); e.set_glow_level(5, 0.2)
 	e.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 	e.volumetric_fog_enabled = bool(s["volumetric"])
 	e.volumetric_fog_density = 0.0018
@@ -382,14 +385,27 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	e.volumetric_fog_sky_affect = 0.0
 	e.adjustment_enabled = true
 	e.adjustment_brightness = 1.0
-	e.adjustment_contrast = 1.07
+	e.adjustment_contrast = 1.06
 	e.adjustment_saturation = c["sat"]
+	e.adjustment_color_correction = _grade_lut()
 	world_env.environment = e
 	var ca := CameraAttributesPractical.new()
 	ca.auto_exposure_enabled = false
 	world_env.camera_attributes = ca
 	add_child(world_env)
 	add_child(sun)
+
+## Film-style grade: gentle S-curve, cool shadows, warm highlights (modern shooter look)
+static func _grade_lut() -> GradientTexture1D:
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.12, 0.3, 0.55, 0.8, 1.0])
+	g.colors = PackedColorArray([
+		Color(0.0, 0.006, 0.014), Color(0.098, 0.112, 0.126), Color(0.28, 0.292, 0.3),
+		Color(0.556, 0.553, 0.545), Color(0.822, 0.808, 0.785), Color(1.0, 0.99, 0.965)])
+	var t := GradientTexture1D.new()
+	t.gradient = g
+	t.width = 256
+	return t
 
 func _bake_nav() -> void:
 	var nm := NavigationMesh.new()
@@ -945,6 +961,30 @@ func test_hook(i: int) -> void:
 			player.rotation.y = atan2(-dir.x, -dir.z)
 			player.pitch = asin(dir.y)
 		player.test_ads = true
+	elif i == 20 or i == 21:
+		# weapon showcase: WIDS="ak47,awp,..." each call equips the next one (21 = aim down sights)
+		var lst: PackedStringArray = OS.get_environment("WIDS").split(",")
+		var k: int = int(get_meta("wid_i", 0))
+		set_meta("wid_i", k + 1)
+		var wid: String = lst[k % lst.size()]
+		if not GS.profile["owned"].has(wid):
+			GS.profile["owned"][wid] = {"lvl": 0, "skins": ["std"], "skin": "std"}
+		if OS.has_environment("WSKIN"):
+			var sks: PackedStringArray = OS.get_environment("WSKIN").split(",")
+			GS.profile["owned"][wid]["skin"] = sks[k % sks.size()]
+		player.test_ads = i == 21
+		player.slots[GS.WEAPONS[wid]["cat"]] = wid
+		player.ammo[wid] = [int(GS.WEAPONS[wid].get("mag", 1)), 99]
+		player.cur = ""
+		player.switch_to(wid, true)
+	elif i == 22:
+		# HUD check: kill feed with weapon icons + inspect card + inspect pose
+		hud.kill_feed("Oyuncu", "Kartal07", "ak47", true, "a", "b", true, false)
+		hud.kill_feed("Tilki", "Bora", "awp", false, "b", "a", false, false)
+		hud.kill_feed("Efsane06", "Oyuncu", "r870", false, "b", "a", false, true)
+		hud.kill_feed("Çelik", "GeceKurdu", "knife", false, "a", "b", false, false)
+		player.inspect_t = 3.2 * (1.0 - float(OS.get_environment("INSP_T")) if OS.has_environment("INSP_T") else 0.6)
+		hud.inspect_card(player.cur)
 	elif i == 15:
 		# close-up of a bot's hands on the weapon: HC env = "angle" (0 side, 1 front-left, 2 top)
 		var b = null

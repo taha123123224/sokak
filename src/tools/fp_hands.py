@@ -11,8 +11,8 @@ import characters as C
 ROOT = C.ROOT
 OUT = C.OUT
 HIP = {"rifle": (0.14, -0.165, -0.36), "pistol": (0.13, -0.14, -0.40), "knife": (0.17, -0.18, -0.36), "frag": (0.16, -0.17, -0.34), "sniper": (0.14, -0.17, -0.33)}
-GRIP = {"aug": 10, "vector": 12, "m249": 16, "scar": 20, "ump45": 14, "revolver": 24, "ak47": 20, "m4a1": 22, "mp5": 15, "p90": 0, "spas": 20, "awp": 10, "kar98": 10, "glock": 22, "deagle": 18, "knife": 0, "karambit": 0, "frag": 0}
-KIND = {"aug": "rifle", "vector": "rifle", "m249": "rifle", "scar": "rifle", "ump45": "rifle", "revolver": "pistol", "ak47": "rifle", "m4a1": "rifle", "mp5": "rifle", "p90": "rifle", "spas": "rifle", "awp": "sniper", "kar98": "sniper", "glock": "pistol", "deagle": "pistol", "knife": "knife", "karambit": "knife", "frag": "frag"}
+GRIP = {"fn502": 20, "r870": 18, "aug": 10, "vector": 12, "m249": 16, "scar": 20, "ump45": 14, "revolver": 24, "ak47": 20, "m4a1": 22, "mp5": 15, "p90": 0, "spas": 20, "awp": 10, "kar98": 10, "glock": 22, "deagle": 18, "knife": 0, "karambit": 0, "frag": 0}
+KIND = {"fn502": "pistol", "r870": "rifle", "aug": "rifle", "vector": "rifle", "m249": "rifle", "scar": "rifle", "ump45": "rifle", "revolver": "pistol", "ak47": "rifle", "m4a1": "rifle", "mp5": "rifle", "p90": "rifle", "spas": "rifle", "awp": "sniper", "kar98": "sniper", "glock": "pistol", "deagle": "pistol", "knife": "knife", "karambit": "knife", "frag": "frag"}
 
 
 def weapon_points(wid):
@@ -180,13 +180,13 @@ def pose_for(wid, body, rig):
     eye = head + Vector((0, -0.11, 0.1))  # approx eye offset from head joint (front is -Y before rotation)
     rot = Matrix.Rotation(math.pi, 4, 'Z')
     eye_r = rot @ eye
-    rig.matrix_world = Matrix.Translation(cam - eye_r + Vector((0.02, 0.3, -0.06))) @ rot
+    rig.matrix_world = Matrix.Translation(cam - eye_r + Vector((0.02, float(os.environ.get("FP_FWD", "0.40")), -0.06))) @ rot
     bpy.context.view_layer.update()
     palm_axes_done = 'palm_axis_Left' in rig.keys()
     if not palm_axes_done:
         palm_axes(rig)
     # bring shoulders forward/inward like a shooter's stance (clavicles protract)
-    for side, ang in (('Left', 38.0), ('Right', -22.0)):
+    for side, ang in (('Left', float(os.environ.get('FP_LCLAV', '42'))), ('Right', -22.0)):
         M = bw(rig, side + 'Shoulder')
         hd = M.translation.copy()
         R = Matrix.Rotation(math.radians(ang), 4, 'Z') @ Matrix.Rotation(math.radians(-12), 4, 'X')

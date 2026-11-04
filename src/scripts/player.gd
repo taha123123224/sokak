@@ -51,6 +51,7 @@ var pending_id := ""
 const HOLSTER := 0.11
 var bolt_t := 0.0
 var inspect_t := 0.0
+var insp_mag := false
 var melee_t := 0.0
 var melee_heavy := false
 var throw_t := 0.0
@@ -198,6 +199,9 @@ func _unhandled_input(e: InputEvent) -> void:
 	if e.is_action_pressed("reload"): start_reload()
 	if e.is_action_pressed("inspect") and reload_t <= 0 and equip_t <= 0 and not ads:
 		inspect_t = 3.2
+		SFX.play("equip", -9, 1.15)
+		if match_node and match_node.hud and match_node.hud.has_method("inspect_card"):
+			match_node.hud.inspect_card(cur)
 	if e.is_action_pressed("jump") and is_on_floor() and not crouching:
 		velocity.y = JUMP
 
@@ -370,7 +374,12 @@ func _process(delta: float) -> void:
 	var target_fov: float = float(GS.settings["fov"]) / lerp(1.0, zoom, ads_k)
 	cam.fov = lerp(cam.fov, target_fov, min(delta * 20.0, 1.0))
 	# firing
-	if not frozen and Input.is_action_pressed("fire") and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+	# knife: right mouse = heavy stab (slower, ~1.9x damage, backstab range)
+	if not frozen and wdata.get("melee", false) and Input.is_action_just_pressed("aim") and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED \
+			and fire_cd <= 0 and equip_t <= draw_total * 0.25 and holster_t <= 0:
+		inspect_t = 0
+		_melee(true)
+	elif not frozen and Input.is_action_pressed("fire") and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_try_fire()
 	elif not Input.is_action_pressed("fire"):
 		trigger_released = true
@@ -614,8 +623,55 @@ func _update_reload(delta: float) -> void:
 		a[0] += take; a[1] -= take
 		reload_t = 0
 
+## Keyframed weapon inspect (F): modern "show off" sequence per weapon kind.
+## Returns [pos offset, rot offset] for normalized time t in 0..1.
+const INSPECT_KEYS := {
+	"rifle": [
+		[0.0, Vector3.ZERO, Vector3.ZERO],
+		[0.18, Vector3(-0.035, 0.03, -0.01), Vector3(0.1, 0.32, 0.5)],    # tilt left side to the camera
+		[0.4, Vector3(-0.04, 0.035, -0.01), Vector3(0.14, 0.36, 0.56)],
+		[0.55, Vector3(-0.02, 0.02, -0.01), Vector3(-0.05, -0.22, -0.4)], # roll over to the right side
+		[0.68, Vector3(-0.02, 0.0, 0.0), Vector3(0.22, -0.15, -0.22)],    # tip down, mag check
+		[0.85, Vector3(-0.02, 0.0, 0.0), Vector3(0.22, -0.12, -0.18)],
+		[1.0, Vector3.ZERO, Vector3.ZERO]],
+	"sniper": [
+		[0.0, Vector3.ZERO, Vector3.ZERO],
+		[0.2, Vector3(-0.03, 0.03, -0.01), Vector3(0.08, 0.26, 0.42)],
+		[0.45, Vector3(-0.035, 0.035, -0.01), Vector3(0.12, 0.3, 0.48)],
+		[0.62, Vector3(-0.015, 0.015, 0.0), Vector3(-0.04, -0.2, -0.34)],
+		[0.85, Vector3(-0.015, 0.01, 0.0), Vector3(0.0, -0.18, -0.3)],
+		[1.0, Vector3.ZERO, Vector3.ZERO]],
+	"pistol": [
+		[0.0, Vector3.ZERO, Vector3.ZERO],
+		[0.15, Vector3(-0.05, 0.035, 0.0), Vector3(0.08, 0.55, 0.4)],
+		[0.38, Vector3(-0.05, 0.04, 0.0), Vector3(0.14, 0.62, 0.48)],
+		[0.52, Vector3(-0.03, 0.035, 0.0), Vector3(0.08, -0.45, -0.45)],
+		[0.66, Vector3(-0.03, 0.02, 0.0), Vector3(0.24, -0.3, -0.3)],
+		[0.85, Vector3(-0.03, 0.02, 0.0), Vector3(0.24, -0.28, -0.26)],
+		[1.0, Vector3.ZERO, Vector3.ZERO]],
+	"knife": [
+		[0.0, Vector3.ZERO, Vector3.ZERO],
+		[0.16, Vector3(-0.05, 0.04, 0.0), Vector3(0.15, 0.45, 0.7)],      # blade up, show the flat
+		[0.36, Vector3(-0.055, 0.045, 0.0), Vector3(0.2, 0.5, 0.8)],
+		[0.5, Vector3(-0.035, 0.05, 0.0), Vector3(-0.12, -0.15, -0.15)],  # quick wrist flip
+		[0.66, Vector3(-0.04, 0.03, 0.0), Vector3(0.14, -0.5, -0.7)],     # show the other side
+		[0.84, Vector3(-0.04, 0.03, 0.0), Vector3(0.18, -0.52, -0.76)],
+		[1.0, Vector3.ZERO, Vector3.ZERO]],
+}
+
+func _inspect_pose(kind: String, t: float) -> Array:
+	var keys: Array = INSPECT_KEYS.get(kind, INSPECT_KEYS["rifle"])
+	for i in range(1, keys.size()):
+		if t <= float(keys[i][0]):
+			var a: Array = keys[i - 1]
+			var b: Array = keys[i]
+			var u: float = (t - float(a[0])) / maxf(float(b[0]) - float(a[0]), 0.001)
+			u = u * u * (3.0 - 2.0 * u)     # ease in/out between keys
+			var r: Vector3 = (a[2] as Vector3).lerp(b[2], u)
+			return [(a[1] as Vector3).lerp(b[1], u), r]
+	return [Vector3.ZERO, Vector3.ZERO]
+
 func _melee(heavy: bool) -> void:
-	heavy = Input.is_action_pressed("aim")
 	melee_heavy = heavy
 	melee_t = 0.75 if heavy else 0.45
 	fire_cd = 1.0 if heavy else 60.0 / float(wdata["rpm"])
@@ -826,9 +882,30 @@ func _build_viewmodel() -> void:
 	vm_env.background_mode = Environment.BG_CLEAR_COLOR
 	vm_env.background_color = Color(0, 0, 0, 0)
 	vm_env.tonemap_mode = Environment.TONE_MAPPER_AGX
+	vm_env.tonemap_exposure = 1.08
 	vm_env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	vm_env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	# weapon-scale contact AO: crevices, rails and grip texture read much sharper
+	vm_env.ssao_enabled = bool(GS.settings.get("ssao", true))
+	vm_env.ssao_radius = 0.06; vm_env.ssao_intensity = 1.6; vm_env.ssao_power = 1.4; vm_env.ssao_detail = 1.0
+	vm_env.ssao_horizon = 0.02; vm_env.ssao_light_affect = 0.1
+	vm_env.glow_enabled = bool(GS.settings.get("glow", true))
+	vm_env.glow_intensity = 0.35; vm_env.glow_hdr_threshold = 1.6; vm_env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
+	vm_env.adjustment_enabled = true
+	vm_env.adjustment_contrast = 1.05
+	vm_env.adjustment_saturation = 1.04
 	vm_cam.environment = vm_env
+	vm_vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_SMAA
+	vm_vp.use_debanding = true
+	vm_vp.positional_shadow_atlas_size = 0
+	# cool rim light from behind: crisp highlight edges on the weapon silhouette
+	var rim := DirectionalLight3D.new()
+	rim.rotation_degrees = Vector3(-18, 160, 0)
+	rim.light_color = Color(0.72, 0.84, 1.0)
+	rim.light_energy = 0.7
+	rim.light_specular = 1.4
+	rim.shadow_enabled = false
+	vm_vp.add_child(rim)
 	vm_sun = DirectionalLight3D.new()
 	vm_sun.shadow_enabled = false
 	vm_vp.add_child(vm_sun)
@@ -885,7 +962,7 @@ func set_vm_env(sky: Sky, sun_dir_basis: Basis, sun_color: Color, sun_energy: fl
 
 const GRIP := {"ak47": 20, "m4a1": 22, "mp5": 15, "p90": 0, "spas": 20, "awp": 10, "kar98": 10, "glock": 22, "deagle": 18}
 const HIP := {
-	"rifle": Vector3(0.14, -0.165, -0.36), "pistol": Vector3(0.13, -0.14, -0.4), "knife": Vector3(0.17, -0.18, -0.36), "frag": Vector3(0.16, -0.17, -0.34), "sniper": Vector3(0.14, -0.17, -0.33),
+	"rifle": Vector3(0.14, -0.165, -0.36), "pistol": Vector3(0.13, -0.14, -0.4), "knife": Vector3(0.12, -0.135, -0.38), "frag": Vector3(0.16, -0.17, -0.34), "sniper": Vector3(0.14, -0.17, -0.33),
 }
 
 func _vm_kind(id: String) -> String:
@@ -1155,12 +1232,31 @@ func _update_viewmodel(delta: float) -> void:
 			back = 0.03
 		sl.transform = (sl.get_meta("rest") as Transform3D).translated_local(Vector3(0, 0, back))
 	# inspect
+	# soft background blur while inspecting (weapon stays sharp: it is in its own viewport)
+	if match_node and match_node.world_env and match_node.world_env.camera_attributes:
+		var ca: CameraAttributesPractical = match_node.world_env.camera_attributes
+		var want := 0.12 if inspect_t > 0.25 else 0.0
+		ca.dof_blur_amount = move_toward(ca.dof_blur_amount, want, delta * 0.5)
+		ca.dof_blur_far_enabled = ca.dof_blur_amount > 0.002
+		ca.dof_blur_far_distance = 4.0
+		ca.dof_blur_far_transition = 6.0
+	if inspect_t <= 0 and insp_mag:
+		insp_mag = false
+		if reload_t <= 0 and vm_parts.has("mag") and is_instance_valid(vm_parts["mag"]) and (vm_parts["mag"] as Node3D).has_meta("rest"):
+			(vm_parts["mag"] as Node3D).transform = vm_parts["mag"].get_meta("rest")
 	if inspect_t > 0:
 		var it := 1.0 - inspect_t / 3.2
-		var s1 := smoothstep(0.0, 0.2, it) * (1.0 - smoothstep(0.85, 1.0, it))
-		var flip := smoothstep(0.4, 0.6, it)
-		rot += Vector3(0.2, 0.9 - flip * 1.6, 0.6 - flip * 1.0) * s1
-		pos += Vector3(-0.1, 0.04, 0.05) * s1
+		var kp := _inspect_pose(kind, it)
+		pos += kp[0]
+		rot += kp[1]
+		# rifles/pistols: mag check / slide check mid-inspect
+		var chk := smoothstep(0.62, 0.7, it) * (1.0 - smoothstep(0.8, 0.88, it))
+		if kind != "knife" and vm_parts.has("mag") and vm_parts["mag"] is Node3D and (vm_parts["mag"] as Node3D).has_meta("rest") and kind != "pistol":
+			insp_mag = true
+			(vm_parts["mag"] as Node3D).transform = (vm_parts["mag"].get_meta("rest") as Transform3D).translated_local(Vector3(0, -0.025 * chk, 0))
+		if kind == "pistol" and vm_parts.has("slide") and vm_parts["slide"] is Node3D:
+			var sl2: Node3D = vm_parts["slide"]
+			sl2.transform = (sl2.get_meta("rest") as Transform3D).translated_local(Vector3(0, 0, 0.022 * chk))
 	# melee
 	if melee_t > 0 and not _fp_has("slash"):
 		var tot := 0.75 if melee_heavy else 0.45
@@ -1187,9 +1283,11 @@ func _update_viewmodel(delta: float) -> void:
 		pos += Vector3(0.05, 0.1, 0.16) * (1.0 - sw) + Vector3(-0.08, -0.05, -0.38) * sin(sw * PI * 0.5) - Vector3(0, 0.25, 0) * smoothstep(0.6, 1.0, tt)
 		rot += Vector3(0.75, -0.15, 0.2) * (1.0 - sw) + Vector3(-1.1, 0.25, -0.3) * sin(sw * PI * 0.5) * (1.0 - smoothstep(0.7, 1.0, tt))
 	if kind == "knife":
-		rot += Vector3(0.0, -0.25, 0.15)
+		rot += Vector3(0.14, -0.12, 0.08)     # blade up toward the crosshair, CS-style ready grip
 	vm_off.position = vm_off.position.lerp(pos, min(delta * 30.0, 1.0))
 	vm_off.rotation = vm_off.rotation.lerp(rot, min(delta * 25.0, 1.0))
+	if vm_off.rotation.z > PI and inspect_t <= 0:
+		vm_off.rotation.z -= TAU     # knife twirl finished: unwind without spinning back
 	# hide for scope
 	var scoped: bool = wdata.get("scope", false) and ads_k > 0.92
 	vm_off.visible = not scoped

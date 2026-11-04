@@ -402,11 +402,33 @@ func kill_feed(killer: String, victim: String, wid: String, head: bool, kt: Stri
 	p.add_child(h)
 	var kc: Color = GS.TEAM_COLORS.get(kt, Color("ffcf5a")) if kt != "" else Color("ffcf5a")
 	var vc: Color = GS.TEAM_COLORS.get(vt, Color("ff6a5a")) if vt != "" else Color("ff6a5a")
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
 	h.add_child(UI.lbl(killer, 20, kc, "Rajdhani-Bold"))
-	var wname: String = GS.WEAPONS[wid]["name"] if GS.WEAPONS.has(wid) else "☠"
-	h.add_child(UI.lbl("[" + wname + "]", 17, UI.DIM, "Rajdhani-SemiBold"))
+	var icon := _kf_icon(wid)
+	if icon:
+		var tr := TextureRect.new()
+		tr.texture = icon
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		var ih := 26.0
+		tr.custom_minimum_size = Vector2(min(ih * icon.get_width() / max(icon.get_height(), 1), 104.0), ih)
+		tr.modulate = Color(1, 1, 1, 0.95)
+		h.add_child(tr)
+	else:
+		var wname: String = GS.WEAPONS[wid]["name"] if GS.WEAPONS.has(wid) else "☠"
+		h.add_child(UI.lbl("[" + wname + "]", 17, UI.DIM, "Rajdhani-SemiBold"))
 	if head:
-		h.add_child(UI.lbl("✖ KAFA", 17, UI.GOLD, "Rajdhani-Bold"))
+		var hs := _kf_icon("_head")
+		if hs:
+			var hr := TextureRect.new()
+			hr.texture = hs
+			hr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			hr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			hr.custom_minimum_size = Vector2(24, 24)
+			hr.modulate = Color(1, 0.84, 0.35)
+			h.add_child(hr)
+		else:
+			h.add_child(UI.lbl("✖", 18, UI.GOLD, "Rajdhani-Bold"))
 	h.add_child(UI.lbl(victim, 20, vc, "Rajdhani-Bold"))
 	feed.add_child(p)
 	_ignore_mouse(p)
@@ -416,6 +438,62 @@ func kill_feed(killer: String, victim: String, wid: String, head: bool, kt: Stri
 	tw.tween_interval(6.0)
 	tw.tween_property(p, "modulate:a", 0.0, 0.6)
 	tw.tween_callback(p.queue_free)
+
+var insp_card: PanelContainer
+## F-inspect card: weapon, skin, level (slides in bottom-right)
+func inspect_card(wid: String) -> void:
+	if not GS.WEAPONS.has(wid) or root == null:
+		return
+	if insp_card and is_instance_valid(insp_card):
+		insp_card.queue_free()
+	var sk: String = GS.wskin(wid)
+	var rar: int = int(GS.SKINS.get(sk, {}).get("rarity", 0))
+	var rc: Color = [Color(0.75, 0.8, 0.88), Color(0.35, 0.65, 1.0), Color(0.75, 0.4, 1.0), Color(1.0, 0.78, 0.25)][clamp(rar, 0, 3)]
+	insp_card = UI.panel(Color(0.03, 0.04, 0.06, 0.78), rc, 10, 2)
+	var v := UI.vbox(2)
+	insp_card.add_child(v)
+	var top := UI.hbox(10)
+	v.add_child(top)
+	var ic := _kf_icon(wid)
+	if ic:
+		var tr := TextureRect.new()
+		tr.texture = ic
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.custom_minimum_size = Vector2(110, 36)
+		tr.modulate = rc
+		top.add_child(tr)
+	var tv := UI.vbox(0)
+	top.add_child(tv)
+	tv.add_child(UI.lbl(str(GS.WEAPONS[wid]["name"]).to_upper(), 26, Color.WHITE, "Rajdhani-Bold"))
+	tv.add_child(UI.lbl(str(GS.SKINS.get(sk, {}).get("name", sk)).to_upper(), 16, rc, "Rajdhani-SemiBold"))
+	var lv: int = GS.wlvl(wid)
+	if lv > 0:
+		v.add_child(UI.lbl("★".repeat(min(lv, 10)) + "  SEVİYE %d" % lv, 15, UI.GOLD, "Rajdhani-Bold"))
+	var stw: Dictionary = GS.stats_for(wid)
+	v.add_child(UI.lbl("HASAR %d   ·   ŞARJÖR %d   ·   %s" % [int(stw.get("dmg", 0)), int(stw.get("mag", 0)), str(GS.WEAPONS[wid].get("cls", ""))], 14, UI.DIM, "Rajdhani-SemiBold"))
+	root.add_child(insp_card)
+	insp_card.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	insp_card.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	insp_card.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 28)
+	insp_card.offset_top -= 120; insp_card.offset_bottom -= 120     # above the ammo panel
+	_ignore_mouse(insp_card)
+	insp_card.modulate.a = 0.0
+	var tw := insp_card.create_tween()
+	tw.tween_property(insp_card, "modulate:a", 1.0, 0.25)
+	tw.tween_interval(2.4)
+	tw.tween_property(insp_card, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(insp_card.queue_free)
+
+var _kf_cache := {}
+func _kf_icon(wid: String) -> Texture2D:
+	if _kf_cache.has(wid):
+		return _kf_cache[wid]
+	var base: String = wid if wid.begins_with("_") else GS.weapon_base(wid)
+	var p := "res://assets/ui/kf/%s.png" % base
+	var t: Texture2D = load(p) if ResourceLoader.exists(p) else null
+	_kf_cache[wid] = t
+	return t
 
 func kill_confirm(head: bool, big: String, multi: int = 1, wid: String = "", streak: int = 1) -> void:
 	center2.text = ("+150  KAFADAN VURUŞ" if head else "+100  ETKİSİZ HALE GETİRİLDİ")

@@ -9,7 +9,7 @@
 
 -- ---------- katalog (fiyatlar, kasalar, görevler — oyundan otomatik üretildi) ----------
 create table if not exists public.sokak_catalog (id int primary key, data jsonb not null);
-insert into public.sokak_catalog (id, data) values (1, $CATALOG${"chances":[80,62,48,35,25,16,10],"chars":{"asker1":{"price":0},"asker2":{"price":5000},"asker3":{"price":4000},"deri":{"price":0},"kapson":{"price":3500},"kot":{"price":3000},"patron":{"price":4500},"takim":{"price":0}},"crates":{"efsane":{"chars":["kot","patron","asker2"],"parts":["sus","optik","sarjor"],"price":5000,"skins":["lav","buz","galaksi","altin","cini","turkuaz"],"weapons":["awp","scar","m249"]},"eklenti":{"chars":[],"parts":["sus","kompen","optik","sarjor","tutamak","lazer"],"price":1500,"skins":["karbon","dijital"],"weapons":[]},"operasyon":{"chars":["asker2","asker3"],"parts":[],"price":2000,"skins":["dijital","karbon","kar","kamuflaj","gece","buz"],"weapons":["aug","vector","scar","ump45","m4a1","p90"]},"osmanli":{"chars":["patron","kapson"],"parts":[],"price":2500,"skins":["cini","turkuaz","altin","kizil","neon"],"weapons":["revolver","deagle","karambit"]},"sokak":{"chars":[],"parts":[],"price":1000,"skins":["kamuflaj","kar","dijital","gece","neon","kizil","galaksi","altin"],"weapons":[]}},"default":{"active_set":0,"char":"","chars":["takim","deri","asker1"],"crates":1,"crates2":{},"gold":7500,"level":1,"mats":{"demir":150,"kobalt":5,"krom":50,"titanyum":15},"missions":{"claimed":{},"head":0,"kills":0,"matches":0,"wins":0},"owned":{"ak47":{"lvl":0,"skin":"std","skins":["std"]},"frag":{"lvl":0,"skin":"std","skins":["std"]},"glock":{"lvl":0,"skin":"std","skins":["std"]},"knife":{"lvl":0,"skin":"std","skins":["std"]},"mp5":{"lvl":0,"skin":"std","skins":["std"]}},"parts":{},"sets":[{"ana":"ak47","bicak":"knife","bomba":"frag","tabanca":"glock"},{"ana":"mp5","bicak":"knife","bomba":"frag","tabanca":"glock"},{"ana":"ak47","bicak":"knife","bomba":"frag","tabanca":"glock"},{"ana":"ak47","bicak":"knife","bomba":"frag","tabanca":"glock"},{"ana":"ak47","bicak":"knife","bomba":"frag","tabanca":"glock"}],"stats":{"deaths":0,"headshots":0,"hits":0,"kills":0,"matches":0,"shots":0,"wins":0},"wparts":{},"xp":0},"featured":["m249","aug","vector","scar"],"max_lvl":7,"missions":[{"goal":25,"id":"k25","key":"kills","reward":{"gold":1500,"krom":15},"text":"25 düşman indir"},{"goal":10,"id":"h10","key":"head","reward":{"gold":1200,"titanyum":6},"text":"10 kafadan vuruş yap"},{"goal":3,"id":"m3","key":"matches","reward":{"gold":1000,"kobalt":3},"text":"3 maç tamamla"},{"goal":1,"id":"w1","key":"wins","reward":{"gold":2000,"krom":10},"text":"1 maç kazan"}],"packs":[["Demir Paketi","demir",50,600],["Krom Paketi","krom",25,900],["Titanyum Paketi","titanyum",10,1500],["Kobalt Paketi","kobalt",5,2500],["Kasa Anahtarı","crate",1,1000]],"parts":{"kompen":{"fits":["ak47","m4a1","mp5","p90","spas","awp","kar98","scar","ump45","aug","vector","m249","revolver","glock","deagle"],"price":700,"slot":"namlu"},"lazer":{"fits":["ak47","m4a1","mp5","p90","spas","awp","kar98","scar","ump45","aug","vector","m249","revolver","glock","deagle"],"price":850,"slot":"alt"},"optik":{"fits":["ak47","mp5","p90"],"price":800,"slot":"optik"},"sarjor":{"fits":["ak47","m4a1","mp5","p90","spas","awp","kar98","scar","ump45","aug","vector","m249","revolver","glock","deagle"],"price":1000,"slot":"sarjor"},"sus":{"fits":["ak47","m4a1","mp5","p90","awp","kar98","scar","ump45","aug","vector","m249","revolver","glock","deagle"],"price":900,"slot":"namlu"},"tutamak":{"fits":["ak47","m4a1","mp5","p90","spas","awp","kar98","scar","ump45","aug","vector","m249"],"price":750,"slot":"alt"}},"sets":5,"skins":{"altin":{"price":5000,"rarity":3},"buz":{"price":4200,"rarity":3},"cini":{"price":3000,"rarity":2},"dijital":{"price":700,"rarity":0},"galaksi":{"price":3500,"rarity":3},"gece":{"price":1200,"rarity":1},"kamuflaj":{"price":600,"rarity":0},"kar":{"price":800,"rarity":1},"karbon":{"price":1500,"rarity":1},"kizil":{"price":2200,"rarity":2},"lav":{"price":4800,"rarity":3},"neon":{"price":1400,"rarity":2},"std":{"price":0,"rarity":0},"turkuaz":{"price":3200,"rarity":2}},"weapons":{"ak47":{"cat":"ana","dmg":33.0,"head":2.6,"melee":false,"pellets":1,"price":0,"rpm":600.0,"throwable":false},"aug":{"cat":"ana","dmg":31.0,"head":2.5,"melee":false,"pellets":1,"price":4400,"rpm":700.0,"throwable":false},"awp":{"cat":"ana","dmg":120.0,"head":3.0,"melee":false,"pellets":1,"price":4750,"rpm":40.0,"throwable":false},"deagle":{"cat":"tabanca","dmg":54.0,"head":2.6,"melee":false,"pellets":1,"price":1800,"rpm":210.0,"throwable":false},"frag":{"cat":"bomba","dmg":130.0,"head":1.0,"melee":false,"pellets":1,"price":0,"rpm":60.0,"throwable":true},"glock":{"cat":"tabanca","dmg":24.0,"head":2.5,"melee":false,"pellets":1,"price":0,"rpm":420.0,"throwable":false},"kar98":{"cat":"ana","dmg":105.0,"head":3.0,"melee":false,"pellets":1,"price":3500,"rpm":48.0,"throwable":false},"karambit":{"cat":"bicak","dmg":60.0,"head":1.0,"melee":true,"pellets":1,"price":2000,"rpm":130.0,"throwable":false},"knife":{"cat":"bicak","dmg":55.0,"head":1.0,"melee":true,"pellets":1,"price":0,"rpm":110.0,"throwable":false},"m249":{"cat":"ana","dmg":30.0,"head":2.3,"melee":false,"pellets":1,"price":6200,"rpm":760.0,"throwable":false},"m4a1":{"cat":"ana","dmg":29.0,"head":2.5,"melee":false,"pellets":1,"price":2600,"rpm":740.0,"throwable":false},"mp5":{"cat":"ana","dmg":23.0,"head":2.2,"melee":false,"pellets":1,"price":1500,"rpm":800.0,"throwable":false},"p90":{"cat":"ana","dmg":21.0,"head":2.2,"melee":false,"pellets":1,"price":3200,"rpm":900.0,"throwable":false},"revolver":{"cat":"tabanca","dmg":62.0,"head":2.7,"melee":false,"pellets":1,"price":2600,"rpm":150.0,"throwable":false},"scar":{"cat":"ana","dmg":38.0,"head":2.6,"melee":false,"pellets":1,"price":5200,"rpm":560.0,"throwable":false},"spas":{"cat":"ana","dmg":16.0,"head":1.6,"melee":false,"pellets":9,"price":2200,"rpm":70.0,"throwable":false},"ump45":{"cat":"ana","dmg":27.0,"head":2.2,"melee":false,"pellets":1,"price":2400,"rpm":650.0,"throwable":false},"vector":{"cat":"ana","dmg":19.0,"head":2.1,"melee":false,"pellets":1,"price":3800,"rpm":1150.0,"throwable":false}}}$CATALOG$::jsonb)
+insert into public.sokak_catalog (id, data) values (1, $CATALOG${"chances":[80,62,48,35,25,16,10],"chars":{"asker1":{"price":0},"asker2":{"price":5000},"asker3":{"price":4000},"deri":{"price":0},"kapson":{"price":3500},"kot":{"price":3000},"patron":{"price":4500},"takim":{"price":0}},"crates":{"efsane":{"chars":["kot","patron","asker2"],"parts":["sus","optik","sarjor"],"price":5000,"skins":["lav","buz","galaksi","altin","cini","turkuaz"],"weapons":["awp","scar","m249"]},"eklenti":{"chars":[],"parts":["sus","kompen","optik","sarjor","tutamak","lazer"],"price":1500,"skins":["karbon","dijital"],"weapons":[]},"operasyon":{"chars":["asker2","asker3"],"parts":[],"price":2000,"skins":["dijital","karbon","kar","kamuflaj","gece","buz"],"weapons":["aug","vector","scar","ump45","m4a1","p90","r870","fn502"]},"osmanli":{"chars":["patron","kapson"],"parts":[],"price":2500,"skins":["cini","turkuaz","altin","kizil","neon"],"weapons":["revolver","deagle","karambit"]},"sokak":{"chars":[],"parts":[],"price":1000,"skins":["kamuflaj","kar","dijital","gece","neon","kizil","galaksi","altin"],"weapons":[]}},"default":{"active_set":0,"char":"","chars":["takim","deri","asker1"],"crates":1,"crates2":{},"gold":7500,"level":1,"mats":{"demir":150,"kobalt":5,"krom":50,"titanyum":15},"missions":{"claimed":{},"head":0,"kills":0,"matches":0,"wins":0},"owned":{"ak47":{"lvl":0,"skin":"std","skins":["std"]},"frag":{"lvl":0,"skin":"std","skins":["std"]},"glock":{"lvl":0,"skin":"std","skins":["std"]},"knife":{"lvl":0,"skin":"std","skins":["std"]},"mp5":{"lvl":0,"skin":"std","skins":["std"]}},"parts":{},"sets":[{"ana":"ak47","bicak":"knife","bomba":"frag","tabanca":"glock"},{"ana":"mp5","bicak":"knife","bomba":"frag","tabanca":"glock"},{"ana":"ak47","bicak":"knife","bomba":"frag","tabanca":"glock"},{"ana":"ak47","bicak":"knife","bomba":"frag","tabanca":"glock"},{"ana":"ak47","bicak":"knife","bomba":"frag","tabanca":"glock"}],"stats":{"deaths":0,"headshots":0,"hits":0,"kills":0,"matches":0,"shots":0,"wins":0},"wparts":{},"xp":0},"featured":["m249","aug","vector","scar"],"max_lvl":7,"missions":[{"goal":25,"id":"k25","key":"kills","reward":{"gold":1500,"krom":15},"text":"25 düşman indir"},{"goal":10,"id":"h10","key":"head","reward":{"gold":1200,"titanyum":6},"text":"10 kafadan vuruş yap"},{"goal":3,"id":"m3","key":"matches","reward":{"gold":1000,"kobalt":3},"text":"3 maç tamamla"},{"goal":1,"id":"w1","key":"wins","reward":{"gold":2000,"krom":10},"text":"1 maç kazan"}],"packs":[["Demir Paketi","demir",50,600],["Krom Paketi","krom",25,900],["Titanyum Paketi","titanyum",10,1500],["Kobalt Paketi","kobalt",5,2500],["Kasa Anahtarı","crate",1,1000]],"parts":{"kompen":{"fits":["ak47","m4a1","mp5","p90","spas","awp","kar98","scar","ump45","aug","vector","m249","revolver","glock","deagle","r870","fn502"],"price":700,"slot":"namlu"},"lazer":{"fits":["ak47","m4a1","mp5","p90","spas","awp","kar98","scar","ump45","aug","vector","m249","revolver","glock","deagle","r870","fn502"],"price":850,"slot":"alt"},"optik":{"fits":["ak47","mp5","p90"],"price":800,"slot":"optik"},"sarjor":{"fits":["ak47","m4a1","mp5","p90","spas","awp","kar98","scar","ump45","aug","vector","m249","revolver","glock","deagle","r870","fn502"],"price":1000,"slot":"sarjor"},"sus":{"fits":["ak47","m4a1","mp5","p90","awp","kar98","scar","ump45","aug","vector","m249","revolver","glock","deagle","fn502"],"price":900,"slot":"namlu"},"tutamak":{"fits":["ak47","m4a1","mp5","p90","spas","awp","kar98","scar","ump45","aug","vector","m249","r870"],"price":750,"slot":"alt"}},"sets":5,"skins":{"altin":{"price":5000,"rarity":3},"buz":{"price":4200,"rarity":3},"cini":{"price":3000,"rarity":2},"dijital":{"price":700,"rarity":0},"galaksi":{"price":3500,"rarity":3},"gece":{"price":1200,"rarity":1},"kamuflaj":{"price":600,"rarity":0},"kar":{"price":800,"rarity":1},"karbon":{"price":1500,"rarity":1},"kizil":{"price":2200,"rarity":2},"lav":{"price":4800,"rarity":3},"neon":{"price":1400,"rarity":2},"std":{"price":0,"rarity":0},"turkuaz":{"price":3200,"rarity":2}},"weapons":{"ak47":{"cat":"ana","dmg":33.0,"head":2.6,"melee":false,"pellets":1,"price":0,"rpm":600.0,"throwable":false},"aug":{"cat":"ana","dmg":31.0,"head":2.5,"melee":false,"pellets":1,"price":4400,"rpm":700.0,"throwable":false},"awp":{"cat":"ana","dmg":120.0,"head":3.0,"melee":false,"pellets":1,"price":4750,"rpm":40.0,"throwable":false},"deagle":{"cat":"tabanca","dmg":54.0,"head":2.6,"melee":false,"pellets":1,"price":1800,"rpm":210.0,"throwable":false},"fn502":{"cat":"tabanca","dmg":21.0,"head":2.5,"melee":false,"pellets":1,"price":1400,"rpm":480.0,"throwable":false},"frag":{"cat":"bomba","dmg":130.0,"head":1.0,"melee":false,"pellets":1,"price":0,"rpm":60.0,"throwable":true},"glock":{"cat":"tabanca","dmg":24.0,"head":2.5,"melee":false,"pellets":1,"price":0,"rpm":420.0,"throwable":false},"kar98":{"cat":"ana","dmg":105.0,"head":3.0,"melee":false,"pellets":1,"price":3500,"rpm":48.0,"throwable":false},"karambit":{"cat":"bicak","dmg":60.0,"head":1.0,"melee":true,"pellets":1,"price":2000,"rpm":130.0,"throwable":false},"knife":{"cat":"bicak","dmg":55.0,"head":1.0,"melee":true,"pellets":1,"price":0,"rpm":110.0,"throwable":false},"m249":{"cat":"ana","dmg":30.0,"head":2.3,"melee":false,"pellets":1,"price":6200,"rpm":760.0,"throwable":false},"m4a1":{"cat":"ana","dmg":29.0,"head":2.5,"melee":false,"pellets":1,"price":2600,"rpm":740.0,"throwable":false},"mp5":{"cat":"ana","dmg":23.0,"head":2.2,"melee":false,"pellets":1,"price":1500,"rpm":800.0,"throwable":false},"p90":{"cat":"ana","dmg":21.0,"head":2.2,"melee":false,"pellets":1,"price":3200,"rpm":900.0,"throwable":false},"r870":{"cat":"ana","dmg":19.0,"head":1.6,"melee":false,"pellets":8,"price":2800,"rpm":62.0,"throwable":false},"revolver":{"cat":"tabanca","dmg":62.0,"head":2.7,"melee":false,"pellets":1,"price":2600,"rpm":150.0,"throwable":false},"scar":{"cat":"ana","dmg":38.0,"head":2.6,"melee":false,"pellets":1,"price":5200,"rpm":560.0,"throwable":false},"spas":{"cat":"ana","dmg":16.0,"head":1.6,"melee":false,"pellets":9,"price":2200,"rpm":70.0,"throwable":false},"ump45":{"cat":"ana","dmg":27.0,"head":2.2,"melee":false,"pellets":1,"price":2400,"rpm":650.0,"throwable":false},"vector":{"cat":"ana","dmg":19.0,"head":2.1,"melee":false,"pellets":1,"price":3800,"rpm":1150.0,"throwable":false}}}$CATALOG$::jsonb)
   on conflict (id) do update set data = excluded.data;
 alter table public.sokak_catalog enable row level security;
 revoke all on public.sokak_catalog from anon, authenticated;
@@ -71,6 +71,40 @@ begin
 end $$;
 
 -- ---------- ana işlem fonksiyonu ----------
+-- timed crate weapons: owned->w->exp (unix seconds). Expired ones move to p->expired (level/skins kept)
+create or replace function public._expire(p jsonb, nowt float8) returns jsonb language plpgsql as $$
+declare w text; d jsonb; i int; sl text; cnt int := 0;
+begin
+  if not (p ? 'expired') or jsonb_typeof(p->'expired') <> 'object' then p := jsonb_set(p, '{expired}', '{}'); end if;
+  for w, d in select key, value from jsonb_each(p->'owned') loop
+    if coalesce((d->>'exp')::float8, 0) > 0 and (d->>'exp')::float8 <= nowt then
+      p := jsonb_set(p, array['expired', w], d - 'exp');
+      p := p #- array['owned', w];
+      cnt := cnt + 1;
+    end if;
+  end loop;
+  if cnt > 0 and jsonb_typeof(p->'sets') = 'array' then
+    for i in 0 .. jsonb_array_length(p->'sets') - 1 loop
+      foreach sl in array array['ana', 'tabanca', 'bicak', 'bomba'] loop
+        if (p->'sets'->i) ? sl and not (p->'owned' ? (p->'sets'->i->>sl)) then
+          p := jsonb_set(p, array['sets', i::text, sl], to_jsonb((jsonb_build_object('ana','ak47','tabanca','glock','bicak','knife','bomba','frag'))->>sl));
+        end if;
+      end loop;
+    end loop;
+  end if;
+  return p;
+end $$;
+
+create or replace function public._give_weapon(p jsonb, w text, expt float8) returns jsonb language plpgsql as $$
+declare d jsonb;
+begin
+  if not (p ? 'expired') or jsonb_typeof(p->'expired') <> 'object' then p := jsonb_set(p, '{expired}', '{}'); end if;
+  d := coalesce(p->'expired'->w, '{"lvl":0,"skins":["std"],"skin":"std"}'::jsonb);
+  p := p #- array['expired', w];
+  if expt > 0 then d := d || jsonb_build_object('exp', floor(expt)); else d := d - 'exp'; end if;
+  return jsonb_set(p, array['owned', w], d);
+end $$;
+
 create or replace function public.sokak_act(a text, args jsonb default '{}'::jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
@@ -89,19 +123,21 @@ begin
   nowt := extract(epoch from clock_timestamp());
   if not (p ? 'parts') or jsonb_typeof(p->'parts') <> 'object' then p := jsonb_set(p, '{parts}', '{}'); end if;
   if not (p ? 'chars') or jsonb_typeof(p->'chars') <> 'array' then p := jsonb_set(p, '{chars}', '["takim","deri","asker1"]'); end if;
+  p := _expire(p, nowt);
 
   case a
   when 'buy_weapon' then
     id := args->>'id';
     if cat->'weapons'->id is null or (cat->'weapons'->id->>'throwable')::boolean or _si(cat, array['weapons', id, 'price']) <= 0 then
       raise exception 'Bu silah satılmıyor'; end if;
-    if p->'owned' ? id then raise exception 'Bu silaha zaten sahipsin'; end if;
+    if p->'owned' ? id and coalesce((p->'owned'->id->>'exp')::float8, 0) <= 0 then raise exception 'Bu silaha zaten sahipsin'; end if;
     price := _si(cat, array['weapons', id, 'price']);
     select f into k from jsonb_array_elements_text(cat->'featured') with ordinality as x(f, o)
       where not (p->'owned' ? f) order by o limit 1;
     if k = id then price := floor(price * 0.8); end if;
     p := _pay(p, price);
-    p := jsonb_set(p, array['owned', id], '{"lvl":0,"skins":["std"],"skin":"std"}');
+    if p->'owned' ? id then p := jsonb_set(p, array['owned', id], (p->'owned'->id) - 'exp');
+    else p := _give_weapon(p, id, 0); end if;
     res := jsonb_build_object('id', id, 'price', price);
 
   when 'buy_skin' then
@@ -160,8 +196,10 @@ begin
        and random() < (case when t = 'eklenti' then 0.85 else 0.12 end) then
       it := jsonb_build_object('type', 'part', 'id', _pick(cat->'crates'->t->'parts'));
     end if;
-    if it is null and jsonb_array_length(coalesce(cat->'crates'->t->'weapons', '[]')) > 0 and random() < 0.10 then
-      it := jsonb_build_object('type', 'weapon', 'id', _pick(cat->'crates'->t->'weapons'));
+    if it is null and jsonb_array_length(coalesce(cat->'crates'->t->'weapons', '[]')) > 0 and random() < 0.14 then
+      r := random();
+      it := jsonb_build_object('type', 'weapon', 'id', _pick(cat->'crates'->t->'weapons'),
+        'days', case when r < 0.15 then 0 when r < 0.45 then 30 when r < 0.8 then 7 else 3 end);
     end if;
     if it is null and jsonb_array_length(coalesce(cat->'crates'->t->'chars', '[]')) > 0 and random() < 0.06 then
       it := jsonb_build_object('type', 'char', 'id', _pick(cat->'crates'->t->'chars'));
@@ -198,11 +236,16 @@ begin
         p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + _si(it, '{dup}')));
       end if;
     when 'weapon' then
-      if p->'owned' ? (it->>'id') then
-        it := it || jsonb_build_object('dup', _si(cat, array['weapons', it->>'id', 'price']) / 2);
+      wid := it->>'id'; nl := _si(it, '{days}')::int; price := _si(cat, array['weapons', wid, 'price']);
+      if p->'owned' ? wid and coalesce((p->'owned'->wid->>'exp')::float8, 0) <= 0 then
+        it := it || jsonb_build_object('dup', case when nl = 0 then price / 2 else greatest(150, price * nl / 90) end);
         p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + _si(it, '{dup}')));
+      elsif p->'owned' ? wid then
+        if nl = 0 then p := jsonb_set(p, array['owned', wid], (p->'owned'->wid) - 'exp');
+        else p := jsonb_set(p, array['owned', wid, 'exp'], to_jsonb(floor(greatest((p->'owned'->wid->>'exp')::float8, nowt) + nl * 86400))); end if;
+        it := it || '{"ext":true}'::jsonb;
       else
-        p := jsonb_set(p, array['owned', it->>'id'], '{"lvl":0,"skins":["std"],"skin":"std"}');
+        p := _give_weapon(p, wid, case when nl = 0 then 0 else nowt + nl * 86400 end);
       end if;
     when 'char' then
       if (p->'chars') ? (it->>'id') then

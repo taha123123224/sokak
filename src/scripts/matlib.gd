@@ -158,6 +158,9 @@ func get_mat(name: String) -> Material:
 	if cache.has(name):
 		return cache[name]
 	var m: Material = null
+	if name.begins_with("ext_") or name.begins_with("gun_paint_ext"):
+		cache[name] = null      # imported, fully textured model: keep its own material
+		return null
 	if name == "leaves" or name == "foliage":
 		var lm := ShaderMaterial.new()
 		lm.shader = _shader("leaves", LEAF_SHADER)
@@ -462,6 +465,95 @@ func skin_mat(skin: String) -> Material:
 	cache[key] = s
 	return s
 
+const EXT_SKIN_SHADER := """
+shader_type spatial;
+render_mode blend_mix, cull_back, diffuse_burley, specular_schlick_ggx;
+uniform sampler2D base_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D base_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D base_rough : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D base_ao : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform vec4 base_col : source_color = vec4(1.0);
+uniform vec4 rough_ch = vec4(0.0, 1.0, 0.0, 0.0);
+uniform vec4 ao_ch = vec4(1.0, 0.0, 0.0, 0.0);
+uniform bool has_albedo = false;
+uniform bool has_normal = false;
+uniform bool has_rough = false;
+uniform bool has_ao = false;
+uniform float normal_depth = 1.0;
+uniform sampler2D skin_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform bool has_skin_tex = false;
+uniform vec4 skin_tint : source_color = vec4(1.0);
+uniform float tri_scale = 2.6;
+uniform float detail_mix = 0.6;
+uniform float skin_metal = 0.2;
+uniform float skin_rough = 0.35;
+uniform float coat = 0.6;
+uniform float emission = 0.0;
+uniform float sheen = 0.0;
+varying vec3 opos;
+varying vec3 onrm;
+void vertex() { opos = VERTEX; onrm = NORMAL; }
+vec3 tri(vec3 p, vec3 n) {
+	vec3 w = pow(abs(n), vec3(4.0));
+	w /= max(w.x + w.y + w.z, 1e-4);
+	return texture(skin_tex, p.zy).rgb * w.x + texture(skin_tex, p.xz).rgb * w.y + texture(skin_tex, p.xy).rgb * w.z;
+}
+void fragment() {
+	vec3 base = has_albedo ? texture(base_albedo, UV).rgb * base_col.rgb : base_col.rgb;
+	float lum = dot(base, vec3(0.299, 0.587, 0.114));
+	vec3 sk = (has_skin_tex ? tri(opos * tri_scale, normalize(onrm)) : vec3(1.0)) * skin_tint.rgb;
+	// keep the model's painted detail (edge wear, grime, engravings) under the skin
+	float det = clamp(lum / 0.32, 0.3, 1.7);
+	ALBEDO = sk * mix(1.0, det, detail_mix);
+	if (has_normal) { NORMAL_MAP = texture(base_normal, UV).rgb; NORMAL_MAP_DEPTH = normal_depth; }
+	float br = has_rough ? dot(texture(base_rough, UV), rough_ch) : skin_rough;
+	ROUGHNESS = clamp(mix(skin_rough, br, 0.45), 0.04, 1.0);
+	METALLIC = skin_metal;
+	if (has_ao) { AO = dot(texture(base_ao, UV), ao_ch); AO_LIGHT_AFFECT = 0.4; }
+	CLEARCOAT = coat;
+	CLEARCOAT_ROUGHNESS = 0.12;
+	float fres = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
+	EMISSION = sk * emission + sk * fres * sheen;
+}
+"""
+
+const _CH := [Vector4(1, 0, 0, 0), Vector4(0, 1, 0, 0), Vector4(0, 0, 1, 0), Vector4(0, 0, 0, 1), Vector4(0.333, 0.333, 0.333, 0)]
+
+## Skin for an imported (3DExport) weapon: the skin pattern is projected
+## tri-planar in model space, the model's own normal/roughness/AO maps stay.
+func ext_skin_mat(orig: BaseMaterial3D, skin: String) -> Material:
+	var key := "extskin:%d:%s" % [orig.get_instance_id(), skin]
+	if cache.has(key):
+		return cache[key]
+	var src := skin_mat(skin) as StandardMaterial3D
+	var m := ShaderMaterial.new()
+	m.shader = _shader("ext_skin", EXT_SKIN_SHADER)
+	m.set_shader_parameter("base_col", orig.albedo_color)
+	if orig.albedo_texture:
+		m.set_shader_parameter("base_albedo", orig.albedo_texture); m.set_shader_parameter("has_albedo", true)
+	if orig.normal_enabled and orig.normal_texture:
+		m.set_shader_parameter("base_normal", orig.normal_texture); m.set_shader_parameter("has_normal", true)
+		m.set_shader_parameter("normal_depth", orig.normal_scale)
+	if orig.roughness_texture:
+		m.set_shader_parameter("base_rough", orig.roughness_texture); m.set_shader_parameter("has_rough", true)
+		m.set_shader_parameter("rough_ch", _CH[int(orig.roughness_texture_channel)])
+	if orig.ao_enabled and orig.ao_texture:
+		m.set_shader_parameter("base_ao", orig.ao_texture); m.set_shader_parameter("has_ao", true)
+		m.set_shader_parameter("ao_ch", _CH[int(orig.ao_texture_channel)])
+	if src:
+		if src.albedo_texture:
+			m.set_shader_parameter("skin_tex", src.albedo_texture); m.set_shader_parameter("has_skin_tex", true)
+		m.set_shader_parameter("skin_tint", src.albedo_color)
+		m.set_shader_parameter("skin_metal", src.metallic)
+		m.set_shader_parameter("skin_rough", 0.4 if src.roughness_texture else src.roughness)
+		m.set_shader_parameter("coat", src.clearcoat if src.clearcoat_enabled else 0.0)
+		m.set_shader_parameter("emission", src.emission_energy_multiplier * 0.6 if src.emission_enabled else 0.0)
+		# a solid metal finish (gold) should not darken the model's detail as much
+		m.set_shader_parameter("detail_mix", 0.35 if src.albedo_texture == null else 0.6)
+		m.set_shader_parameter("sheen", 0.25 if skin in ["galaksi", "buz", "turkuaz", "altin"] else 0.0)
+	cache[key] = m
+	return m
+
 ## Replace materials in an imported scene by name. skin: weapon skin id or ""
 func _tune_rb(_m: Material) -> void:
 	# Rocketbox materials are used exactly as imported (alpha/culling come from the glTF).
@@ -482,12 +574,43 @@ func apply(node: Node, skin: String = "") -> void:
 				if n.begins_with("rb_"):
 					_tune_rb(sm)
 					continue
-				if skin != "" and skin != "std" and n.begins_with("gun_paint"):
+				if skin != "" and skin != "std" and n.begins_with("gun_paint_ext") and sm is BaseMaterial3D:
+					mi.set_surface_override_material(i, ext_skin_mat(sm as BaseMaterial3D, skin))
+				elif skin != "" and skin != "std" and n.begins_with("gun_paint"):
 					mi.set_surface_override_material(i, skin_mat(skin))
+				elif EXT_FALLBACK.has(n):
+					mi.set_surface_override_material(i, _ext_fallback(n, sm))
 				else:
 					mi.set_surface_override_material(i, get_mat(n))
 	for c in node.get_children():
 		apply(c, skin)
+
+## imported models whose archive came without textures: give them real wood / steel detail
+const EXT_FALLBACK := {"gun_paint_ext_r870_2": "wood", "gun_paint_ext_r870_1": "metal"}
+func _ext_fallback(n: String, orig: Material) -> Material:
+	var key := "extfb:" + n
+	if cache.has(key):
+		return cache[key]
+	var m := StandardMaterial3D.new()
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = false
+	if EXT_FALLBACK[n] == "wood":
+		m.albedo_texture = tex("gunwood_albedo.png")
+		m.albedo_color = Color(0.62, 0.42, 0.3)
+		m.uv1_scale = Vector3(3.0, 3.0, 3.0)
+		m.roughness = 0.42
+		m.clearcoat_enabled = true; m.clearcoat = 0.35; m.clearcoat_roughness = 0.3
+	else:
+		m.albedo_texture = tex("gunmetal_albedo.png")
+		m.albedo_color = Color(0.55, 0.56, 0.6)
+		m.normal_enabled = true; m.normal_texture = tex("gunmetal_normal.png"); m.normal_scale = 0.6
+		m.roughness_texture = tex("gunmetal_orm.png")
+		m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_GREEN
+		m.metallic = 0.85; m.roughness = 1.0
+		m.uv1_scale = Vector3(6.0, 6.0, 6.0)
+	cache[key] = m
+	return m
 
 const WATER_SHADER := """
 shader_type spatial;
