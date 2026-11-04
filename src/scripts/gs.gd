@@ -373,7 +373,7 @@ var MODES := {
 	"gungame": {"name": "Silah Oyunu", "desc": "Her öldürmede silahın değişir. Son silah bıçak!", "teams": false},
 	"knife": {"name": "Bıçak Arenası", "desc": "Sadece bıçak ve el bombası. Saf refleks.", "teams": false},
 	"sniper": {"name": "Nişancı Düellosu", "desc": "Sadece keskin nişancı tüfekleri. Takımlı.", "teams": true},
-	"sabotaj": {"name": "Sabotaj", "desc": "KARTAL bombayı A ya da B noktasına kurar, AKREP çözer. Turlu, ilk 6 turu alan kazanır.", "teams": true, "offline_only": true},
+	"sabotaj": {"name": "Sabotaj", "desc": "KARTAL bombayı A ya da B noktasına kurar, AKREP çözer. Turlu, ilk 6 turu alan kazanır.", "teams": true},
 }
 const TEAMS := {"a": "KARTAL", "b": "AKREP"}
 const TEAM_COLORS := {"a": Color("3d8bff"), "b": Color("ff4d3d")}
@@ -666,11 +666,11 @@ func stats_for(id: String, lvl: int = -1) -> Dictionary:
 func default_settings() -> Dictionary:
 	return {
 		"sens": 1.0, "ads_sens": 0.8, "scope_sens": 0.6, "invert_y": false, "fov": 80.0,
-		"quality": "high", "resolution_scale": 1.0, "upscaler": "fsr2", "fullscreen": true, "vsync": false, "fps_cap": 0,
+		"quality": "high", "resolution_scale": 1.0, "upscaler": "fsr2", "fullscreen": true, "vsync": false, "fps_cap": -1,
 		"msaa": 0, "taa": false, "fxaa": true, "shadows": 2, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false,
 		"dyn_res": true, "dyn_target": 75,
 		"motion_blur": false, "draw_distance": 1.0, "sharpen": 0.3, "brightness": 1.0, "show_fps": true, "announcer": true,
-		"vol_master": 0.8, "vol_sfx": 1.0, "vol_music": 0.5, "vol_amb": 0.6, "vol_voice": 1.0, "voice_on": true,
+		"vol_master": 0.8, "vol_sfx": 1.0, "vol_music": 0.5, "vol_amb": 0.6, "vol_voice": 1.0, "voice_on": true, "voice_mode": "ptt",
 		"xh_style": 0, "xh_color": "3dff8a", "xh_size": 7.0, "xh_gap": 5.0, "xh_thick": 2.0, "xh_dot": false, "xh_outline": true, "xh_dynamic": true, "xh_alpha": 1.0,
 		"hit_marker": true, "kill_feed": true, "blood": true, "minimap": true, "damage_numbers": true,
 		"binds": {},
@@ -685,6 +685,10 @@ func load_settings() -> void:
 			for k in d.keys():
 				settings[k] = d[k]
 	# v2.7: one-time automatic quality pick (older installs defaulted to ULTRA, too heavy for many PCs)
+	if not bool(settings.get("perf_v29", false)):
+		if int(settings.get("fps_cap", 0)) == 0:
+			settings["fps_cap"] = -1
+		settings["perf_v29"] = true
 	if not bool(settings.get("perf_v28", false)):
 		var tier := detect_tier()
 		apply_preset(tier)
@@ -739,7 +743,7 @@ func apply_settings() -> void:
 	elif DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if settings["vsync"] else DisplayServer.VSYNC_DISABLED)
-	Engine.max_fps = int(settings["fps_cap"])
+	Engine.max_fps = fps_limit()
 	var vp := get_viewport()
 	var ms := int(settings["msaa"])
 	vp.msaa_3d = Viewport.MSAA_DISABLED if ms == 0 else (Viewport.MSAA_2X if ms == 2 else (Viewport.MSAA_4X if ms == 4 else Viewport.MSAA_8X))
@@ -972,6 +976,18 @@ func _own(n: Node, owner_: Node) -> void:
 		_own(c, owner_)
 
 ## central asset resolution (base game + eklentiler)
+## FPS limit. -1 = automatic: just under the monitor refresh rate (e.g. 141 on 144 Hz) — the GPU never queues
+## frames, so frame times stay even (no micro-stutter) and input lag stays low
+func fps_limit() -> int:
+	var c := int(settings.get("fps_cap", -1))
+	if c >= 0:
+		return c
+	var hz := int(round(DisplayServer.screen_get_refresh_rate()))
+	if hz >= 70:
+		return hz - 3
+	return 0
+
+var _wscene_cache := {}
 func weapon_scene(id: String) -> PackedScene:
 	var mm: Dictionary = mod_weapon_model.get(id, {})
 	if mm.has("glb"):
@@ -979,7 +995,10 @@ func weapon_scene(id: String) -> PackedScene:
 		if ps:
 			return ps
 	var base: String = mm.get("base", id)
-	return load("res://assets/models/w_%s.glb" % base)
+	# keep loaded weapon scenes in memory: without a reference Godot frees them and reads them from disk again
+	if not _wscene_cache.has(base):
+		_wscene_cache[base] = load("res://assets/models/w_%s.glb" % base)
+	return _wscene_cache[base]
 
 func weapon_base(id: String) -> String:
 	return str(mod_weapon_model.get(id, {}).get("base", id))

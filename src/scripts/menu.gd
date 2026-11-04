@@ -128,7 +128,7 @@ func _exit_tree() -> void:
 
 func _ready() -> void:
 	# menus don't need more than 144 FPS: less GPU heat, no fan spin-up, smoother frame pacing
-	if int(GS.settings.get("fps_cap", 0)) == 0 or int(GS.settings.get("fps_cap", 0)) > 144:
+	if GS.fps_limit() == 0 or GS.fps_limit() > 144:
 		Engine.max_fps = 144
 	online = preload("res://scripts/menu_online.gd").new(self)
 	adminp = preload("res://scripts/menu_admin.gd").new(self)
@@ -821,10 +821,28 @@ func show_page(p: String) -> void:
 		"profile": _page_profile()
 		"settings": _page_settings()
 	_refresh_currency()
+	_update_friend_badge.call_deferred()
 	if p != "room" and p != "netroom" and (Net.active() or (local_room and not room_cfg.is_empty())):
 		_room_return_bar()
 
 ## floating "you are still in a room" bar on every other page
+var _fr_badge: Label
+func _update_friend_badge() -> void:
+	if not nav_btns.has("friends"):
+		return
+	var n: int = Online.incoming_count() if Online.is_logged_in() else 0
+	var b: Button = nav_btns["friends"]
+	if _fr_badge == null or not is_instance_valid(_fr_badge):
+		_fr_badge = UI.lbl("", 12, Color.WHITE, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+		_fr_badge.add_theme_stylebox_override("normal", UI.sb(UI.RED, Color(0, 0, 0, 0), 0, 9, 0))
+		_fr_badge.custom_minimum_size = Vector2(18, 18)
+		_fr_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_fr_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(_fr_badge)
+	_fr_badge.text = str(n)
+	_fr_badge.visible = n > 0
+	_fr_badge.position = Vector2(b.size.x - 14, 2)
+
 func _room_return_bar() -> void:
 	var online_r := Net.active()
 	var bar := PanelContainer.new()
@@ -1981,140 +1999,270 @@ class Rays extends Control:
 		for k in 6:
 			draw_circle(c, 120.0 - k * 18.0, Color(col.r, col.g, col.b, 0.05 + k * 0.025))
 
+const RARITY_NAMES := ["SIRADAN", "NADİR", "EPİK", "EFSANEVİ"]
+
+class CrateBox extends Control:
+	## stylised crate drawn in code: it shakes, its seams glow brighter and brighter, then it bursts open
+	var col := Color.WHITE
+	var glow := 0.0
+	var lid := 0.0           # 0 closed .. 1 blown off
+	func _process(_d: float) -> void:
+		queue_redraw()
+	func _box(r: Rect2, c: Color, rad: int) -> void:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = c
+		sb.set_corner_radius_all(rad)
+		draw_style_box(sb, r)
+	func _draw() -> void:
+		var w := size.x; var h := size.y
+		var body := Rect2(w * 0.12, h * 0.38, w * 0.76, h * 0.52)
+		# glow behind
+		for k in 8:
+			var gr := body.grow(14.0 + k * 10.0 * (0.4 + glow))
+			_box(gr, Color(col.r, col.g, col.b, 0.035 * glow), 28)
+		_box(Rect2(body.position + Vector2(0, 10), body.size), Color(0, 0, 0, 0.45), 14)
+		_box(body, col.darkened(0.62), 14)
+		_box(body.grow(-10), col.darkened(0.5), 10)
+		# metal straps
+		for x in [0.22, 0.78]:
+			_box(Rect2(body.position.x + body.size.x * x - 10, body.position.y, 20, body.size.y), Color(0.12, 0.13, 0.15), 4)
+		# glowing seam + emblem
+		var seam := Color(col.r, col.g, col.b, 0.35 + glow * 0.65).lightened(glow * 0.4)
+		draw_rect(Rect2(body.position.x, body.position.y - 2, body.size.x, 4 + glow * 4), seam)
+		var c := body.get_center()
+		draw_circle(c, 26, Color(0.1, 0.1, 0.12))
+		draw_circle(c, 20, seam)
+		# lid (lifts and rotates away when it bursts)
+		var lr := Rect2(w * 0.08, h * 0.24 - lid * h * 0.5, w * 0.84, h * 0.16)
+		draw_set_transform(lr.get_center(), -lid * 0.6, Vector2.ONE)
+		var lrr := Rect2(-lr.size / 2, lr.size)
+		_box(Rect2(lrr.position + Vector2(0, 6), lrr.size), Color(0, 0, 0, 0.4 * (1.0 - lid)), 12)
+		_box(lrr, col.darkened(0.55), 12)
+		_box(lrr.grow(-8), col.darkened(0.42), 8)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		# light leaking out of the seam
+		if glow > 0.2:
+			for i in 9:
+				var x0 := body.position.x + body.size.x * (0.08 + i * 0.105)
+				var ln := 60.0 + glow * 160.0 + sin(Time.get_ticks_msec() * 0.01 + i) * 16.0
+				draw_colored_polygon(PackedVector2Array([Vector2(x0 - 6, body.position.y), Vector2(x0 + 6, body.position.y), Vector2(x0 + 22, body.position.y - ln), Vector2(x0 - 22, body.position.y - ln)]),
+					Color(col.r, col.g, col.b, 0.12 * glow))
+
+class GlowBG extends Control:
+	## soft radial glow + slow light rays in the rarity colour
+	var col := Color.WHITE
+	var t := 0.0
+	var power := 1.0
+	func _process(d: float) -> void:
+		t += d
+		queue_redraw()
+	func _draw() -> void:
+		var c := size * Vector2(0.5, 0.42)
+		var r: float = max(size.x, size.y) * 0.8
+		for i in 24:
+			var a0 := t * 0.12 + i * TAU / 24.0
+			draw_colored_polygon(PackedVector2Array([c, c + Vector2.from_angle(a0) * r, c + Vector2.from_angle(a0 + 0.05) * r]), Color(col.r, col.g, col.b, 0.022 * power))
+		for k in 14:
+			draw_circle(c, 420.0 - k * 28.0, Color(col.r, col.g, col.b, 0.008 * power * (k + 1) * 0.5))
+
+func _rar_stars(r: int) -> String:
+	return "★".repeat(r + 1) + "☆".repeat(3 - r)
+
+func _info_chip(t: String, c: Color) -> PanelContainer:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UI.sb(Color(c.r, c.g, c.b, 0.14), Color(c.r, c.g, c.b, 0.5), 1, 16, 0))
+	var sb: StyleBoxFlat = p.get_theme_stylebox("panel")
+	sb.content_margin_left = 14; sb.content_margin_right = 14; sb.content_margin_top = 4; sb.content_margin_bottom = 4
+	p.add_child(UI.lbl(t, 15, c.lightened(0.2), "Rajdhani-Bold"))
+	return p
+
 func _crate_info_box(it: Dictionary) -> Control:
-	## details of the won item: what it is, rarity, duration, stats / value
+	## spec sheet of the won item: chips (type, duration, value) + stat bars in two columns
 	var col: Color = it["color"]
-	var p := UI.panel(Color(0.03, 0.035, 0.05, 0.94), col, 16, 2)
-	p.custom_minimum_size = Vector2(460, 0)
-	var v := UI.vbox(6)
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UI.sb(Color(0.02, 0.025, 0.035, 0.88), Color(col.r, col.g, col.b, 0.45), 1, 14, 18))
+	p.custom_minimum_size = Vector2(820, 0)
+	var v := UI.vbox(10)
 	p.add_child(v)
-	var rar: String = ["SIRADAN", "NADİR", "EPİK", "EFSANEVİ"][clamp(int(it.get("rarity", 0)), 0, 3)]
-	v.add_child(UI.lbl(rar, 16, col, "Rajdhani-Bold"))
+	var chips := UI.hbox(8)
+	v.add_child(chips)
 	match str(it.get("type", "")):
 		"weapon":
 			var wid: String = it["id"]
 			var w: Dictionary = GS.full_stats(wid)
-			v.add_child(UI.lbl(str(w["name"]).to_upper(), 32, Color.WHITE, "RussoOne-Regular"))
 			var dd := int(it.get("days", 0))
-			v.add_child(UI.lbl(str(w.get("cls", "")) + "   •   " + ("SÜRESİZ" if dd == 0 else "%d GÜN KULLANIM" % dd) + ("   •   süre uzatıldı" if it.get("ext", false) else ""), 17, UI.GOLD if dd == 0 else Color("ff9a4a"), "Rajdhani-Bold"))
+			chips.add_child(_info_chip("SİLAH  •  " + str(w.get("cls", "")).to_upper(), col))
+			chips.add_child(_info_chip("SÜRESİZ" if dd == 0 else "%d GÜN" % dd, UI.GOLD if dd == 0 else Color("ff9a4a")))
+			chips.add_child(_info_chip("Şarjör %d" % int(w.get("mag", 0)), Color("9fc8ff")))
+			if it.get("ext", false):
+				chips.add_child(_info_chip("SÜRE UZATILDI", UI.GREEN))
 			if w.has("ability"):
-				v.add_child(_wrap("★ " + str(w["ability"]), 16))
+				var ab := UI.lbl("★ " + str(w["ability"]), 16, Color("ffd8a8"), "Rajdhani-SemiBold")
+				ab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				v.add_child(ab)
+			var g := GridContainer.new()
+			g.columns = 2
+			g.add_theme_constant_override("h_separation", 34)
+			g.add_theme_constant_override("v_separation", 6)
+			v.add_child(g)
 			for row in _stat_rows(wid).slice(0, 6):
-				v.add_child(_stat(row[0], row[1], row[2], true))
+				g.add_child(_stat(row[0], row[1], row[2], true))
 			if it.has("dup"):
 				v.add_child(UI.lbl("Bu silah zaten sende: +%s altın verildi" % UI.money(int(it["dup"])), 15, UI.DIM, "Rajdhani-SemiBold"))
 		"skin":
 			var sd: Dictionary = GS.SKINS.get(it.get("id", "std"), {"name": "?", "price": 0, "rarity": 0})
-			v.add_child(UI.lbl(str(sd["name"]).to_upper(), 32, Color.WHITE, "RussoOne-Regular"))
-			v.add_child(UI.lbl("STİL  •  " + str(GS.WEAPONS.get(it.get("wid", ""), {}).get("name", "?")), 18, col, "Rajdhani-Bold"))
-			v.add_child(UI.lbl("Market değeri: ◉ %s" % UI.money(int(sd.get("price", 0))), 16, UI.GOLD, "Rajdhani-Bold"))
-			v.add_child(UI.lbl("Çanta > silah > STİL ile kuşanabilirsin.", 15, UI.DIM, "Rajdhani-SemiBold"))
+			chips.add_child(_info_chip("STİL", col))
+			chips.add_child(_info_chip(str(GS.WEAPONS.get(it.get("wid", ""), {}).get("name", "?")).to_upper(), Color("9fc8ff")))
+			chips.add_child(_info_chip("Değer ◉ %s" % UI.money(int(sd.get("price", 0))), UI.GOLD))
+			v.add_child(UI.lbl("Çanta > silah > STİLLER bölümünden kuşanabilirsin.", 16, UI.TEXT, "Rajdhani-SemiBold"))
 			if it.has("dup"):
 				v.add_child(UI.lbl("Bu stil zaten sende: +%s altın verildi" % UI.money(int(it["dup"])), 15, UI.DIM, "Rajdhani-SemiBold"))
 		"part":
 			var pd: Dictionary = GS.PARTS.get(it["id"], {})
-			v.add_child(UI.lbl(str(pd.get("name", it["id"])).to_upper(), 30, Color.WHITE, "RussoOne-Regular"))
-			v.add_child(_wrap(str(pd.get("desc", "Silah eklentisi: Çanta > EKLENTİ ile tak.")), 16))
+			chips.add_child(_info_chip("EKLENTİ", col))
+			var dl := UI.lbl(str(pd.get("desc", "Silah eklentisi: Çanta > EKLENTİ ile tak.")), 16, UI.TEXT, "Rajdhani-SemiBold")
+			dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			v.add_child(dl)
 		"char":
 			var cd: Dictionary = GS.CHARACTERS.get(it["id"], {})
-			v.add_child(UI.lbl(str(cd.get("name", it["id"])).to_upper(), 30, Color.WHITE, "RussoOne-Regular"))
-			v.add_child(_wrap(str(cd.get("desc", "Yeni karakter")), 16))
+			chips.add_child(_info_chip("KARAKTER", col))
+			var cl := UI.lbl(str(cd.get("desc", "Yeni karakter")), 16, UI.TEXT, "Rajdhani-SemiBold")
+			cl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			v.add_child(cl)
 		"mat":
-			v.add_child(UI.lbl("%d %s" % [int(it["n"]), str(GS.MATS.get(it["id"], it["id"])).to_upper()], 30, Color.WHITE, "RussoOne-Regular"))
-			v.add_child(UI.lbl("Silah yükseltmede kullanılır.", 16, UI.DIM, "Rajdhani-SemiBold"))
+			chips.add_child(_info_chip("MALZEME", col))
+			chips.add_child(_info_chip("x%d" % int(it["n"]), Color.WHITE))
+			v.add_child(UI.lbl("Silah yükseltmede kullanılır (Çanta > YÜKSELT).", 16, UI.TEXT, "Rajdhani-SemiBold"))
 		"gold":
-			v.add_child(UI.lbl("◉ %s ALTIN" % UI.money(int(it["n"])), 30, UI.GOLD, "RussoOne-Regular"))
+			chips.add_child(_info_chip("ALTIN", UI.GOLD))
+			v.add_child(UI.lbl("Hesabına eklendi. Market'te silah ve stil alabilirsin.", 16, UI.TEXT, "Rajdhani-SemiBold"))
 	return p
 
 func _crate_reveal(it: Dictionary, label: String) -> void:
+	## 1) the crate shakes and its seams glow  2) flash + burst  3) the item rises in the light with its spec sheet
+	var col: Color = it["color"]
+	var rar: int = clamp(int(it.get("rarity", 0)), 0, 3)
+	var vs := get_viewport().get_visible_rect().size
 	var ov := ColorRect.new()
-	ov.color = Color(0, 0, 0, 0.0)
+	ov.color = Color(0.0, 0.0, 0.0, 0.0)
 	ov.set_anchors_preset(Control.PRESET_FULL_RECT)
 	ui.add_child(ov)
-	var rays := Rays.new()
-	rays.col = it["color"]
-	rays.set_anchors_preset(Control.PRESET_FULL_RECT)
-	rays.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ov.add_child(rays)
-	var vs := get_viewport().get_visible_rect().size
-	# white flash
+	var bg := GlowBG.new()
+	bg.col = col
+	bg.power = 0.0
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ov.add_child(bg)
+	var box := CrateBox.new()
+	box.col = col
+	box.size = Vector2(360, 300)
+	box.position = Vector2(vs.x * 0.5 - 180, vs.y * 0.42 - 170)
+	box.pivot_offset = box.size * 0.5
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ov.add_child(box)
 	var fl := ColorRect.new()
 	fl.color = Color(1, 1, 1, 0.0)
 	fl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	fl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ov.add_child(fl)
-	# big item card (left of centre) + info box (right)
-	var card := UI.panel(Color(0.05, 0.06, 0.085), it["color"], 10, 2)
-	card.custom_minimum_size = Vector2(340, 360)
-	var ccv := UI.vbox(6)
-	card.add_child(ccv)
-	var cbar := ColorRect.new(); cbar.color = it["color"]; cbar.custom_minimum_size = Vector2(0, 5)
-	ccv.add_child(cbar)
+	# ---- the reward: big image, rarity ribbon, name, spec sheet
+	var stage := Control.new()
+	stage.set_anchors_preset(Control.PRESET_FULL_RECT)
+	stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stage.modulate.a = 0.0
+	ov.add_child(stage)
+	var rib := UI.lbl(_rar_stars(rar) + "   " + RARITY_NAMES[rar] + "   " + _rar_stars(rar), 26, col.lightened(0.15), "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
+	rib.custom_minimum_size = Vector2(900, 0)
+	rib.position = Vector2(vs.x * 0.5 - 450, vs.y * 0.08)
+	rib.add_theme_constant_override("outline_size", 6)
+	rib.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	stage.add_child(rib)
+	var img: Control
 	match str(it.get("type", "")):
-		"skin": ccv.add_child(thumb_rect(it["wid"], it["id"], Vector2(0, 240)))
-		"weapon": ccv.add_child(thumb_rect(it["id"], "std", Vector2(0, 240)))
+		"skin": img = thumb_rect(it["wid"], it["id"], Vector2(vs.y * 0.42 * 2.15, vs.y * 0.42))
+		"weapon": img = thumb_rect(it["id"], "std", Vector2(vs.y * 0.42 * 2.15, vs.y * 0.42))
 		_:
-			var small := _crate_card(it)
-			small.custom_minimum_size = Vector2(0, 240)
-			ccv.add_child(small)
-	var cl := UI.lbl(str(it.get("label", "")), 20, Color.WHITE, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
-	cl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	ccv.add_child(cl)
-	ov.add_child(card)
-	card.position = Vector2(vs.x * 0.5 - 380, vs.y * 0.5 - 200)
-	card.pivot_offset = Vector2(170, 180)
-	card.scale = Vector2(0.2, 0.2)
-	card.rotation = deg_to_rad(-12)
-	card.modulate = Color(3, 3, 3, 0)
+			img = _crate_card(it)
+			img.custom_minimum_size = Vector2(300, 260)
+	img.size = img.custom_minimum_size
+	img.position = Vector2(vs.x * 0.5 - img.size.x * 0.5, vs.y * 0.36 - img.size.y * 0.5)
+	img.pivot_offset = img.size * 0.5
+	img.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stage.add_child(img)
+	# soft floor shadow under the item
+	var sh := TextureRect.new()
+	var gt := GradientTexture2D.new()
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5); gt.fill_to = Vector2(1.0, 0.5)
+	var g0 := Gradient.new(); g0.set_color(0, Color(0, 0, 0, 0.55)); g0.set_color(1, Color(0, 0, 0, 0))
+	gt.gradient = g0
+	sh.texture = gt
+	sh.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	sh.size = Vector2(520, 60)
+	sh.position = Vector2(vs.x * 0.5 - 260, img.position.y + img.size.y - 20)
+	sh.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stage.add_child(sh)
+	var nm := UI.lbl(str(it.get("label", label)).to_upper(), 40, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
+	nm.custom_minimum_size = Vector2(1000, 0)
+	nm.position = Vector2(vs.x * 0.5 - 500, img.position.y + img.size.y + 8)
+	nm.add_theme_constant_override("outline_size", 8)
+	nm.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	stage.add_child(nm)
 	var info := _crate_info_box(it)
-	ov.add_child(info)
-	info.position = Vector2(vs.x * 0.5 + 10, vs.y * 0.5 - 200)
-	info.modulate.a = 0.0
-	var tl := UI.lbl(["SIRADAN", "NADİR", "EPİK", "EFSANEVİ"][clamp(int(it.get("rarity", 0)), 0, 3)] + "!", 44, it["color"], "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
-	tl.custom_minimum_size = Vector2(800, 0)
-	tl.position = Vector2(vs.x * 0.5 - 400, vs.y * 0.5 - 290)
-	tl.pivot_offset = Vector2(400, 30)
-	tl.scale = Vector2(1.8, 1.8)
-	tl.modulate.a = 0.0
-	ov.add_child(tl)
-	var ok := UI.btn("HARİKA!", func(): ov.queue_free(), 22, true, 240, 54)
-	ok.position = Vector2(vs.x * 0.5 - 120, vs.y * 0.5 + 200)
-	ok.modulate.a = 0.0
-	ov.add_child(ok)
+	stage.add_child(info)
+	info.position = Vector2(vs.x * 0.5 - 410, nm.position.y + 56)
+	info.size = info.get_combined_minimum_size()
+	info.resized.connect(func(): if info.size.y > info.get_combined_minimum_size().y + 2: info.size = info.get_combined_minimum_size())
+	var bh := UI.hbox(12)
+	bh.alignment = BoxContainer.ALIGNMENT_CENTER
+	(info.get_child(0) as VBoxContainer).add_child(bh)
+	bh.add_child(UI.btn("✔ TAMAM", func(): ov.queue_free(), 20, true, 220, 48))
+	if str(it.get("type", "")) in ["weapon", "skin"]:
+		bh.add_child(UI.btn("ÇANTADA GÖR", func(): ov.queue_free(); show_page("bag"), 18, false, 220, 48))
 	var sp := CPUParticles2D.new()
-	sp.position = card.position + Vector2(170, 180)
-	sp.amount = 160 + 60 * int(it.get("rarity", 0)); sp.lifetime = 1.6; sp.one_shot = true; sp.explosiveness = 0.95
+	sp.position = Vector2(vs.x * 0.5, vs.y * 0.42)
+	sp.amount = 140 + 70 * rar; sp.lifetime = 1.8; sp.one_shot = true; sp.explosiveness = 0.97
 	sp.direction = Vector2(0, -1); sp.spread = 180
-	sp.initial_velocity_min = 200; sp.initial_velocity_max = 620
-	sp.gravity = Vector2(0, 420)
+	sp.initial_velocity_min = 220; sp.initial_velocity_max = 700
+	sp.gravity = Vector2(0, 380)
 	sp.scale_amount_min = 2.0; sp.scale_amount_max = 6.0
 	var g := Gradient.new()
-	g.set_color(0, Color(1, 1, 1, 1)); g.set_color(1, Color(it["color"], 0))
+	g.set_color(0, Color(1, 1, 1, 1)); g.set_color(1, Color(col, 0))
 	sp.color_ramp = g
+	sp.emitting = false
 	ov.add_child(sp)
+	# ---- timeline
 	var tw := ov.create_tween()
-	tw.tween_property(ov, "color:a", 0.82, 0.2)
-	tw.parallel().tween_property(fl, "color:a", 0.85 if int(it.get("rarity", 0)) >= 2 else 0.45, 0.08)
-	tw.tween_property(fl, "color:a", 0.0, 0.35)
-	tw.parallel().tween_property(card, "scale", Vector2(1.12, 1.12), 0.38).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.parallel().tween_property(card, "rotation", 0.0, 0.38).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.parallel().tween_property(card, "modulate", Color(1.7, 1.7, 1.7, 1), 0.3)
-	tw.parallel().tween_property(tl, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.parallel().tween_property(tl, "modulate:a", 1.0, 0.2)
-	tw.tween_property(card, "scale", Vector2.ONE, 0.2)
-	tw.parallel().tween_property(card, "modulate", Color.WHITE, 0.5)
-	tw.parallel().tween_property(info, "modulate:a", 1.0, 0.35)
-	tw.parallel().tween_property(info, "position:x", info.position.x + 20, 0.35).from(info.position.x - 40)
-	tw.tween_property(ok, "modulate:a", 1.0, 0.25)
-	# floating idle bob of the card
-	var bob := card.create_tween().set_loops()
-	bob.tween_property(card, "position:y", card.position.y - 8, 1.2).set_trans(Tween.TRANS_SINE).set_delay(1.0)
-	bob.tween_property(card, "position:y", card.position.y, 1.2).set_trans(Tween.TRANS_SINE)
-	sp.emitting = true
-	if int(it.get("rarity", 0)) >= 2:
-		SFX.play("medal", -2)
-	if int(it.get("rarity", 0)) >= 3:
-		SFX.play("multikill", -4)
+	tw.tween_property(ov, "color", Color(0.01, 0.012, 0.02, 0.9), 0.25)
+	box.scale = Vector2(0.6, 0.6)
+	tw.parallel().tween_property(box, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	SFX.play("upgrade_charge", -4, 1.2)
+	var shake_n := 10 + rar * 4
+	for k in shake_n:
+		var amp := 3.0 + k * 0.9
+		tw.tween_property(box, "rotation", deg_to_rad(amp * (1 if k % 2 == 0 else -1) * 0.35), 0.05)
+		tw.parallel().tween_property(box, "glow", float(k + 1) / shake_n, 0.05)
+	tw.tween_property(box, "rotation", 0.0, 0.04)
+	tw.tween_callback(func():
+		sp.emitting = true
+		SFX.play("success")
+		if rar >= 2: SFX.play("medal", -2)
+		if rar >= 3: SFX.play("multikill", -4))
+	tw.tween_property(fl, "color:a", 0.9 if rar >= 2 else 0.55, 0.06)
+	tw.parallel().tween_property(box, "lid", 1.0, 0.35).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(box, "modulate:a", 0.0, 0.35)
+	tw.parallel().tween_property(bg, "power", 1.0 + rar * 0.35, 0.5)
+	tw.tween_property(fl, "color:a", 0.0, 0.4)
+	img.scale = Vector2(0.3, 0.3)
+	tw.parallel().tween_property(stage, "modulate:a", 1.0, 0.3)
+	tw.parallel().tween_property(img, "scale", Vector2(1.08, 1.08), 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(info, "position:y", info.position.y, 0.45).from(info.position.y + 40).set_ease(Tween.EASE_OUT)
+	tw.tween_property(img, "scale", Vector2.ONE, 0.25)
+	tw.tween_callback(func():
+		box.queue_free()
+		var bob := img.create_tween().set_loops()
+		bob.tween_property(img, "position:y", img.position.y - 10, 1.4).set_trans(Tween.TRANS_SINE)
+		bob.tween_property(img, "position:y", img.position.y, 1.4).set_trans(Tween.TRANS_SINE))
 
 func _roll_item(t: String = "sokak") -> Dictionary:
 	var cd: Dictionary = GS.CRATES.get(t, GS.CRATES["sokak"])
@@ -2512,75 +2660,229 @@ func _create_room_dialog() -> void:
 	if GS.play_mode == "online":
 		if not Online.is_logged_in():
 			show_page("mode"); return
-		online.create_room()
+		var oc: Dictionary = online.room_cfg.duplicate()
+		oc["name"] = "%s'in Odası" % Online.username
+		_room_dialog(oc, true, func(c): online.room_cfg = c; online.create_room())
 		return
 	var cfg := {"name": str(GS.profile["name"]) + " odası", "map": "mahalle", "mode": "ffa", "bots": 9, "diff": 1, "time": 8, "target": 40, "team": "a", "no": randi_range(100, 999)}
 	_room_dialog(cfg)
 
-func _room_dialog(cfg: Dictionary) -> void:
-	var v := _modal(1060, 760)
-	var top := UI.hbox(10)
+const MODE_ICONS := {"tdm": "⚔", "ffa": "✦", "gungame": "↑", "knife": "✂", "sniper": "◎", "sabotaj": "✹"}
+const MODE_SHORT := {"tdm": "Takımlar en çok öldürmeye yarışır", "ffa": "Herkes herkese karşı", "gungame": "Her öldürmede yeni silah",
+	"knife": "Sadece bıçaklar", "sniper": "Sadece nişancı tüfekleri", "sabotaj": "Bomba kur / çöz, turlu oyun"}
+
+func _chip(text: String, on: bool, cb: Callable, w: int = 0) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(w, 38)
+	b.add_theme_font_override("font", UI.font("Rajdhani-Bold"))
+	b.add_theme_font_size_override("font_size", 16)
+	b.add_theme_stylebox_override("normal", UI.sb(Color(1, 0.55, 0.12, 0.22) if on else Color(1, 1, 1, 0.05), UI.ACCENT if on else Color(1, 1, 1, 0.1), 1, 8, 8))
+	b.add_theme_stylebox_override("hover", UI.sb(Color(1, 1, 1, 0.1), UI.ACCENT2, 1, 8, 8))
+	b.add_theme_stylebox_override("pressed", UI.sb(Color(1, 0.55, 0.12, 0.3), UI.ACCENT, 1, 8, 8))
+	b.add_theme_color_override("font_color", Color.WHITE if on else UI.TEXT)
+	b.pressed.connect(func(): SFX.play("ui_click", -8); cb.call())
+	return b
+
+func _set_label(v: VBoxContainer, t: String) -> void:
+	v.add_child(UI.lbl(t, 14, UI.DIM, "Rajdhani-Bold"))
+
+## modern room setup, shared by bot rooms and online rooms.
+## online: shows player limit / ranked instead of bots. done: called with the final cfg (null = bot room default)
+func _room_dialog(cfg: Dictionary, is_online: bool = false, done: Callable = Callable()) -> void:
+	var v := _modal(1280, 790)
+	var top := UI.hbox(12)
 	v.add_child(top)
-	top.add_child(UI.header("ODA KUR", 30))
+	var tv := UI.vbox(-4)
+	top.add_child(tv)
+	tv.add_child(UI.lbl("ODA AYARLARI" if cfg.has("_edit") else "ODA KUR", 32, Color.WHITE, "RussoOne-Regular"))
+	tv.add_child(UI.lbl(("ÇEVRİMİÇİ ODA  •  arkadaşlarınla oyna" if is_online else "BOT ODASI  •  yapay zekâya karşı"), 15, UI.ACCENT2, "Rajdhani-Bold"))
 	top.add_child(UI.spacer())
 	top.add_child(UI.btn("✕", _close_modal, 20, false, 44, 40))
+	var body := UI.hbox(18)
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(body)
+	var redraw := func(): _room_dialog(cfg, is_online, done)
+	# ---------------- left: name, map, mode
+	var left := UI.vbox(10)
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(left)
+	_set_label(left, "ODA ADI")
 	var le := LineEdit.new()
-	le.text = cfg["name"]
+	le.text = str(cfg["name"])
+	le.max_length = 28
 	le.custom_minimum_size = Vector2(0, 44)
 	le.text_changed.connect(func(t): cfg["name"] = t)
-	v.add_child(UI.lbl("Oda Adı", 18, UI.DIM))
-	v.add_child(le)
-	v.add_child(UI.lbl("Harita", 18, UI.DIM))
-	var mh := GridContainer.new()
-	mh.columns = 6
-	mh.add_theme_constant_override("h_separation", 8)
-	v.add_child(mh)
-	for m in GS.MAPS.keys():
-		var sel: bool = cfg["map"] == m
+	left.add_child(le)
+	_set_label(left, "HARİTA")
+	var mg := GridContainer.new()
+	mg.columns = 3
+	mg.add_theme_constant_override("h_separation", 10)
+	mg.add_theme_constant_override("v_separation", 10)
+	left.add_child(mg)
+	for mid in GS.MAPS.keys():
+		var sel: bool = cfg["map"] == mid
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(160, 130)
+		b.custom_minimum_size = Vector2(238, 118)
 		b.focus_mode = Control.FOCUS_NONE
-		b.add_theme_stylebox_override("normal", UI.sb(Color(0.06, 0.07, 0.1), UI.ACCENT if sel else UI.LINE, 3 if sel else 1, 4, 0))
-		b.add_theme_stylebox_override("hover", UI.sb(Color(0.08, 0.09, 0.12), UI.ACCENT2, 1, 4, 0))
-		b.add_theme_stylebox_override("pressed", UI.sb(Color(0.06, 0.07, 0.1), UI.ACCENT, 2, 4, 0))
-		var img := _map_image(m)
+		b.clip_contents = true
+		b.add_theme_stylebox_override("normal", UI.sb(Color(0.05, 0.06, 0.08), UI.ACCENT if sel else Color(1, 1, 1, 0.08), 3 if sel else 1, 10, 0))
+		b.add_theme_stylebox_override("hover", UI.sb(Color(0.08, 0.09, 0.12), UI.ACCENT2, 2, 10, 0))
+		b.add_theme_stylebox_override("pressed", UI.sb(Color(0.05, 0.06, 0.08), UI.ACCENT, 3, 10, 0))
+		var img := _map_image(mid)
 		img.set_anchors_preset(Control.PRESET_FULL_RECT)
-		img.offset_left = 3; img.offset_right = -3; img.offset_top = 3; img.offset_bottom = -34
+		img.offset_left = 3; img.offset_right = -3; img.offset_top = 3; img.offset_bottom = -3
+		img.modulate = Color(1, 1, 1) if sel else Color(0.72, 0.72, 0.76)
 		b.add_child(img)
-		var l := UI.lbl(GS.MAPS[m]["name"], 20, Color.WHITE if sel else UI.TEXT, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+		var shade := ColorRect.new()
+		shade.color = Color(0, 0, 0, 0.55)
+		shade.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		shade.offset_top = -38; shade.offset_left = 3; shade.offset_right = -3; shade.offset_bottom = -3
+		shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(shade)
+		var l := UI.lbl(GS.MAPS[mid]["name"].to_upper(), 19, Color.WHITE, "RussoOne-Regular")
 		l.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-		l.offset_top = -34
+		l.offset_top = -36; l.offset_left = 12
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(l)
-		b.pressed.connect(func(): cfg["map"] = m; SFX.play("ui_click", -6); _room_dialog(cfg))
-		mh.add_child(b)
-	v.add_child(UI.lbl("Mod", 18, UI.DIM))
-	var mdh := UI.hbox(8)
-	v.add_child(mdh)
+		var sz := UI.lbl(str(GS.MAPS[mid].get("size", "")).to_upper(), 13, UI.ACCENT2, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_RIGHT)
+		sz.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		sz.offset_top = -30; sz.offset_right = -12
+		sz.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(sz)
+		if sel:
+			var ck := UI.lbl("✔", 20, UI.ACCENT, "Rajdhani-Bold")
+			ck.position = Vector2(12, 6)
+			ck.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			b.add_child(ck)
+		b.pressed.connect(func(): cfg["map"] = mid; SFX.play("ui_click", -6); redraw.call())
+		mg.add_child(b)
+	_set_label(left, "OYUN MODU")
+	var mdg := GridContainer.new()
+	mdg.columns = 3
+	mdg.add_theme_constant_override("h_separation", 10)
+	mdg.add_theme_constant_override("v_separation", 10)
+	left.add_child(mdg)
 	for md in GS.MODES.keys():
-		mdh.add_child(UI.btn(GS.MODES[md]["name"], func(): cfg["mode"] = md; cfg["target"] = 60 if GS.MODES[md]["teams"] else 40; _room_dialog(cfg), 18, cfg["mode"] == md, 0, 42))
-	v.add_child(UI.lbl(GS.MODES[cfg["mode"]]["desc"], 17, UI.ACCENT2))
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 30)
-	grid.add_theme_constant_override("v_separation", 8)
-	v.add_child(grid)
-	var bl := UI.lbl("Bot Sayısı: %d" % cfg["bots"], 19, Color.WHITE)
-	grid.add_child(bl)
-	grid.add_child(UI.slider(1, 15, 1, cfg["bots"], func(x): cfg["bots"] = int(x); bl.text = "Bot Sayısı: %d" % int(x), 420))
-	var tl := UI.lbl("Süre: %d dk" % cfg["time"], 19, Color.WHITE)
-	grid.add_child(tl)
-	grid.add_child(UI.slider(3, 20, 1, cfg["time"], func(x): cfg["time"] = int(x); tl.text = "Süre: %d dk" % int(x), 420))
-	var sl := UI.lbl("Hedef Skor: %d" % cfg["target"], 19, Color.WHITE)
-	grid.add_child(sl)
-	grid.add_child(UI.slider(10, 150, 5, cfg["target"], func(x): cfg["target"] = int(x); sl.text = "Hedef Skor: %d" % int(x), 420))
-	grid.add_child(UI.lbl("Bot Zorluğu", 19, Color.WHITE))
-	var dh := UI.hbox(6)
-	for d in [[0, "Kolay"], [1, "Normal"], [2, "Zor"]]:
-		dh.add_child(UI.btn(d[1], func(): cfg["diff"] = d[0]; _room_dialog(cfg), 17, cfg["diff"] == d[0], 120, 38))
-	grid.add_child(dh)
-	var go := UI.btn("ODAYI OLUŞTUR", func(): room_cfg = cfg; _close_modal(); show_page("room"), 24, true, 0, 58)
-	v.add_child(go)
+		var on: bool = cfg["mode"] == md
+		var mb := Button.new()
+		mb.focus_mode = Control.FOCUS_NONE
+		mb.custom_minimum_size = Vector2(238, 64)
+		mb.add_theme_stylebox_override("normal", UI.sb(Color(1, 0.55, 0.12, 0.16) if on else Color(1, 1, 1, 0.04), UI.ACCENT if on else Color(1, 1, 1, 0.08), 2 if on else 1, 10, 0))
+		mb.add_theme_stylebox_override("hover", UI.sb(Color(1, 1, 1, 0.08), UI.ACCENT2, 1, 10, 0))
+		mb.add_theme_stylebox_override("pressed", UI.sb(Color(1, 0.55, 0.12, 0.25), UI.ACCENT, 2, 10, 0))
+		var mh := UI.hbox(10)
+		mh.set_anchors_preset(Control.PRESET_FULL_RECT)
+		mh.offset_left = 12
+		mh.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		mb.add_child(mh)
+		var ic := UI.lbl(str(MODE_ICONS.get(md, "•")), 28, UI.ACCENT if on else UI.DIM, "Rajdhani-Bold")
+		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		ic.custom_minimum_size = Vector2(30, 0)
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		mh.add_child(ic)
+		var mv := UI.vbox(-4)
+		mv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		mv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		mh.add_child(mv)
+		var n1 := UI.lbl(str(GS.MODES[md]["name"]).to_upper(), 18, Color.WHITE, "Rajdhani-Bold")
+		n1.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		mv.add_child(n1)
+		var n2 := UI.lbl(str(MODE_SHORT.get(md, "")), 13, UI.DIM, "Rajdhani-SemiBold")
+		n2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		mv.add_child(n2)
+		mb.pressed.connect(func():
+			cfg["mode"] = md
+			cfg["target"] = 6 if md == "sabotaj" else (60 if GS.MODES[md]["teams"] else 40)
+			SFX.play("ui_click", -6); redraw.call())
+		mdg.add_child(mb)
+	# ---------------- right: settings + summary
+	var rp := PanelContainer.new()
+	rp.add_theme_stylebox_override("panel", UI.sb(Color(0.03, 0.035, 0.05, 0.95), Color(1, 1, 1, 0.08), 1, 12, 18))
+	rp.custom_minimum_size = Vector2(430, 0)
+	body.add_child(rp)
+	var r := UI.vbox(10)
+	rp.add_child(r)
+	r.add_child(UI.lbl("KURALLAR", 20, UI.ACCENT, "RussoOne-Regular"))
+	var sab: bool = cfg["mode"] == "sabotaj"
+	if sab:
+		_set_label(r, "KAZANMAK İÇİN TUR")
+		var rh := UI.hbox(6)
+		r.add_child(rh)
+		for n in [3, 5, 6, 8, 10]:
+			rh.add_child(_chip(str(n), int(cfg["target"]) == n, func(): cfg["target"] = n; redraw.call(), 64))
+		var info := PanelContainer.new()
+		info.add_theme_stylebox_override("panel", UI.sb(Color(1, 0.55, 0.12, 0.08), Color(1, 0.55, 0.12, 0.3), 1, 8, 10))
+		r.add_child(info)
+		var il := UI.lbl("✹ Tur süresi 1:45  •  Bomba 35 sn'de patlar\n✹ Kurma 3,2 sn  •  Çözme 5 sn (E basılı tut)\n✹ Ölen oyuncu tur sonunu bekler", 15, Color("ffd8a8"), "Rajdhani-SemiBold")
+		info.add_child(il)
+	else:
+		_set_label(r, "SÜRE")
+		var th := UI.hbox(6)
+		r.add_child(th)
+		for t in [5, 8, 10, 15, 20]:
+			th.add_child(_chip("%d dk" % t, int(cfg["time"]) == t, func(): cfg["time"] = t; redraw.call(), 72))
+		_set_label(r, "HEDEF SKOR")
+		var sh := UI.hbox(6)
+		r.add_child(sh)
+		var targets := [20, 40, 60, 80, 100] if GS.MODES[cfg["mode"]]["teams"] else [15, 25, 40, 60, 80]
+		if cfg["mode"] == "gungame":
+			sh.add_child(UI.lbl("Tüm silahları ilk bitiren kazanır", 15, UI.DIM, "Rajdhani-SemiBold"))
+		else:
+			for t in targets:
+				sh.add_child(_chip(str(t), int(cfg["target"]) == t, func(): cfg["target"] = t; redraw.call(), 72))
+	if is_online:
+		_set_label(r, "OYUNCU SINIRI")
+		var ph := UI.hbox(6)
+		r.add_child(ph)
+		for n in [2, 4, 6, 8, 10]:
+			ph.add_child(_chip(str(n), int(cfg.get("max", 10)) == n, func(): cfg["max"] = n; redraw.call(), 64))
+		var oh := UI.hbox(6)
+		r.add_child(oh)
+		oh.add_child(_chip("★ DERECELİ " + ("AÇIK" if cfg.get("ranked", false) else "KAPALI"), cfg.get("ranked", false), func(): cfg["ranked"] = not cfg.get("ranked", false); redraw.call(), 200))
+		oh.add_child(_chip("ÖZEL ODA (kodla)" if cfg.get("private", false) else "HERKESE AÇIK", cfg.get("private", false), func(): cfg["private"] = not cfg.get("private", false); redraw.call(), 190))
+	else:
+		_set_label(r, "BOT SAYISI")
+		var bh := UI.hbox(6)
+		r.add_child(bh)
+		for n in [3, 5, 7, 9, 11, 15]:
+			bh.add_child(_chip(str(n), int(cfg["bots"]) == n, func(): cfg["bots"] = n; redraw.call(), 54))
+		_set_label(r, "BOT ZORLUĞU")
+		var dh := UI.hbox(6)
+		r.add_child(dh)
+		for d in [[0, "KOLAY"], [1, "NORMAL"], [2, "ZOR"]]:
+			dh.add_child(_chip(d[1], int(cfg["diff"]) == d[0], func(): cfg["diff"] = d[0]; redraw.call(), 110))
+		if GS.MODES[cfg["mode"]]["teams"]:
+			_set_label(r, "TAKIMIN")
+			var tmh := UI.hbox(6)
+			r.add_child(tmh)
+			for t in ["a", "b"]:
+				tmh.add_child(_chip(str(GS.TEAMS[t]) + ("  (saldırı)" if sab and t == "a" else ("  (savunma)" if sab else "")), cfg.get("team", "a") == t, func(): cfg["team"] = t; redraw.call(), 180))
+	r.add_child(UI.spacer())
+	# summary
+	var sm := PanelContainer.new()
+	sm.add_theme_stylebox_override("panel", UI.sb(Color(1, 1, 1, 0.04), Color(1, 1, 1, 0.08), 1, 10, 10))
+	r.add_child(sm)
+	var smh := UI.hbox(12)
+	sm.add_child(smh)
+	var th2 := _map_image(cfg["map"])
+	th2.custom_minimum_size = Vector2(120, 70)
+	smh.add_child(th2)
+	var smv := UI.vbox(0)
+	smh.add_child(smv)
+	smv.add_child(UI.lbl(str(GS.MAPS[cfg["map"]]["name"]).to_upper() + "  •  " + str(GS.MODES[cfg["mode"]]["name"]).to_upper(), 17, Color.WHITE, "Rajdhani-Bold"))
+	var line2 := ("İlk %d tur" % int(cfg["target"])) if sab else ("%d dk  •  hedef %d" % [int(cfg["time"]), int(cfg["target"])])
+	line2 += ("  •  en fazla %d oyuncu" % int(cfg.get("max", 10))) if is_online else ("  •  %d bot  •  %s" % [int(cfg["bots"]), ["Kolay", "Normal", "Zor"][int(cfg["diff"])]])
+	smv.add_child(UI.lbl(line2, 14, UI.DIM, "Rajdhani-SemiBold"))
+	var go := UI.btn(("✔ AYARLARI KAYDET" if cfg.has("_edit") else "▶ ODAYI OLUŞTUR"), func():
+		cfg.erase("_edit")
+		_close_modal()
+		if done.is_valid():
+			done.call(cfg)
+		else:
+			room_cfg = cfg; show_page("room"), 24, true, 0, 60)
+	r.add_child(go)
 
 func _map_image(m: String) -> Control:
 	var path := "res://assets/ui/map_%s.jpg" % m
@@ -2816,7 +3118,7 @@ func _page_room() -> void:
 	var lay := room_layout({"title": str(cfg["name"]), "no": cfg["no"], "map": cfg["map"], "mode": cfg["mode"], "time": cfg["time"], "target": cfg["target"],
 		"teams": teams, "players": room_players,
 		"info_extra": [["Zorluk", ["Kolay", "Normal", "Zor"][int(cfg["diff"])]], ["Oyuncu", "%d / 16" % room_players.size()]],
-		"on_settings": func(): _room_dialog(cfg),
+		"on_settings": func(): cfg["_edit"] = true; _room_dialog(cfg),
 		"on_leave": func(): local_room = false; _room_key = ""; show_page("rooms"),
 		"on_chat": func(t): _chat(str(GS.profile["name"]), t, Color.WHITE); _bot_reply(),
 		"host_box": func(box):
@@ -3055,6 +3357,20 @@ func _page_mods() -> void:
 # ---------------------------------------------------------------- screenshot test hooks
 func test_hook(i: int) -> void:
 	match i:
+		35:
+			_room_dialog({"name": "Kapışma Odası", "map": "canakkale", "mode": "sabotaj", "bots": 9, "diff": 1, "time": 8, "target": 6, "team": "a", "no": 110})
+		36, 37:
+			Online.token = "test"; Online.uid = "me"; Online.username = "sokakoperasyon"; Online.expires_at = 1e12
+			Online.friends = [
+				{"username": "KurtReis", "user_id": "u1", "level": 24, "status": "match", "online": true, "pending": false, "incoming": false, "friendship_id": 1, "room": "AB12CD"},
+				{"username": "Mehmetcik_06", "user_id": "u2", "level": 12, "status": "lobby", "online": true, "pending": false, "incoming": false, "friendship_id": 2, "room": null},
+				{"username": "ZulaKing", "user_id": "u3", "level": 40, "status": "offline", "online": false, "pending": false, "incoming": false, "friendship_id": 3, "room": null},
+				{"username": "GeceKurdu", "user_id": "u4", "level": 7, "status": "lobby", "online": true, "pending": true, "incoming": true, "friendship_id": 4, "room": null},
+				{"username": "Atmaca", "user_id": "u5", "level": 15, "status": "lobby", "online": true, "pending": true, "incoming": false, "friendship_id": 5, "room": null}]
+			show_page("friends")
+			if i == 37:
+				online._on_friend_request(Online.friends[3])
+				online._on_invite({"id": 1, "from": "KurtReis", "room_name": "Kurtlar Vadisi", "room": "AB12CD"})
 		34:
 			room_cfg = {"name": "Kapışma Odası", "map": "canakkale", "mode": "tdm", "bots": 9, "diff": 1, "time": 8, "target": 6, "team": "a", "no": 110}
 			show_page("room")

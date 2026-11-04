@@ -6,8 +6,8 @@ extends RefCounted
 ## The choice is written to user://grafik.cfg, which project.godot loads as a settings override.
 
 const CFG := "user://grafik.cfg"
-const MODES := ["auto", "vulkan", "d3d12", "gl"]
-const NAMES := {"auto": "Otomatik (önerilen)", "vulkan": "Vulkan", "d3d12": "DirectX 12", "gl": "Uyumluluk (OpenGL) — eski kartlar"}
+const MODES := ["auto", "vulkan", "d3d12", "mobile", "gl"]
+const NAMES := {"auto": "Otomatik (önerilen)", "vulkan": "Vulkan", "d3d12": "DirectX 12", "gl": "Uyumluluk (OpenGL) — eski kartlar", "mobile": "Performans modu (zayıf PC)"}
 
 static func load_cfg() -> ConfigFile:
 	var c := ConfigFile.new()
@@ -36,6 +36,8 @@ static func write(mode_: String, auto_pick: String = "") -> void:
 		c.set_value("rendering", "rendering_device/driver.windows", "vulkan")
 	if eff == "gl":
 		c.set_value("rendering", "renderer/rendering_method", "gl_compatibility")
+	elif eff == "mobile":
+		c.set_value("rendering", "renderer/rendering_method", "mobile")
 	c.save(CFG)
 
 static func restart() -> void:

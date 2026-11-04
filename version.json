@@ -1,33 +1,33 @@
 {
-	"version": "2.8.0",
-	"build": 28,
+	"version": "2.9.0",
+	"build": 29,
 	"parts": [
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v28.pck.part00",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v29.pck.part00",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v28.pck.part01",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v29.pck.part01",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v28.pck.part02",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v29.pck.part02",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v28.pck.part03",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v29.pck.part03",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v28.pck.part04",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v29.pck.part04",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v28.pck.part05",
-			"size": 58577876
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v29.pck.part05",
+			"size": 58616516
 		}
 	],
-	"pck_size": 530437076,
+	"pck_size": 530475716,
 	"installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
-	"notes": "FPS güncellemesi: silah ve gölge çizimi hafifletildi, lobi/maç takılmaları giderildi (sunucu kontrolleri arka planda), silah resimleri önbellekte, menü 144 FPS sınırı, dinamik çözünürlük hedefi 75 FPS. Ultra ayarı tam kalite."
+	"notes": "Çevrimiçi SABOTAJ modu, yeni oda kurma ekranı, yeni kasa açma animasyonu ve bilgi kartı, yeni arkadaşlar sayfası + arkadaşlık isteği bildirimi, sesli sohbet düzeltmesi (otomatik ses yükseltme, açık mikrofon seçeneği), Performans grafik modu."
 }

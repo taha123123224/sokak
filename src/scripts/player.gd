@@ -167,6 +167,41 @@ func setup_loadout(set: Dictionary, mode: String) -> void:
 	cur = ""
 	var first = "ana" if slots.has("ana") else ("tabanca" if slots.has("tabanca") else slots.keys()[0])
 	switch_to(slots[first], true)
+	_warm_vm()
+
+## loads every weapon of the set (model + first-person arms) and draws it once in the weapon view, so the first
+## switch to a weapon doesn't read from disk or compile shaders mid-fight
+var _fp_cache := {}
+func _fp_scene(path: String) -> PackedScene:
+	if not _fp_cache.has(path):
+		_fp_cache[path] = load(path)
+	return _fp_cache[path]
+
+func _warm_vm() -> void:
+	if vm_off == null:
+		return
+	var tmp := Node3D.new()
+	vm_off.add_child(tmp)
+	tmp.position = Vector3(0, 0, -0.6)
+	tmp.scale = Vector3.ONE * 0.02
+	for c in slots.keys():
+		var id: String = slots[c]
+		var ps: PackedScene = GS.weapon_scene(id)
+		if ps:
+			var w := ps.instantiate()
+			MatLib.apply(w, GS.wskin(id))
+			tmp.add_child(w)
+		var fp_path := "res://assets/models/fp_%s.glb" % GS.weapon_base(id)
+		if ResourceLoader.exists(fp_path):
+			var fp: Node3D = _fp_scene(fp_path).instantiate()
+			MatLib.apply(fp)
+			tmp.add_child(fp)
+	for i in 3:
+		if DisplayServer.get_name() == "headless":
+			await get_tree().process_frame
+		else:
+			await RenderingServer.frame_post_draw
+	tmp.queue_free()
 
 # ---------------------------------------------------------------- input
 func _input(e: InputEvent) -> void:
@@ -1014,7 +1049,7 @@ func _load_vm_weapon(id: String) -> void:
 	fp_ap = null; fp_skel = null; fp_meta = {}; fp_anim = ""; mag_att = null; held_att = null
 	var fp_path := "res://assets/models/fp_%s.glb" % GS.weapon_base(id)
 	if ResourceLoader.exists(fp_path):
-		var fp: Node3D = (load(fp_path) as PackedScene).instantiate()
+		var fp: Node3D = _fp_scene(fp_path).instantiate()
 		MatLib.apply(fp)
 		_set_no_shadow(fp)
 		vm_off.add_child(fp)

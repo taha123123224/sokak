@@ -25,6 +25,12 @@ export default {
     if (!m) return new Response("not found", { status: 404 });
     if (req.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
     // ---- identity: the player must send a valid Supabase login token; id + name come from the server, not the client
+    // local test only (wrangler dev --var DEV_NOAUTH:1): never set this variable on the real worker
+    if (env.DEV_NOAUTH === "1") {
+      const fwd0 = new URL(req.url);
+      fwd0.searchParams.set("k", env.SUPABASE_KEY.slice(-12));
+      return env.ROOMS.get(env.ROOMS.idFromName(m[1].toUpperCase())).fetch(new Request(fwd0.toString(), req));
+    }
     const auth = req.headers.get("Authorization") || "";
     const tok = auth.startsWith("Bearer ") ? auth.slice(7) : (url.searchParams.get("tok") || "");
     if (!tok || tok.length > 4096) return new Response("Oyunu güncelle ve tekrar giriş yap", { status: 401 });

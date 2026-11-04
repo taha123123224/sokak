@@ -350,12 +350,12 @@ func _voice_ui() -> void:
 		voice_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		root.add_child(voice_lbl)
 	var names: Array = []
-	if Voice.talking:
+	if Voice.is_sending():
 		names.append("SEN")
 	for id in Voice.speaking.keys():
 		names.append(str(Net.members.get(id, {}).get("name", "?")))
 	voice_lbl.text = ("◉ KONUŞUYOR: " + ", ".join(names)) if names.size() > 0 else ""
-	if Voice.talking:
+	if Voice.is_sending():
 		voice_lbl.text += "   " + "▮".repeat(int(clampf(Voice.level * 40.0, 0, 10))) + "▯".repeat(10 - int(clampf(Voice.level * 40.0, 0, 10)))
 
 func _process(delta: float) -> void:
@@ -489,6 +489,12 @@ func ping_minimap(n) -> void:
 	pings[n] = 2.0
 
 func kill_feed(killer: String, victim: String, wid: String, head: bool, kt: String, vt: String, by_player: bool, player_died: bool) -> void:
+	var __t := Time.get_ticks_usec()
+	_sp_kill_feed(killer, victim, wid, head, kt, vt, by_player, player_died)
+	var __d := Time.get_ticks_usec() - __t
+	if __d > 3000: print("SPIKE hud.gd.kill_feed ", __d / 1000.0, "ms")
+
+func _sp_kill_feed(killer: String, victim: String, wid: String, head: bool, kt: String, vt: String, by_player: bool, player_died: bool) -> void:
 	if not GS.settings.get("kill_feed", true):
 		return
 	var p := UI.panel(Color(0.02, 0.03, 0.05, 0.65) if not by_player else Color(0.35, 0.2, 0.05, 0.75), Color(1, 1, 1, 0.08) if not (by_player or player_died) else (UI.ACCENT if by_player else UI.RED), 8, 2)
@@ -1396,6 +1402,8 @@ class ScoreBar extends Control:
 	var hud
 
 	static func grad_rect(ci: CanvasItem, r: Rect2, c0: Color, c1: Color, horizontal: bool = true) -> void:
+		if r.size.x < 0.5 or r.size.y < 0.5:
+			return
 		var pts := PackedVector2Array([r.position, r.position + Vector2(r.size.x, 0), r.end, r.position + Vector2(0, r.size.y)])
 		var cols := PackedColorArray([c0, c1, c1, c0]) if horizontal else PackedColorArray([c0, c0, c1, c1])
 		ci.draw_polygon(pts, cols)

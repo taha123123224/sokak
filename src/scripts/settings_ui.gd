@@ -112,7 +112,7 @@ func _build() -> void:
 			_section("EKRAN")
 			_check("fullscreen", "Tam Ekran")
 			_check("vsync", "Dikey Senkronizasyon (V-Sync)", "Yırtılmayı önler, gecikme ekler")
-			_options("fps_cap", "FPS Sınırı", [[0, "Sınırsız"], [60, "60"], [144, "144"], [165, "165"], [240, "240"]])
+			_options("fps_cap", "FPS Sınırı", [[-1, "Otomatik (akıcı, önerilen)"], [0, "Sınırsız"], [60, "60"], [144, "144"], [165, "165"], [240, "240"]], "Otomatik: ekranın yenileme hızının hemen altı — takılmasız, düzgün kare akışı")
 			_slide("resolution_scale", "Çözünürlük Ölçeği", 0.5, 2.0, 0.05, "%.2fx", "1.0 üstü = süper örnekleme")
 			_options("upscaler", "Ölçekleyici", [["fsr2", "AMD FSR 2.2"], ["fsr", "FSR 1.0"]], "Ölçek < 1 iken kullanılır")
 			_slide("sharpen", "Keskinlik", 0.0, 1.0, 0.05)
@@ -193,6 +193,7 @@ func _build() -> void:
 			_section("SESLİ SOHBET")
 			_check("voice_on", "Sesli sohbet açık (V tuşuna basılı tut: konuş)")
 			_slide("vol_voice", "Diğer oyuncuların sesi", 0, 1.5, 0.01, "%.2f")
+			_options("voice_mode", "Konuşma şekli", [["ptt", "Bas-konuş (V basılı tut)"], ["open", "Açık mikrofon (konuşunca otomatik)"]], "Açık mikrofonda V'ye basman gerekmez")
 			var devs := AudioServer.get_input_device_list()
 			var mo := OptionButton.new()
 			mo.custom_minimum_size = Vector2(380, 40)
@@ -223,11 +224,22 @@ func _build() -> void:
 				tb.text = "■ TESTİ DURDUR (konuş, çubuk dolmalı)" if on else "◉ MİKROFONU TEST ET")
 			th.add_child(tb)
 			th.add_child(meter)
+			var lb := UI.btn("↻ KENDİ SESİNİ DUY", Callable(), 18, false, 280, 42)
+			lb.toggle_mode = true
+			lb.toggled.connect(func(on):
+				if not Voice.loop_test(on):
+					lb.button_pressed = false
+					lb.text = "✖ " + (Voice.last_error if Voice.last_error != "" else "MİKROFON AÇILAMADI")
+					return
+				lb.text = "■ DURDUR (kendi sesini duyuyor olmalısın)" if on else "↻ KENDİ SESİNİ DUY")
+			th.add_child(lb)
+			th.tree_exiting.connect(func(): Voice.loop_test(false))
 			var tmr := Timer.new(); tmr.wait_time = 0.05; tmr.autostart = true
 			tmr.timeout.connect(func(): meter.value = clampf(Voice.level * 3.0, 0.0, 1.0))
 			th.add_child(tmr)
 			th.tree_exiting.connect(func(): Voice.mic_test(false))
-			body.add_child(UI.lbl("Nasıl kullanılır: çevrimiçi bir odada maça gir, V tuşuna BASILI TUT ve konuş; bırakınca susar.\nYazılı sohbet: Enter (veya T) herkese, Y sadece takımına. Ekranda kimin konuştuğu görünür.", 16, UI.DIM, "Rajdhani-SemiBold"))
+			body.add_child(UI.lbl("Kendi sesini duyuyorsan mikrofon ve ses sistemi çalışıyor demektir. Duymuyorsan: Windows Ayarlar > Gizlilik > Mikrofon > 'Masaüstü uygulamalarının erişimine izin ver' AÇIK olmalı.", 15, Color("ffd27a"), "Rajdhani-SemiBold"))
+			body.add_child(UI.lbl("Nasıl kullanılır: çevrimiçi odada veya maçta V tuşuna BASILI TUT ve konuş; bırakınca susar.\nYazılı sohbet: Enter (veya T) herkese, Y sadece takımına. Ekranda kimin konuştuğu görünür.", 16, UI.DIM, "Rajdhani-SemiBold"))
 			body.add_child(UI.btn("TEST: SİLAH SESİ", func(): GS.apply_settings(); SFX.play("shot_ak"), 18, false, 260, 42))
 		"oyun":
 			_section("ARAYÜZ")

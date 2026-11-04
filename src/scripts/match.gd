@@ -197,6 +197,7 @@ func _build() -> void:
 		combatants.append({"node": b, "name": bn, "team": bt, "kills": 0, "deaths": 0, "score": 0, "head": 0, "is_player": false, "gg": 0, "lvl": randi_range(5, 80)})
 	for c in combatants:
 		_spawn(c, true)
+	_fill_gun_pool()
 	await _progress(92, "Efektler ve gölgelendiriciler hazırlanıyor...")
 	if GRASS_MAPS.has(map_id) and str(GS.settings.get("quality", "high")) != "low":
 		await _scatter_grass(GRASS_MAPS[map_id])
@@ -277,6 +278,54 @@ func _add_occluders() -> void:
 		occ_root.add_child(oi)
 		oi.global_transform = Transform3D(Basis(Vector3.UP, float(r[1])), ctr)
 
+# ---------------------------------------------------------------- bot gun pool
+## guns are built during the loading screen and handed to bots when they (re)spawn: building a gun model
+## mid-match took 5-28 ms (a visible hitch every time a bot respawned with a new weapon)
+var gun_pool := {}
+func give_gun(g: Node3D) -> void:
+	var id: String = g.get_meta("wid", "")
+	if id == "":
+		g.queue_free(); return
+	if not gun_pool.has(id):
+		gun_pool[id] = []
+	gun_pool[id].append(g)
+
+func take_gun(id: String) -> Node3D:
+	var arr: Array = gun_pool.get(id, [])
+	while not arr.is_empty():
+		var g = arr.pop_back()
+		if is_instance_valid(g):
+			return g
+	return null
+
+func _fill_gun_pool() -> void:
+	var ids: Array = []
+	if mode == "gungame":
+		ids = GS.GUNGAME_ORDER.duplicate()
+	else:
+		for k in 30:
+			var w := _bot_weapon(0)
+			if not w in ids: ids.append(w)
+	for id in ids:
+		if not GS.WEAPONS.has(id):
+			continue
+		var ps: PackedScene = GS.weapon_scene(id)
+		if ps == null:
+			continue
+		for k in 2:
+			var g := ps.instantiate()
+			g.set_meta("wid", id)
+			MatLib.apply(g, "std" if k == 0 else GS.SKINS.keys()[randi() % GS.SKINS.size()])
+			give_gun(g)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		for id in gun_pool.keys():
+			for g in gun_pool[id]:
+				if is_instance_valid(g) and not g.is_inside_tree():
+					g.free()
+		gun_pool.clear()
+
 func _bot_weapon(gg: int) -> String:
 	match mode:
 		"knife":
@@ -291,7 +340,7 @@ func _bot_weapon(gg: int) -> String:
 var env_exp := 1.0
 
 func _setup_env(env_cfg: Dictionary) -> void:
-	Engine.max_fps = int(GS.settings.get("fps_cap", 0))   # menu caps at 144, the match uses the player's setting
+	Engine.max_fps = GS.fps_limit()   # menu caps at 144, the match uses the player's setting
 	var preset: String = env_cfg.get("preset", "day")
 	var s := GS.settings
 	world_env = WorldEnvironment.new()
@@ -873,6 +922,13 @@ func gg_level(n) -> int:
 	return int(entry(n).get("gg", 0))
 
 func on_death(victim, attacker, wid: String, head: bool) -> void:
+	if OS.has_environment("PERF"): print("EV death t=%.1f" % (Time.get_ticks_msec() / 1000.0))
+	var __t := Time.get_ticks_usec()
+	_sp_on_death(victim, attacker, wid, head)
+	var __d := Time.get_ticks_usec() - __t
+	if __d > 3000: print("SPIKE match.gd.on_death ", __d / 1000.0, "ms")
+
+func _sp_on_death(victim, attacker, wid: String, head: bool) -> void:
 	if ended:
 		return
 	var ve := entry(victim)
@@ -998,6 +1054,13 @@ func _check_win() -> void:
 				return
 
 func _spawn(e: Dictionary, initial: bool) -> void:
+	if OS.has_environment("PERF") and not initial: print("EV spawn t=%.1f" % (Time.get_ticks_msec() / 1000.0))
+	var __t := Time.get_ticks_usec()
+	_sp__spawn(e, initial)
+	var __d := Time.get_ticks_usec() - __t
+	if __d > 3000: print("SPIKE match.gd._spawn ", __d / 1000.0, "ms")
+
+func _sp__spawn(e: Dictionary, initial: bool) -> void:
 	if e.has("net_id"):
 		return
 	var n = e["node"]
@@ -1034,7 +1097,9 @@ func _spawn(e: Dictionary, initial: bool) -> void:
 		n.respawn(pos, best["yaw"])
 		hud.on_respawn()
 	else:
-		n.respawn(pos, best["yaw"], _bot_weapon(int(e["gg"])))
+		# bots mostly keep their weapon when they respawn (fewer model swaps = no respawn hitch)
+		var keep: bool = mode != "gungame" and "wid" in n and n.wid != "" and randf() < 0.75
+		n.respawn(pos, best["yaw"], n.wid if keep else _bot_weapon(int(e["gg"])))
 
 # ---------------------------------------------------------------- end
 func end_match() -> void:

@@ -66,7 +66,7 @@ func _test(args: Dictionary) -> void:
 			var ids: Array = Net.members.keys()
 			var tm := {}
 			for i in ids.size(): tm[ids[i]] = "a" if i % 2 == 0 else "b"
-			var c := {"map": args.get("map", "liman"), "mode": "tdm", "time": 8, "target": 40, "net": true, "teams_map": tm, "bots": 0, "diff": 1, "no": 0, "name": "test"}
+			var c := {"map": args.get("map", "liman"), "mode": args.get("mode", "tdm"), "time": 8, "target": int(args.get("target", "40")), "net": true, "teams_map": tm, "bots": 0, "diff": 1, "no": 0, "name": "test"}
 			Net.send({"t": "start", "cfg": c})
 			c["team"] = tm[Net.my_id]
 			start_match(c)
@@ -78,6 +78,14 @@ func _test(args: Dictionary) -> void:
 					d = mm["cfg"]; break
 			d["team"] = d["teams_map"][Net.my_id]
 			start_match(d)
+		if OS.has_environment("VOICETEST"):
+			for k in 40:
+				await get_tree().create_timer(0.5).timeout
+				var pkt := PackedByteArray([0x56, Net.my_id.length()])
+				pkt.append_array(Net.my_id.to_utf8_buffer())
+				for j in 600: pkt.append(int(60 + 40 * sin(j * 0.3)) & 0x7f)
+				Net.send_binary(pkt)
+				if k % 8 == 0: print("VOICE me=%s received=%d speaking=%s" % [Net.my_id, Voice.received, str(Voice.speaking.keys())])
 	elif args.has("match"):
 		var parts: PackedStringArray = args["match"].split(":")
 		start_match({"map": parts[0], "mode": parts[1] if parts.size() > 1 else "ffa", "bots": int(args.get("bots", "6")), "diff": 1, "time": float(args.get("time", "8")), "target": 40, "team": "a", "no": 1, "name": "test"})
@@ -152,6 +160,9 @@ func _process(_d: float) -> void:
 	if OS.has_environment("PERF"):
 		_perf_t += _d
 		_perf_max = maxf(_perf_max, _d)
+		if _d > 0.025 and Engine.get_process_frames() > 300:
+			print("HITCH %.1fms t=%.1f" % [_d * 1000.0, Time.get_ticks_msec() / 1000.0])
+		if _d > 0.02: print("FRAMESPIKE ", int(_d * 1000), "ms t=", Time.get_ticks_msec())
 		var vr := get_viewport().get_viewport_rid()
 		RenderingServer.viewport_set_measure_render_time(vr, true)
 		var vmr := RID()

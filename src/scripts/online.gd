@@ -10,6 +10,8 @@ signal invite_received(inv: Dictionary)
 signal error(msg: String)
 signal announced(text: String)
 signal gifts_arrived(mail: Array)
+signal friend_request(f: Dictionary)      # a new incoming friend request
+signal friend_accepted(f: Dictionary)     # someone accepted your request
 
 var url := ""
 var anon := ""
@@ -355,7 +357,7 @@ func _process(delta: float) -> void:
 		_poll_invites()
 	_fr_t -= delta
 	if _fr_t <= 0:
-		_fr_t = 90.0 if in_match else 25.0
+		_fr_t = 90.0 if in_match else 12.0
 		refresh_friends()
 	if _save_t > 0:
 		_save_t -= delta
@@ -393,11 +395,31 @@ func _refresh_token() -> void:
 		_take_session(r["data"])
 
 # ---------------------------------------------------------------- friends
+var _seen_req := {}        # friendship ids already notified
+var _pending_out := {}     # friendship id -> username of requests you sent
 func refresh_friends() -> void:
 	var r := await _req(HTTPClient.METHOD_POST, "/rest/v1/rpc/my_friends", {})
 	if r["ok"] and r["data"] is Array:
 		friends = r["data"]
+		for f in friends:
+			var fid := int(f.get("friendship_id", 0))
+			if bool(f.get("pending", false)):
+				if bool(f.get("incoming", false)) and not _seen_req.has(fid):
+					_seen_req[fid] = true
+					friend_request.emit(f)
+				elif not bool(f.get("incoming", false)):
+					_pending_out[fid] = str(f.get("username", ""))
+			elif _pending_out.has(fid):
+				_pending_out.erase(fid)
+				friend_accepted.emit(f)
 		friends_updated.emit(friends)
+
+func incoming_count() -> int:
+	var n := 0
+	for f in friends:
+		if bool(f.get("pending", false)) and bool(f.get("incoming", false)):
+			n += 1
+	return n
 
 func search_users(q: String) -> Array:
 	q = q.strip_edges()

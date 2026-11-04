@@ -134,15 +134,40 @@ func _tint_team() -> void:
 				d.albedo_color = d.albedo_color.lerp(tint, 0.22)
 				m.set_surface_override_material(i, d)
 
+var _gun_cache := {}     # weapon id -> gun node already built for this bot (re-used on respawn / weapon swap)
+
 func set_weapon(w: String) -> void:
+	var __t := Time.get_ticks_usec()
+	_sp_set_weapon(w)
+	var __d := Time.get_ticks_usec() - __t
+	if __d > 3000: print("SPIKE bot.gd.set_weapon ", __d / 1000.0, "ms")
+
+func _sp_set_weapon(w: String) -> void:
+	if w == wid and gun and is_instance_valid(gun) and gun.is_inside_tree():
+		mag = int(wdata.get("mag", 1))
+		return
 	wid = w
 	wdata = GS.WEAPONS[w]
 	mag = int(wdata.get("mag", 1))
-	if gun:
-		gun.queue_free()
-	var ps: PackedScene = GS.weapon_scene(w)
-	gun = ps.instantiate()
-	MatLib.apply(gun, "std" if randf() < 0.6 else GS.SKINS.keys()[randi() % GS.SKINS.size()])
+	if gun and is_instance_valid(gun):
+		if gun.get_parent():
+			gun.get_parent().remove_child(gun)
+		if match_node and match_node.has_method("give_gun"):
+			match_node.give_gun(gun)
+		else:
+			_gun_cache[gun.get_meta("wid", "")] = gun
+	var pooled = match_node.take_gun(w) if match_node and match_node.has_method("take_gun") else null
+	if pooled:
+		gun = pooled
+	elif _gun_cache.has(w):
+		gun = _gun_cache[w]
+		_gun_cache.erase(w)
+	else:
+		var ps: PackedScene = GS.weapon_scene(w)
+		gun = ps.instantiate()
+		gun.set_meta("wid", w)
+		MatLib.apply(gun, "std" if randf() < 0.6 else GS.SKINS.keys()[randi() % GS.SKINS.size()])
+	gun.transform = Transform3D.IDENTITY
 	var kind := "pistol" if wdata["cat"] == "tabanca" else ("knife" if wdata.get("melee", false) or wdata.get("throwable", false) else "rifle")
 	muzzle = gun.find_child("muzzle", true, false)
 	if not _attach_hand(kind):
@@ -341,8 +366,45 @@ func _update_tag(delta: float) -> void:
 		vis = match_node.los(cam.global_position, head)
 	name_tag.visible = vis
 
+## animation level of detail: bots you can't see (or far away) update their skeleton less often.
+## Godot animates every skeleton every frame even off-screen; this was a large part of the CPU cost per bot.
+var _lod_t := 0.0
+var _lod_level := 0          # 0 full, 1 15 Hz, 2 off-screen (2 Hz, no IK/aim modifiers)
+var _lod_acc := 0.0
+func _set_lod(lvl: int) -> void:
+	if lvl == _lod_level or anim == null:
+		return
+	_lod_level = lvl
+	anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_IDLE if lvl == 0 else AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+	for mm in [pose, twist, follow, grip]:
+		if mm and is_instance_valid(mm):
+			mm.active = lvl < 2
+	_lod_acc = 0.0
+
+func _anim_lod(delta: float) -> void:
+	if anim == null:
+		return
+	_lod_t -= delta
+	if _lod_t <= 0.0:
+		_lod_t = 0.2 + randf() * 0.05
+		var cam := get_viewport().get_camera_3d()
+		var lvl := 0
+		if cam and alive:
+			var d := cam.global_position.distance_to(global_position)
+			if not cam.is_position_in_frustum(global_position + Vector3.UP):
+				lvl = 2 if d > 6.0 else 1
+			elif d > 40.0:
+				lvl = 1
+		_set_lod(lvl)
+	if _lod_level > 0:
+		_lod_acc += delta
+		if _lod_acc >= (1.0 / 15.0 if _lod_level == 1 else 0.5):
+			anim.advance(_lod_acc)
+			_lod_acc = 0.0
+
 func _physics_process(delta: float) -> void:
 	_update_tag(delta)
+	_anim_lod(delta)
 	if not alive:
 		_death_anim(delta)
 		return
@@ -737,6 +799,8 @@ var net_pitch := 0.0
 var net_t := 0.0
 var _net_force := false
 
+var net_use := false     # online: the remote player is holding E (sabotage plant / defuse)
+
 func net_state(d: Dictionary) -> void:
 	var p: Array = d.get("p", [0, 0, 0])
 	var np := Vector3(float(p[0]), float(p[1]), float(p[2]))
@@ -749,6 +813,7 @@ func net_state(d: Dictionary) -> void:
 	net_yaw = float(d.get("yw", 0.0))
 	net_pitch = float(d.get("pt", 0.0))
 	crouching = bool(d.get("c", false))
+	net_use = bool(d.get("u", false))
 	net_t = Time.get_ticks_msec() / 1000.0
 	var w := str(d.get("w", wid))
 	if w != wid and GS.WEAPONS.has(w):
@@ -802,6 +867,12 @@ func net_die(killer, w: String, head: bool) -> void:
 var slow_t := 0.0
 
 func take_damage(amount: float, attacker, pos: Vector3, headshot: bool, w: String) -> void:
+	var __t := Time.get_ticks_usec()
+	_sp_take_damage(amount, attacker, pos, headshot, w)
+	var __d := Time.get_ticks_usec() - __t
+	if __d > 3000: print("SPIKE bot.gd.take_damage ", __d / 1000.0, "ms")
+
+func _sp_take_damage(amount: float, attacker, pos: Vector3, headshot: bool, w: String) -> void:
 	if not alive or match_node.ended:
 		return
 	if puppet and not _net_force:
@@ -923,3 +994,10 @@ func chest_pos() -> Vector3:
 
 func eye_pos() -> Vector3:
 	return global_position + Vector3.UP * 1.6
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		for k in _gun_cache.keys():
+			if is_instance_valid(_gun_cache[k]):
+				_gun_cache[k].free()
+		_gun_cache.clear()

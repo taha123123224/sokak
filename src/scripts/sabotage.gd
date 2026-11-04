@@ -7,7 +7,7 @@ const BOMB_TIME := 35.0
 const PLANT_T := 3.2
 const DEFUSE_T := 5.0
 const SITE_R := 3.6
-const WIN_ROUNDS := 6
+var WIN_ROUNDS := 6
 const POST_T := 5.0
 
 var m                         # match.gd
@@ -28,15 +28,144 @@ var bomb_node: Node3D
 var bomb_light: OmniLight3D
 var ui: Control
 
+# ---- online: the room host runs the rules and streams the state; everyone else mirrors it
+var online := false
+var is_host := true
+var _st_t := 0.0
+var _got_state := false
+
 func setup(match_node) -> void:
 	m = match_node
-	_make_sites()
+	WIN_ROUNDS = clampi(int(m.target_score), 3, 10) if int(m.target_score) <= 10 else 6
+	online = m.net != null and Net.active()
+	is_host = not online or Net.is_host()
 	ui = SabUI.new()
 	ui.sab = self
 	ui.set_anchors_preset(Control.PRESET_FULL_RECT)
 	ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	m.hud.root.add_child(ui)
-	_new_round(true)
+	if online:
+		Net.message.connect(_on_net)
+	if is_host:
+		_make_sites()
+		_new_round(true)
+	else:
+		m.hud.center_msg("SABOTAJ  •  kurucunun turu başlatması bekleniyor...", UI.ACCENT2)
+
+func _exit_tree() -> void:
+	if online and Net.message.is_connected(_on_net):
+		Net.message.disconnect(_on_net)
+
+func _id_of(n) -> String:
+	if n == null or not is_instance_valid(n):
+		return ""
+	if n == m.player:
+		return Net.my_id
+	return str(n.net_id) if "net_id" in n else ""
+
+func _node_of(id: String):
+	if id == "":
+		return null
+	if id == Net.my_id:
+		return m.player
+	return m.net.puppets.get(id, null) if m.net else null
+
+static func _v(a) -> Vector3:
+	return Vector3(float(a[0]), float(a[1]), float(a[2])) if a is Array and a.size() == 3 else Vector3.INF
+
+static func _a(v: Vector3) -> Array:
+	return [snappedf(v.x, 0.01), snappedf(v.y, 0.01), snappedf(v.z, 0.01)] if v != Vector3.INF else []
+
+func _send_state() -> void:
+	Net.send({"t": "sab", "ph": phase, "rn": round_no, "tl": snappedf(m.time_left, 0.05), "ca": _id_of(carrier),
+		"bd": _a(bomb_drop), "pl": planted, "bp": _a(bomb_pos), "pk": prog_kind, "pw": _id_of(prog_who), "pg": snappedf(progress, 0.02),
+		"sa": int(m.team_score["a"]), "sb": int(m.team_score["b"]), "ts": target_site, "ps": planted_site,
+		"si": [_a(sites[0]["pos"]), _a(sites[1]["pos"])] if sites.size() == 2 else []})
+
+func _on_net(d: Dictionary) -> void:
+	if is_host or str(d.get("from", "")) != Net.host_id:
+		return                  # only the host may drive the rounds
+	match str(d.get("t", "")):
+		"sab":
+			_apply_state(d)
+		"sabr":
+			# new round: everybody respawns at their team spawn
+			if m.player:
+				var e: Dictionary = m.entry(m.player)
+				if not e.is_empty():
+					m._spawn(e, true)
+			m.countdown = 0.0 if int(d.get("rn", 1)) <= 1 else 3.0
+			if m.countdown > 0:
+				m.hud.show_countdown()
+			m.hud.center_msg("TUR %d   •   %s %d - %d %s" % [int(d.get("rn", 1)), GS.TEAMS["a"], int(d.get("sa", 0)), int(d.get("sb", 0)), GS.TEAMS["b"]], UI.ACCENT2)
+			if str(d.get("ca", "")) == Net.my_id:
+				m.hud.center_msg("BOMBA SENDE!  A ya da B noktasına götür, E ile kur.", UI.ACCENT)
+		"sabe":
+			var w := str(d.get("w", "a"))
+			var mine: bool = m.player and m.player.team == w
+			m.hud.center_msg("%s  —  TURU %s KAZANDI" % [str(d.get("why", "")), GS.TEAMS.get(w, "")], UI.GREEN if mine else UI.RED)
+			SFX.play("success" if mine else "fail", -4)
+		"sabx":
+			var bp := _v(d.get("p", []))
+			if bp != Vector3.INF:
+				_boom_local(bp)
+
+func _apply_state(d: Dictionary) -> void:
+	var si: Array = d.get("si", [])
+	if sites.is_empty() and si.size() == 2:
+		sites = [{"name": "A", "pos": _v(si[0])}, {"name": "B", "pos": _v(si[1])}]
+		for st in sites:
+			_site_marker(st)
+	_got_state = true
+	var was_planted := planted
+	if OS.has_environment("SABLOG") and (str(d.get("ph", "")) != phase or int(d.get("rn", 0)) != round_no):
+		print("SABC phase=%s rn=%d ca=%s score=%d-%d sites=%d" % [str(d.get("ph", "")), int(d.get("rn", 0)), str(d.get("ca", "")), int(d.get("sa", 0)), int(d.get("sb", 0)), sites.size()])
+	phase = str(d.get("ph", phase))
+	round_no = int(d.get("rn", round_no))
+	m.time_left = float(d.get("tl", m.time_left))
+	carrier = _node_of(str(d.get("ca", "")))
+	bomb_drop = _v(d.get("bd", []))
+	planted = bool(d.get("pl", false))
+	var bp := _v(d.get("bp", []))
+	if bp != Vector3.INF:
+		bomb_pos = bp
+	prog_kind = str(d.get("pk", ""))
+	prog_who = _node_of(str(d.get("pw", "")))
+	progress = float(d.get("pg", 0.0))
+	m.team_score["a"] = int(d.get("sa", 0)); m.team_score["b"] = int(d.get("sb", 0))
+	target_site = int(d.get("ts", 0))
+	planted_site = str(d.get("ps", planted_site))
+	# bomb model: armed on the site, lying on the ground when dropped, gone when carried
+	if planted:
+		_place_bomb(bomb_pos, true)
+		if not was_planted:
+			banner_t = 3.0
+			beep_t = 0.0
+			SFX.play("beep_go", 0)
+	elif bomb_drop != Vector3.INF:
+		_place_bomb(bomb_drop, false)
+	elif bomb_node:
+		bomb_node.queue_free(); bomb_node = null
+
+func _boom_local(pos: Vector3) -> void:
+	m.fx.explosion(pos)
+	SFX.play3d("explosion", pos, 6, 1.0, 300.0, 30.0)
+	if m.player:
+		m.player.shake = maxf(m.player.shake, 1.4)
+		if m.player.alive:
+			var d: float = m.player.global_position.distance_to(pos)
+			if d < 14.0:
+				m.player.take_damage(500.0 * (1.0 - d / 16.0), null, pos, false, "frag")
+	if bomb_node:
+		bomb_node.queue_free(); bomb_node = null
+
+## is this combatant holding E right now? (remote players send it in their state packets)
+func _wants_use(n) -> bool:
+	if n == m.player:
+		return Input.is_action_pressed("use") and m.player.alive and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+	if "puppet" in n and n.puppet:
+		return bool(n.net_use)
+	return not n.target_visible
 
 # ------------------------------------------------------------------ sites
 func _team_center(t: String) -> Vector3:
@@ -147,6 +276,10 @@ func _new_round(first: bool = false) -> void:
 		m.countdown = 3.0
 		m.hud.show_countdown()
 	phase = "pre"
+	if OS.has_environment("SABLOG"): print("SABH new round %d carrier=%s" % [round_no, _id_of(carrier)])
+	if online:
+		Net.send({"t": "sabr", "rn": round_no, "ca": _id_of(carrier), "sa": int(m.team_score["a"]), "sb": int(m.team_score["b"])})
+		_send_state()
 	m.hud.center_msg("TUR %d   •   %s %d - %d %s" % [round_no, GS.TEAMS["a"], m.team_score["a"], m.team_score["b"], GS.TEAMS["b"]], UI.ACCENT2)
 	if carrier == m.player:
 		m.hud.center_msg("BOMBA SENDE!  A ya da B noktasına götür, E ile kur.", UI.ACCENT)
@@ -186,6 +319,9 @@ func _end_round(winner: String, why: String) -> void:
 	post_t = POST_T
 	progress = 0.0; prog_kind = ""
 	m.team_score[winner] += 1
+	if online:
+		Net.send({"t": "sabe", "w": winner, "why": why})
+		_send_state()
 	var mine: bool = m.player and m.player.team == winner
 	m.hud.center_msg("%s  —  TURU %s KAZANDI" % [why, GS.TEAMS[winner]], UI.GREEN if mine else UI.RED)
 	SFX.play("success" if mine else "fail", -4)
@@ -194,7 +330,7 @@ func _end_round(winner: String, why: String) -> void:
 			c["node"].obj_goal = Vector3.INF
 
 func on_death(victim) -> void:
-	if phase == "post":
+	if phase == "post" or not is_host:
 		return
 	if victim == carrier:
 		bomb_drop = victim.global_position
@@ -280,8 +416,16 @@ func _near_site(p: Vector3) -> int:
 	return -1
 
 func _process(delta: float) -> void:
-	if m.ended or m.paused:
+	if m.ended or (m.paused and not online):
 		return
+	if not is_host:
+		_client_tick(delta)
+		return
+	if online:
+		_st_t -= delta
+		if _st_t <= 0:
+			_st_t = 0.12
+			_send_state()
 	if phase == "post":
 		post_t -= delta
 		if post_t <= 0:
@@ -323,7 +467,7 @@ func _process(delta: float) -> void:
 				if carrier == pl:
 					if use_down and Vector2(pl.velocity.x, pl.velocity.z).length() < 1.0:
 						who = pl
-				elif not carrier.target_visible:
+				elif _wants_use(carrier):
 					who = carrier
 		_progress(who, "plant", delta)
 		if prog_kind == "plant" and progress >= PLANT_T:
@@ -363,13 +507,39 @@ func _process(delta: float) -> void:
 			if n == pl:
 				if use_down:
 					who2 = pl
-			elif not n.target_visible:
+			elif _wants_use(n):
 				who2 = n
 			if who2:
 				break
 		_progress(who2, "defuse", delta)
 		if prog_kind == "defuse" and progress >= DEFUSE_T:
 			_end_round("b", "BOMBA ÇÖZÜLDÜ")
+
+## clients: no rules, only the local effects of the host's state (beeps, light, timer text, smooth progress)
+func _client_tick(delta: float) -> void:
+	if m.countdown <= 0 and phase in ["live", "planted"]:
+		m.time_left = maxf(m.time_left - delta, 0.0)
+	if prog_kind != "" and prog_who != null:
+		progress += delta
+		if prog_who == m.player and prog_kind == "plant":
+			var dg := int(progress / PLANT_T * 7.0)
+			if dg > typed and dg <= 7:
+				typed = dg
+				SFX.play("tick", -2, 1.0 + dg * 0.06)
+	else:
+		typed = 0
+	if planted:
+		beep_t -= delta
+		var rate := clampf(m.time_left / BOMB_TIME, 0.08, 1.0)
+		if beep_t <= 0:
+			beep_t = 0.12 + rate * 0.9
+			SFX.play3d("beep", bomb_pos, -4)
+			if bomb_light:
+				bomb_light.light_energy = 3.0
+		if bomb_light:
+			bomb_light.light_energy = maxf(bomb_light.light_energy - delta * 12.0, 0.0)
+		if bomb_label:
+			bomb_label.text = "%02d.%d" % [int(m.time_left), int(fmod(m.time_left, 1.0) * 10.0)]
 
 func _progress(who, kind: String, delta: float) -> void:
 	if who == null:
@@ -393,6 +563,11 @@ func _progress(who, kind: String, delta: float) -> void:
 		typed = 0
 
 func _explode() -> void:
+	if online:
+		Net.send({"t": "sabx", "p": _a(bomb_pos)})
+		_boom_local(bomb_pos)
+		_end_round("a", "BOMBA PATLADI")
+		return
 	m.fx.explosion(bomb_pos)
 	SFX.play3d("explosion", bomb_pos, 6, 1.0, 300.0, 30.0)
 	m.player.shake = maxf(m.player.shake, 1.4)
