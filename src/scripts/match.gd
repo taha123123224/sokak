@@ -1243,6 +1243,15 @@ func leave() -> void:
 		main.go_menu("lobby")
 
 func test_hook(i: int) -> void:
+	if i == 28 or i == 29:
+		for c in combatants:
+			if c["node"] != player:
+				c["node"].set_physics_process(false)
+		if not GS.profile.has("wparts"): GS.profile["wparts"] = {}
+		GS.profile["wparts"][player.cur] = [OS.get_environment("TPART") if OS.has_environment("TPART") else "optik"]
+		player.switch_to(player.cur, true)
+		player.test_ads = i == 29
+		return
 	if i == 27:
 		for c in combatants:
 			if c["node"] != player:

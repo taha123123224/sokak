@@ -3268,6 +3268,11 @@ class PartIcon extends Control:
 				draw_rect(Rect2(c - Vector2(s * 0.8, s * 0.5), Vector2(s * 1.6, s)), dk)
 				draw_arc(c, s * 0.38, 0, TAU, 32, col, 2.5)
 				draw_circle(c, s * 0.07, Color(1, 0.2, 0.1))
+			"durbun":
+				draw_rect(Rect2(c - Vector2(s * 1.1, s * 0.32), Vector2(s * 2.2, s * 0.64)), dk)
+				draw_rect(Rect2(c - Vector2(s * 1.1, s * 0.32), Vector2(s * 2.2, s * 0.64)), col, false, 2.0)
+				draw_rect(Rect2(c + Vector2(-s * 0.2, -s * 0.55), Vector2(s * 0.4, s * 0.23)), col)
+				draw_rect(Rect2(c + Vector2(-s * 0.5, s * 0.32), Vector2(s, s * 0.3)), dk)
 			"sarjor":
 				var pts := PackedVector2Array([c + Vector2(-s * 0.35, -s), c + Vector2(s * 0.25, -s), c + Vector2(s * 0.55, s), c + Vector2(-s * 0.05, s)])
 				draw_colored_polygon(pts, dk)

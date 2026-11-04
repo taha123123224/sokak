@@ -77,11 +77,11 @@ var CRATES := {
 	"operasyon": {"name": "Operasyon Kasası", "price": 2000, "color": Color("4fb3ff"), "desc": "Taktik stiller ve %38 silah şansı (AUG, Vector, Vityaz, UZI...). Kasa silahları süreli gelir.",
 		"skins": ["dijital", "karbon", "kar", "kamuflaj", "gece", "buz", "col", "kan", "siber", "okyanus"], "weapons": ["aug", "vector", "scar", "ump45", "m4a1", "p90", "r870", "fn502", "vityaz", "m1911", "uzi"], "wchance": 0.38, "chars": ["asker2", "asker3"]},
 	"eklenti": {"name": "Eklenti Paketi", "price": 1500, "color": Color("7dff6a"), "desc": "Silah eklentileri: susturucu, nişangah, şarjör, tutamak, lazer.",
-		"skins": ["karbon", "dijital"], "weapons": [], "chars": [], "parts": ["sus", "kompen", "optik", "sarjor", "tutamak", "lazer"]},
+		"skins": ["karbon", "dijital"], "weapons": [], "chars": [], "parts": ["sus", "kompen", "optik", "durbun", "sarjor", "tutamak", "lazer"]},
 	"osmanli": {"name": "Osmanlı Kasası", "price": 2500, "color": Color("2fb6a8"), "desc": "Çini ve turkuaz desenler, Magnum ve Patron karakteri şansı.",
 		"skins": ["cini", "turkuaz", "altin", "kizil", "neon", "lale", "nazar", "mermer", "ayyildiz", "kehribar"], "weapons": ["revolver", "deagle", "karambit", "m1911"], "wchance": 0.32, "chars": ["patron", "kapson"]},
 	"efsane": {"name": "Efsane Kasası", "price": 5000, "color": Color("ffb02e"), "desc": "En az Epik garantili! Lav, Buz, Galaksi, Altın.",
-		"skins": ["lav", "buz", "galaksi", "altin", "cini", "turkuaz", "zumrut", "mermer", "aurora", "ayyildiz", "ejder", "kehribar"], "weapons": ["awp", "awm", "scar", "m249", "rpk16", "kuzgun"], "wchance": 0.4, "chars": ["kot", "patron", "asker2"], "parts": ["sus", "optik", "sarjor"]},
+		"skins": ["lav", "buz", "galaksi", "altin", "cini", "turkuaz", "zumrut", "mermer", "aurora", "ayyildiz", "ejder", "kehribar"], "weapons": ["awp", "awm", "scar", "m249", "rpk16", "kuzgun"], "wchance": 0.4, "chars": ["kot", "patron", "asker2"], "parts": ["sus", "optik", "durbun", "sarjor"]},
 }
 const RARITY_NAMES := ["Sıradan", "Nadir", "Epik", "Efsanevi"]
 const RARITY_COLORS := [Color("9aa4ad"), Color("3b8cff"), Color("b04bff"), Color("ffb02e")]
@@ -118,7 +118,8 @@ const BALLISTICS := {
 const PARTS := {
 	"sus":     {"name": "Susturucu", "desc": "Sessiz atış, namlu alevi yok, haritada görünmezsin. Hasar -%6", "slot": "namlu", "price": 900, "pistol": true},
 	"kompen":  {"name": "Kompansatör", "desc": "Dikey sekme -%22", "slot": "namlu", "price": 700, "pistol": true},
-	"optik":   {"name": "Holografik Nişangah", "desc": "Nişanlı isabet +%30, yakınlaştırma +0.2", "slot": "optik", "price": 800, "pistol": false},
+	"optik":   {"name": "Holografik Nişangah (EXPS)", "desc": "Nişanlı isabet +%30, yakınlaştırma +0.2", "slot": "optik", "price": 800, "pistol": false},
+	"durbun":  {"name": "Taktik Dürbün 3x", "desc": "3 kat yakınlaştırma, nişanlı isabet +%50, nişan alma biraz yavaş", "slot": "optik", "price": 1400, "pistol": false},
 	"sarjor":  {"name": "Uzatılmış Şarjör", "desc": "Şarjör +%50, doldurma süresi +%12", "slot": "sarjor", "price": 1000, "pistol": true},
 	"tutamak": {"name": "Ön Tutamak", "desc": "Sekme -%15, yatay sekme -%30", "slot": "alt", "price": 750, "pistol": false},
 	"lazer":   {"name": "Taktik Lazer", "desc": "Belden atış isabeti +%25, hareket isabeti +%30", "slot": "alt", "price": 850, "pistol": true},
@@ -135,9 +136,9 @@ func part_fits(pid: String, wid: String) -> bool:
 	var w: Dictionary = WEAPONS.get(wid, {})
 	if w.get("melee", false) or w.get("throwable", false):
 		return false
-	if pid == "optik" and (w.get("scope", false) or wid in ["m4a1", "scar", "ump45", "vector", "m249", "aug"]):
+	if pid in ["optik", "durbun"] and (w.get("scope", false) or wid in ["m4a1", "scar", "ump45", "vector", "m249", "aug"]):
 		return false   # these already have an optic
-	if w.get("pellets", 0) > 0 and pid in ["sus", "optik"]:
+	if w.get("pellets", 0) > 0 and pid in ["sus", "optik", "durbun"]:
 		return false
 	return w["cat"] == "ana" or bool(PARTS[pid]["pistol"])
 
@@ -180,6 +181,8 @@ func full_stats(id: String, parts = null) -> Dictionary:
 				w["recoil"] = float(w["recoil"]) * 0.78
 			"optik":
 				w["ads_spread"] = float(w.get("ads_spread", 0.005)) * 0.7; w["zoom"] = float(w.get("zoom", 1.2)) + 0.2
+			"durbun":
+				w["ads_spread"] = float(w.get("ads_spread", 0.005)) * 0.5; w["zoom"] = 3.0; w["ads_time"] = float(w.get("ads_time", 0.18)) * 1.35
 			"sarjor":
 				w["mag_max"] = int(ceil(float(w["mag_max"]) * 1.5)); w["reload"] = float(w["reload"]) * 1.12
 			"tutamak":
@@ -331,9 +334,9 @@ func parts_visual(gun: Node3D, id: String, parts = null) -> void:
 					var tip := a.find_child("muzzle", true, false) as Node3D
 					if tip:
 						mz.position = a.position + tip.position * a.scale
-			"optik":
+			"optik", "durbun":
 				if sg:
-					var a := _att("optik")
+					var a := _att(pid)
 					if a == null: continue
 					sg.get_parent().add_child(a)
 					a.position = sg.position + Vector3(0, -0.02, 0.025)

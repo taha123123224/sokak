@@ -152,6 +152,8 @@ var DEFS := {
 	"gun_glass": ["", 1.0, Color(0.15, 0.3, 0.38, 0.35), 0.02, 0.5, {"alpha": true}],
 	"gun_holo_glass": ["", 1.0, Color(0.75, 0.92, 1.0, 0.035), 0.02, 0.0, {"alpha": true, "unshaded": true}],
 	"gun_magclear": ["", 1.0, Color(0.45, 0.35, 0.18, 0.55), 0.1, 0, {"alpha": true}],
+	"gun_paint_eotech": ["gunmetal", 1.0, Color(0.16, 0.16, 0.17), 0.55, 0.6, {"no_albedo": true}],
+	"gun_reticle": ["", 1.0, Color(0.02, 0.02, 0.02), 0.6, 0, {"unshaded": true}],
 	"gun_dot": ["", 1.0, Color(1, 0.1, 0.05), 0.3, 0, {"emit": Color(1, 0.05, 0.02), "emit_e": 12.0, "unshaded": true}],
 	"gun_brass": ["", 1.0, Color(0.85, 0.62, 0.26), 0.28, 1.0, {}],
 	"gun_shell": ["", 1.0, Color(0.7, 0.06, 0.05), 0.4, 0, {}],

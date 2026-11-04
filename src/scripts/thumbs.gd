@@ -7,7 +7,7 @@ var holder: Node3D
 var cache := {}
 var queue: Array = []
 var busy := false
-const THUMB_VER := 28   # bump when weapon models / skins change
+const THUMB_VER := 31   # bump when weapon models / skins change
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS

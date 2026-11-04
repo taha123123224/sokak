@@ -1,33 +1,33 @@
 {
-	"version": "2.9.1",
-	"build": 30,
+	"version": "2.9.2",
+	"build": 31,
 	"parts": [
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v30.pck.part00",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v31.pck.part00",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v30.pck.part01",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v31.pck.part01",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v30.pck.part02",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v31.pck.part02",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v30.pck.part03",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v31.pck.part03",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v30.pck.part04",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v31.pck.part04",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v30.pck.part05",
-			"size": 58630580
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v31.pck.part05",
+			"size": 59675820
 		}
 	],
-	"pck_size": 530489780,
+	"pck_size": 531535020,
 	"installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
-	"notes": "Sabotaj yenilendi: bomba kurulunca silahın bozulması düzeltildi, elde C4 ve tuş takımı animasyonu, nişangahta ilerleme halkası, e-spor tarzı A/B bölgeleri ve rozetleri, mini haritada A/B ve bomba, ölünce takım arkadaşını izleme."
+	"notes": "Yeni nişangahlar: EOTech EXPS holografik nişangah (yeni 3D model) ve yeni Taktik Dürbün 3x eklentisi."
 }

@@ -44,6 +44,7 @@
 			"parts": [
 				"sus",
 				"optik",
+				"durbun",
 				"sarjor"
 			],
 			"price": 5000,
@@ -77,6 +78,7 @@
 				"sus",
 				"kompen",
 				"optik",
+				"durbun",
 				"sarjor",
 				"tutamak",
 				"lazer"
@@ -411,6 +413,19 @@
 		]
 	],
 	"parts": {
+		"durbun": {
+			"fits": [
+				"ak47",
+				"mp5",
+				"p90",
+				"vityaz",
+				"rpk16",
+				"uzi",
+				"kuzgun"
+			],
+			"price": 1400,
+			"slot": "optik"
+		},
 		"kompen": {
 			"fits": [
 				"ak47",

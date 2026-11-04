@@ -405,7 +405,7 @@ func _process(delta: float) -> void:
 			inspect_t = 0
 			if wdata.get("scope", false):
 				SFX.play("scope_in", -6)
-	ads_k = move_toward(ads_k, 1.0 if ads else 0.0, delta * (7.0 if not wdata.get("scope", false) else 9.0))
+	ads_k = move_toward(ads_k, 1.0 if ads else 0.0, delta * (7.0 if not wdata.get("scope", false) else 9.0) * (0.75 if GS.wparts(cur).has("durbun") else 1.0))
 	if vm_weapon and is_instance_valid(vm_weapon) and vm_weapon.has_meta("glow_mat"):
 		(vm_weapon.get_meta("glow_mat") as ShaderMaterial).set_shader_parameter("power", float(vm_weapon.get_meta("glow_power")) * (1.0 - ads_k * 0.85))
 	var zoom: float = wdata.get("zoom", 1.2)
@@ -1283,7 +1283,7 @@ func _update_viewmodel(delta: float) -> void:
 	if vm_parts.has("sight") and kind != "knife" and kind != "frag":
 		var sight_rest: Transform3D = (vm_parts["sight"] as Node3D).get_meta("rest")
 		var sp: Vector3 = sight_rest.origin
-		var ads_pos := Vector3(-sp.x, -sp.y, -sp.z - (0.14 if kind != "pistol" else 0.3) - (0.07 if GS.wparts(cur).has("optik") else 0.0))
+		var ads_pos := Vector3(-sp.x, -sp.y, -sp.z - (0.14 if kind != "pistol" else 0.3) - (0.1 if GS.wparts(cur).has("optik") else (0.09 if GS.wparts(cur).has("durbun") else 0.0)))
 		if wdata.get("scope", false):
 			ads_pos.z = -sp.z - 0.06
 		pos = hip.lerp(ads_pos, ads_k)
