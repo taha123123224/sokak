@@ -8,6 +8,8 @@ signal logged_out
 signal friends_updated(list: Array)
 signal invite_received(inv: Dictionary)
 signal error(msg: String)
+signal announced(text: String)
+signal gifts_arrived(mail: Array)
 
 var url := ""
 var anon := ""
@@ -148,7 +150,7 @@ func register(n: String, pw: String) -> String:
 			await _req(HTTPClient.METHOD_PATCH, "/rest/v1/profiles?id=eq." + uid, {"data": GS.profile, "level": 1}, PackedStringArray(["Prefer: return=minimal"]))
 		elif chk["ok"] and chk["profile"] is Dictionary:
 			GS.profile = chk["profile"]; GS.sanitize_profile()
-	_after_login()
+	await _after_login()
 	return ""
 
 func login(n: String, pw: String) -> String:
@@ -158,8 +160,12 @@ func login(n: String, pw: String) -> String:
 	_take_session(r["data"])
 	var ok := await _load_profile()
 	if not ok:
+		var bm := banned_msg
+		if bm != "":
+			token = ""; uid = ""; username = ""
+			return bm
 		return "Profil yüklenemedi"
-	_after_login()
+	await _after_login()
 	return ""
 
 func try_resume() -> bool:
@@ -176,7 +182,7 @@ func try_resume() -> bool:
 	_take_session(r["data"])
 	if not await _load_profile():
 		return false
-	_after_login()
+	await _after_login()
 	return true
 
 func go_offline() -> void:
@@ -207,10 +213,21 @@ func _take_session(d: Dictionary) -> void:
 	f.store_string(JSON.stringify({"refresh": refresh}))
 
 func _load_profile() -> bool:
-	var r := await _req(HTTPClient.METHOD_GET, "/rest/v1/profiles?id=eq.%s&select=username,data" % uid)
+	banned_msg = ""
+	var r := await _req(HTTPClient.METHOD_GET, "/rest/v1/profiles?id=eq.%s&select=username,data,banned_until,ban_reason" % uid)
 	if not r["ok"] or not (r["data"] is Array) or (r["data"] as Array).is_empty():
-		return false
+		# older servers have no ban columns yet
+		r = await _req(HTTPClient.METHOD_GET, "/rest/v1/profiles?id=eq.%s&select=username,data" % uid)
+		if not r["ok"] or not (r["data"] is Array) or (r["data"] as Array).is_empty():
+			return false
 	var row: Dictionary = r["data"][0]
+	var bu = row.get("banned_until")
+	if bu != null and str(bu) != "":
+		var forever := str(bu) == "infinity"
+		var until: float = 0.0 if forever else float(Time.get_unix_time_from_datetime_string(str(bu).substr(0, 19)))
+		if forever or until > Time.get_unix_time_from_system():
+			banned_msg = "HESABIN YASAKLANDI%s%s" % [" (süresiz)" if forever else " (%s'e kadar)" % str(bu).substr(0, 16).replace("T", " "), ("  —  Sebep: " + str(row.get("ban_reason", ""))) if row.get("ban_reason") else ""]
+			return false
 	username = str(row["username"])
 	var d = row.get("data", {})
 	if d is Dictionary and d.size() > 3:
@@ -222,7 +239,14 @@ func _load_profile() -> bool:
 	GS.save_profile(true)
 	return true
 
+var banned_msg := ""
+var is_admin := false
+var ann_last := -1
+
 func _after_login() -> void:
+	is_admin = false
+	var w := await admin("whoami")
+	is_admin = w["ok"] and bool(w["res"].get("admin", false))
 	set_status("lobby")
 	refresh_friends()
 	logged_in.emit()
@@ -247,6 +271,38 @@ func act(a: String, args: Dictionary) -> Dictionary:
 		server_v2 = 1
 		return {"ok": true, "err": "", "profile": r["data"].get("profile"), "res": r["data"].get("res", {}) if r["data"].get("res") is Dictionary else {}}
 	return {"ok": false, "err": r["err"] if r["err"] != "" else "Sunucu hatası", "profile": null, "res": {}}
+
+## yönetici işlemleri: yetki sunucuda (sokak_admin) kontrol edilir
+func admin(a: String, args: Dictionary = {}) -> Dictionary:
+	if not is_logged_in():
+		return {"ok": false, "err": "Giriş yapılmadı", "res": {}}
+	var r := await _req(HTTPClient.METHOD_POST, "/rest/v1/rpc/sokak_admin", {"a": a, "args": args})
+	if r["ok"] and r["data"] is Dictionary:
+		var d: Dictionary = r["data"]
+		if a == "whoami":
+			return {"ok": true, "err": "", "res": d}
+		return {"ok": true, "err": "", "res": d.get("res", {})}
+	return {"ok": false, "err": r["err"] if r["err"] != "" else "Sunucu hatası", "res": {}}
+
+## new announcements since the last one seen (first call only records the latest id)
+func new_announcements() -> Array:
+	if not is_logged_in():
+		return []
+	var r := await _req(HTTPClient.METHOD_GET, "/rest/v1/sokak_announcements?select=id,text,created_at&order=id.desc&limit=5")
+	if not r["ok"] or not (r["data"] is Array):
+		return []
+	var rows: Array = r["data"]
+	var out: Array = []
+	if rows.is_empty():
+		if ann_last < 0: ann_last = 0
+		return out
+	var top := int(rows[0]["id"])
+	if ann_last >= 0:
+		for row in rows:
+			if int(row["id"]) > ann_last:
+				out.push_front(row)
+	ann_last = top
+	return out
 
 func _cosmetic() -> Dictionary:
 	var skins := {}
@@ -298,6 +354,31 @@ func _process(delta: float) -> void:
 		_save_t -= delta
 		if _save_t <= 0:
 			save_now()
+	_ann_t -= delta
+	if _ann_t <= 0:
+		_ann_t = 15.0
+		_poll_news()
+
+var _ann_t := 3.0
+var _news_busy := false
+func _poll_news() -> void:
+	if _news_busy:
+		return
+	_news_busy = true
+	for a in await new_announcements():
+		announced.emit(str(a.get("text", "")))
+	# gifts from the admin land in profile.mail: pull the profile (server copy) and hand them to the UI
+	if server_v2 != 0 and status != "match":
+		var r := await act("get", {})
+		if r["ok"] and r["profile"] is Dictionary:
+			var mail = (r["profile"] as Dictionary).get("mail", [])
+			if mail is Array and not (mail as Array).is_empty():
+				GS.profile = r["profile"]
+				GS.sanitize_profile()
+				gifts_arrived.emit(mail)
+				await act("mail_ack", {})
+				GS.profile["mail"] = []
+	_news_busy = false
 
 func _refresh_token() -> void:
 	var r := await _req(HTTPClient.METHOD_POST, "/auth/v1/token?grant_type=refresh_token", {"refresh_token": refresh}, PackedStringArray(), false)
@@ -377,11 +458,13 @@ func count_online() -> int:
 func leaderboard(sort_key: String, limit: int = 50) -> Array:
 	## sort_key: level | wins | kills
 	var order := "level.desc,last_seen.desc"
-	if sort_key == "wins":
+	if sort_key == "rp":
+		order = "data->rp.desc.nullslast,level.desc"
+	elif sort_key == "wins":
 		order = "data->stats->wins.desc.nullslast,level.desc"
 	elif sort_key == "kills":
 		order = "data->stats->kills.desc.nullslast,level.desc"
-	var r := await _req(HTTPClient.METHOD_GET, "/rest/v1/profiles?select=id,username,level,last_seen,wins:data->stats->wins,kills:data->stats->kills,deaths:data->stats->deaths,matches:data->stats->matches&order=%s&limit=%d" % [order, limit])
+	var r := await _req(HTTPClient.METHOD_GET, "/rest/v1/profiles?select=id,username,level,last_seen,rp:data->rp,wins:data->stats->wins,kills:data->stats->kills,deaths:data->stats->deaths,matches:data->stats->matches&order=%s&limit=%d" % [order, limit])
 	return r["data"] if r["ok"] and r["data"] is Array else []
 
 func list_rooms() -> Array:

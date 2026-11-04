@@ -172,6 +172,9 @@ func _build() -> void:
 			_slide("vol_music", "Müzik", 0, 1, 0.01, "%.2f")
 			_check("announcer", "Yapay zeka anons sesi (Kafadan!, Çifte öldürme!...)")
 			_slide("vol_amb", "Ortam Sesleri", 0, 1, 0.01, "%.2f")
+			_section("SESLİ SOHBET")
+			_check("voice_on", "Sesli sohbet açık (V tuşuna basılı tut: konuş)")
+			_slide("vol_voice", "Diğer oyuncuların sesi", 0, 1.5, 0.01, "%.2f")
 			body.add_child(UI.btn("TEST: SİLAH SESİ", func(): GS.apply_settings(); SFX.play("shot_ak"), 18, false, 260, 42))
 		"oyun":
 			_section("ARAYÜZ")

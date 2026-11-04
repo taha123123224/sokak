@@ -11,8 +11,8 @@ import characters as C
 ROOT = C.ROOT
 OUT = C.OUT
 HIP = {"rifle": (0.14, -0.165, -0.36), "pistol": (0.13, -0.14, -0.40), "knife": (0.17, -0.18, -0.36), "frag": (0.16, -0.17, -0.34), "sniper": (0.14, -0.17, -0.33)}
-GRIP = {"fn502": 20, "r870": 18, "aug": 10, "vector": 12, "m249": 16, "scar": 20, "ump45": 14, "revolver": 24, "ak47": 20, "m4a1": 22, "mp5": 15, "p90": 0, "spas": 20, "awp": 10, "kar98": 10, "glock": 22, "deagle": 18, "knife": 0, "karambit": 0, "frag": 0}
-KIND = {"fn502": "pistol", "r870": "rifle", "aug": "rifle", "vector": "rifle", "m249": "rifle", "scar": "rifle", "ump45": "rifle", "revolver": "pistol", "ak47": "rifle", "m4a1": "rifle", "mp5": "rifle", "p90": "rifle", "spas": "rifle", "awp": "sniper", "kar98": "sniper", "glock": "pistol", "deagle": "pistol", "knife": "knife", "karambit": "knife", "frag": "frag"}
+GRIP = {"awm": 12, "uzi": 8, "kuzgun": 14, "m1911": 22, "vityaz": 16, "rpk16": 18, "fn502": 20, "r870": 18, "aug": 10, "vector": 12, "m249": 16, "scar": 20, "ump45": 14, "revolver": 24, "ak47": 20, "m4a1": 22, "mp5": 15, "p90": 0, "spas": 20, "awp": 10, "kar98": 10, "glock": 22, "deagle": 18, "knife": 0, "karambit": 0, "frag": 0}
+KIND = {"awm": "sniper", "uzi": "rifle", "kuzgun": "rifle", "m1911": "pistol", "vityaz": "rifle", "rpk16": "rifle", "fn502": "pistol", "r870": "rifle", "aug": "rifle", "vector": "rifle", "m249": "rifle", "scar": "rifle", "ump45": "rifle", "revolver": "pistol", "ak47": "rifle", "m4a1": "rifle", "mp5": "rifle", "p90": "rifle", "spas": "rifle", "awp": "sniper", "kar98": "sniper", "glock": "pistol", "deagle": "pistol", "knife": "knife", "karambit": "knife", "frag": "frag"}
 
 
 def weapon_points(wid):

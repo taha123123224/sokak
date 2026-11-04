@@ -1893,7 +1893,359 @@ def map_liman():
     finalize('liman', dict(preset='overcast', sun=[-40, 120], fog=0.012, sky='overcast', water=True), [X0, Y0, X1, Y1])
 
 
-ALL = dict(mahalle=map_mahalle, safranbolu=map_safranbolu, gemi=map_gemi, liman=map_liman)
+# ======================================================================== user props (USD) placed in maps
+PROPS = {
+    'cosmo': ('/home/claude/ext3d/new/8845cf3c-Eunos_Cosmo_1990/scene.usdc', 4.82),
+    'sr5': ('/home/claude/ext3d/new/357cd1a1-SR-5_GMLRS__MWT_Tank_Battles/scene.usdc', 10.5),
+}
+
+
+def usd_prop(key, x, y, rot, collide=True, z=0.0):
+    """import a user supplied USD model, scale its length, keep its textured materials (ext_ prefix)"""
+    path, length = PROPS[key]
+    before = set(bpy.data.objects)
+    bpy.ops.wm.usd_import(filepath=path)
+    new = [o for o in bpy.data.objects if o not in before]
+    meshes = [o for o in new if o.type == 'MESH']
+    dg = bpy.context.evaluated_depsgraph_get()
+    pts = [o.matrix_world @ Vector(c) for o in meshes for c in o.bound_box]
+    mn = Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)))
+    mx = Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
+    size = mx - mn
+    s = length / max(size.x, size.y)
+    long_x = size.x > size.y
+    root = empty('prop_' + key, (x, y, z))
+    root.rotation_euler = (0, 0, math.radians(rot + (90 if long_x else 0)))
+    ctr = Vector(((mn.x + mx.x) / 2, (mn.y + mx.y) / 2, mn.z))
+    for o in meshes:
+        mw = o.matrix_world.copy()
+        o.parent = root
+        o.matrix_parent_inverse = Matrix.Identity(4)
+        o.matrix_basis = Matrix.Scale(s, 4) @ Matrix.Translation(-ctr) @ mw
+        for sl in o.material_slots:
+            if sl.material and not sl.material.name.startswith('ext_'):
+                sl.material.name = 'ext_%s_%s' % (key, sl.material.name)
+    # props render opaque (alpha-blended chunks of a merged map mesh sort badly and are expensive)
+    for o in meshes:
+        for sl in o.material_slots:
+            mt = sl.material
+            if mt and mt.node_tree:
+                for nd in mt.node_tree.nodes:
+                    if nd.type == 'BSDF_PRINCIPLED':
+                        for lk in list(nd.inputs['Alpha'].links):
+                            mt.node_tree.links.remove(lk)
+                        nd.inputs['Alpha'].default_value = 1.0
+                try:
+                    mt.surface_render_method = 'DITHERED'
+                except Exception:
+                    pass
+                mt.use_backface_culling = True
+    # props are scenery: cap their textures at 512 px (keeps VRAM and download size down)
+    for o in meshes:
+        for sl in o.material_slots:
+            if sl.material and sl.material.node_tree:
+                for nd in sl.material.node_tree.nodes:
+                    im = getattr(nd, 'image', None)
+                    if im and not im.get('capped') and max(im.size) > 512:
+                        f = 512 / max(im.size)
+                        im.scale(max(1, int(im.size[0] * f)), max(1, int(im.size[1] * f)))
+                        im['capped'] = True
+    for o in new:
+        if o.type != 'MESH' and o is not root and o.name in bpy.data.objects:
+            if not o.children:
+                bpy.data.objects.remove(o)
+    if collide:
+        w, l, h = (size.y if long_x else size.x) * s, max(size.x, size.y) * s, size.z * s
+        col((x, y, z + h / 2), (w * 0.95, l * 0.95, h), rotz=rot)
+    return root
+
+
+def fence_panel(x, y, rot, mm, length=3.4):
+    root = empty('fence', (x, y, 0)); root.rotation_euler = (0, 0, math.radians(rot))
+    for s_ in (-1, 1):
+        box('f_foot', (0.25, 0.6, 0.12), (s_ * length / 2, 0, 0.06), m=mm['concrete'], parent=root)
+        cyl('f_post', 0.025, 2.0, (s_ * length / 2, 0, 1.0), m=mm['steel'], parent=root, axis='Z', verts=6)
+    box('f_mesh', (length, 0.02, 1.9), (0, 0, 1.05), m=M('fence_mesh', (0.75, 0.78, 0.8), 0.4, 0.8), parent=root)
+    box('f_banner', (length * 0.95, 0.03, 0.9), (0, -0.02, 1.0), m=M('fence_banner', (0.1, 0.32, 0.55), 0.7), parent=root)
+
+
+def sand_pile(x, y, r, h, m):
+    cyl('sand', r, h, (x, y, h / 2), m=m, axis='Z', verts=18, r2=r * 0.15)
+    col((x, y, h * 0.35), (r * 1.3, r * 1.3, h * 0.7))
+
+
+def rebar_bundle(x, y, rot, mm, n=14, length=6):
+    root = empty('rebar', (x, y, 0)); root.rotation_euler = (0, 0, math.radians(rot))
+    rm = M('rebar_rust', (0.35, 0.18, 0.1), 0.8, 0.6)
+    for i in range(n):
+        cyl('rb', 0.012, length, ((i % 7) * 0.05 - 0.15, 0, 0.15 + (i // 7) * 0.05), m=rm, parent=root, axis='Y', verts=5)
+    for k in (-2, 0, 2):
+        box('rb_wood', (0.5, 0.1, 0.1), (0, k, 0.05), m=mm['planks'], parent=root)
+
+
+def tower_crane(x, y, mm, h=34, jib=36):
+    cm = M('crane_yellow', (0.95, 0.68, 0.05), 0.5, 0.3)
+    box('crane_base', (4.5, 4.5, 1.2), (x, y, 0.6), m=mm['concrete'])
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            box('cr_leg', (0.2, 0.2, h), (x + sx * 0.8, y + sy * 0.8, h / 2), m=cm)
+    for k in range(int(h / 2)):
+        z = k * 2 + 1
+        for sy in (-1, 1):
+            box('cr_x', (1.6, 0.1, 0.1), (x, y + sy * 0.8, z), (0, 35 if k % 2 else -35, 0), m=cm)
+            box('cr_y', (0.1, 1.6, 0.1), (x + sy * 0.8, y, z), (35 if k % 2 else -35, 0, 0), m=cm)
+    box('cr_cab', (2.2, 2.4, 2.2), (x + 1.6, y, h + 1.1), m=cm, bevel=0.1)
+    box('cr_cab_win', (0.05, 2.0, 1.2), (x + 2.72, y, h + 1.3), m=mm['carglass'])
+    box('cr_jib', (jib, 1.2, 1.2), (x + jib / 2 - 8, y, h + 2.8), m=cm)
+    box('cr_counter', (4, 2, 2), (x - 9, y, h + 2.0), m=mm['concrete'])
+    box('cr_apex', (0.8, 0.8, 6), (x, y, h + 5.5), m=cm)
+    cyl('cr_cable', 0.02, h - 6, (x + 18, y, h / 2 + 4), m=mm['cable'], axis='Z', verts=4)
+    box('cr_hook', (0.4, 0.3, 0.6), (x + 18, y, 9.5), m=mm['ship_orange'])
+    box('cr_load', (1.2, 4.5, 0.6), (x + 18, y, 7.8), m=M('rebar_rust', (0.35, 0.18, 0.1), 0.8, 0.6))
+    col((x, y, h / 2), (2.2, 2.2, h))
+
+
+def mixer(x, y, rot, mm):
+    root = empty('mixer', (x, y, 0)); root.rotation_euler = (0, 0, math.radians(rot))
+    w = M('mixer_white', (0.9, 0.9, 0.88), 0.35, 0.3)
+    box('mx_cab', (2.4, 2.2, 2.4), (0, 3.2, 1.9), m=w, parent=root, bevel=0.12)
+    box('mx_ws', (2.2, 0.05, 1.0), (0, 4.31, 2.4), m=mm['carglass'], parent=root)
+    box('mx_chassis', (2.2, 8.4, 0.5), (0, 0, 0.9), m=mm['metal'], parent=root)
+    cyl('mx_drum', 1.25, 4.6, (0, -1.0, 2.5), (14, 0, 0), m=M('mixer_drum', (0.85, 0.42, 0.06), 0.4, 0.3), parent=root, axis='Y', verts=24, r2=0.7, bevel=0.05)
+    for sy in (3.2, -1.2, -2.8):
+        for sx in (-1, 1):
+            cyl('mx_wheel', 0.5, 0.35, (sx * 1.05, sy, 0.5), m=mm['tire'], parent=root, axis='X', verts=18)
+    col((x, y, 1.6), (2.5, 8.6, 3.2), rotz=rot)
+
+
+def site_slab(name, x0, y0, x1, y1, z, mm, holes=()):
+    """floor slab with stair holes: split into rectangles around holes (single hole supported)"""
+    t = 0.3
+    if not holes:
+        wall(name, (x0 + x1) / 2, (y0 + y1) / 2, z - t, x1 - x0, y1 - y0, t, mm['concrete'])
+        return
+    hx0, hy0, hx1, hy1 = holes[0]
+    parts = [(x0, y0, hx0, y1), (hx1, y0, x1, y1), (hx0, y0, hx1, hy0), (hx0, hy1, hx1, y1)]
+    for i, (a, b, c, d) in enumerate(parts):
+        if c - a > 0.05 and d - b > 0.05:
+            wall(f'{name}{i}', (a + c) / 2, (b + d) / 2, z - t, c - a, d - b, t, mm['concrete'])
+
+
+# ======================================================================== MAP 5: İNŞAAT (small construction site)
+def map_insaat():
+    mm = begin()
+    X0, X1, Y0, Y1 = -34, 34, -30, 30
+    dirt = M('site_dirt', (0.45, 0.37, 0.28), 0.95)
+    gravel = M('gravel', (0.5, 0.48, 0.45), 0.95)
+    ground('site', X0 - 260, Y0 - 260, X1 + 260, Y1 + 260, 0, dirt)
+    box('pad', (30, 22, 0.06), (0, 4, 0.03), m=mm['concrete'])
+    box('road', (68, 7, 0.05), (0, -24, 0.025), m=gravel)
+    # ---- unfinished 3-storey concrete frame (20 x 14) with an open roof slab
+    BX, BY, BW, BD, FH = 0, 6, 20, 14, 3.6
+    cols_x = [BX - BW / 2 + 0.25 + i * (BW - 0.5) / 4 for i in range(5)]
+    cols_y = [BY - BD / 2 + 0.25 + i * (BD - 0.5) / 2 for i in range(3)]
+    for lv in range(3):
+        z = lv * FH
+        for cx in cols_x:
+            for cy in cols_y:
+                wall('column', cx, cy, z, 0.5, 0.5, FH, mm['concrete'])
+        hole = (BX + 5.5, BY - 6.4, BX + 9.5, BY - 3.6)
+        site_slab(f'slab{lv}', BX - BW / 2, BY - BD / 2, BX + BW / 2, BY + BD / 2, z + FH, mm, holes=[hole] if lv < 2 else [hole])
+        # stairs inside the hole (east side)
+        stairs(f'st{lv}', BX + 7.5, BY - 5.0, z, z + FH, 2.8, 1.8 if lv < 2 else 1.8, mm['concrete'], axis='X', direction=-1) if lv < 2 else None
+        # brick infill: partial walls with window gaps; ground floor north wall full, upper floors broken
+        bm = mm['brick']
+        if lv == 0:
+            wall('bw_n', BX - 3, BY + BD / 2 - 0.15, z, 12, 0.25, FH - 0.3, bm)
+            wall('bw_w1', BX - BW / 2 + 0.15, BY + 3.5, z, 0.25, 5, FH - 0.3, bm)
+            wall('bw_s1', BX - 6, BY - BD / 2 + 0.15, z, 6, 0.25, 1.1, bm)
+        elif lv == 1:
+            wall('bw_n2', BX + 4, BY + BD / 2 - 0.15, z, 8, 0.25, FH - 0.3, bm)
+            wall('bw_e2', BX + BW / 2 - 0.15, BY + 3.0, z, 0.25, 6, 1.2, bm)
+            wall('bw_mid2', BX - 2, BY + 1.0, z, 0.25, 6, FH - 0.3, bm)
+        else:
+            wall('bw_w3', BX - BW / 2 + 0.15, BY - 2, z, 0.25, 7, 1.0, bm)
+            wall('bw_n3', BX - 5, BY + BD / 2 - 0.15, z, 6, 0.25, 1.0, bm)
+        # rebar sticking out of the top columns
+    for cx in cols_x:
+        for cy in cols_y:
+            for dx in (-0.12, 0.12):
+                cyl('rebar_top', 0.012, 1.2, (cx + dx, cy, 3 * FH + 0.6), m=M('rebar_rust', (0.35, 0.18, 0.1), 0.8, 0.6), axis='Z', verts=5)
+    # roof parapet low walls (cover on the top floor)
+    for sy in (-1, 1):
+        wall('parapet', BX, BY + sy * (BD / 2 - 0.1), 3 * FH, BW, 0.2, 0.8, mm['concrete'])
+    stairs('st2', BX + 7.5, BY - 5.0, 2 * FH, 3 * FH, 2.8, 1.8, mm['concrete'], axis='X', direction=-1)
+    scaffold(BX - 2, BY - BD / 2 - 0.2, 0, 14, 10, mm)
+    col((BX - 2, BY - BD / 2 - 1.2, 5), (14, 0.2, 10))
+    # ---- crane, site office containers, mixer and materials
+    tower_crane(-24, 20, mm)
+    container(24, 20, 0, 90, mm['c_white'], mm)
+    container(24, 17.3, 0, 90, mm['c_grey'], mm)
+    container(24, 18.6, 2.59, 90, mm['c_blue'], mm)
+    stairs('off_st', 27.6, 14.5, 0, 2.6, 4.0, 1.4, mm['steel'], axis='Y', direction=1)
+    box('office_sign', (5, 0.1, 0.9), (24, 15.9, 4.2), m=M('site_sign', (0.95, 0.75, 0.1), 0.5))
+    mixer(20, -6, 15, mm)
+    sand_pile(-22, -6, 3.2, 2.4, M('sand', (0.82, 0.7, 0.5), 0.95))
+    sand_pile(-17, -12, 2.4, 1.8, gravel)
+    for (bx, by, r) in [(-14, 18, 0), (-10, 19, 0), (14, -10, 30), (8, -12, 0), (-27, 2, 90)]:
+        brick_stack(bx, by, mm, rot=r)
+    for (px, py) in [(-6, -10), (-4.6, -10), (28, 2), (28, 4)]:
+        pallet_stack(px, py, RND.randint(2, 6), mm)
+    rebar_bundle(-12, -16, 80, mm)
+    rebar_bundle(12, 22, 10, mm)
+    for (rx, ry) in [(-28, -14), (6, 24), (30, -12)]:
+        cable_reel(rx, ry, mm)
+    for i in range(5):
+        cyl('pipe', 0.45, 6, (-30 + i * 0.0, 12 + i * 0.95, 0.45 if i < 3 else 1.25), m=mm['concrete'], axis='Y', verts=18) if False else None
+    for k in range(3):
+        cyl('big_pipe', 0.55, 5.5, (-30 + k * 1.15, 10, 0.55), m=mm['concrete'], axis='Y', verts=20)
+    cyl('big_pipe', 0.55, 5.5, (-29.4, 10, 1.5), m=mm['concrete'], axis='Y', verts=20)
+    col((-28.85, 10, 1.0), (3.5, 5.5, 2.0))
+    for (jx, jy, r) in [(-6, -18, 90), (6, -18, 90), (-20, -20, 0), (18, 8, 0)]:
+        jersey(jx, jy, r, mm)
+    for (cx, cy) in [(-3, -21), (0, -21), (3, -21), (15, 0), (16, 1.5)]:
+        cone(cx, cy)
+    for (lx, ly) in [(-32, -28), (32, 28), (-32, 28)]:
+        light_tower(lx, ly, mm, h=11)
+    crate(10, 16, 0, 1.2, mm); crate(11.3, 16.2, 0, 1.2, mm, rot=10); crate(10.6, 16.1, 1.2, 1.1, mm, rot=-6)
+    barrel(-8, 22, mm, 'yellow'); barrel(-7.3, 22.6, mm, 'red'); barrel(16, -16, mm, 'blue')
+    car(-14, -24, 90, ('red', (0.55, 0.03, 0.03)), mm)
+    car(-8, -25, 90, ('white', (0.85, 0.85, 0.82)), mm)
+    # perimeter fence with site banners
+    for i in range(int((X1 - X0) / 3.4)):
+        fence_panel(X0 + 1.7 + i * 3.4, Y1 + 0.6, 0, mm)
+        if not (-6 < X0 + 1.7 + i * 3.4 < 6):
+            fence_panel(X0 + 1.7 + i * 3.4, Y0 - 0.6, 0, mm)
+    for i in range(int((Y1 - Y0) / 3.4)):
+        fence_panel(X0 - 0.6, Y0 + 1.7 + i * 3.4, 90, mm)
+        fence_panel(X1 + 0.6, Y0 + 1.7 + i * 3.4, 90, mm)
+    # background city blocks
+    for i, (ax, ay, h) in enumerate([(-60, 50, 26), (-30, 62, 34), (10, 58, 22), (45, 55, 30), (70, 10, 24), (66, -40, 36), (-70, -20, 28), (-55, -60, 20), (20, -66, 26)]):
+        box('bg_block', (18, 16, h), (ax, ay, h / 2), m=[mm['p_grey'], mm['p_cream'], mm['concrete']][i % 3])
+        for f in range(int(h / 3.2)):
+            box('bg_win', (16, 16.1, 1.2), (ax, ay, f * 3.2 + 1.8), m=mm['glass'])
+    spawns_a = [(-28, 26, 180), (-22, 26, 180), (-16, 27, 180), (-30, 18, 120), (-10, 27, 180), (-26, 14, 135)]
+    spawns_b = [(28, -27, 0), (22, -27, 0), (14, -27, 0), (30, -18, 300), (8, -27, 0), (26, -10, 330)]
+    for i, (x, y, yaw) in enumerate(spawns_a + spawns_b):
+        spawn(x, y, 0.1, yaw, 'a' if i < 6 else 'b')
+    bounds_walls(X0, Y0, X1, Y1, 22)
+    finalize('insaat', dict(preset='day', sun=[-50, 40], fog=0.006, sky='day'), [X0, Y0, X1, Y1])
+
+
+# ======================================================================== MAP 6: ÇANAKKALE (coastal fortress + trenches)
+def berm(x, y, length, rot, mm, h=1.5):
+    """earth trench wall with a sandbag crest (cover on both sides)"""
+    root = empty('berm', (x, y, 0)); root.rotation_euler = (0, 0, math.radians(rot))
+    prof('berm_body', [(-1.4, 0), (1.4, 0), (0.45, h), (-0.45, h)], length, m=M('earth', (0.42, 0.33, 0.22), 0.95), parent=root, plane='XZ', bevel=0.05)
+    for i in range(int(length / 0.6)):
+        box('crest_bag', (0.55, 0.38, 0.17), (RND.uniform(-0.15, 0.15), -length / 2 + 0.3 + i * 0.6, h + 0.08), (0, 0, RND.uniform(-8, 8)), m=mm['sandbag'], parent=root, bevel=0.07, segs=3)
+    col((x, y, (h + 0.2) / 2), (1.6, length, h + 0.2), rotz=rot)
+
+
+def cannon(x, y, rot, mm, z=0.0):
+    root = empty('cannon', (x, y, z)); root.rotation_euler = (0, 0, math.radians(rot))
+    iron = M('cannon_iron', (0.12, 0.12, 0.12), 0.45, 0.85)
+    cyl('cn_barrel', 0.32, 3.4, (0, 0.9, 1.25), (-6, 0, 0), m=iron, parent=root, axis='Y', verts=24, r2=0.22, bevel=0.03)
+    torus('cn_ring', 0.33, 0.05, (0, -0.6, 1.1), (90, 0, 0), m=iron, parent=root, seg=24, mseg=6)
+    cyl('cn_muzzle', 0.26, 0.25, (0, 2.6, 1.42), (-6, 0, 0), m=iron, parent=root, axis='Y', verts=24)
+    box('cn_carriage', (1.1, 2.4, 0.7), (0, 0, 0.55), m=mm['beam'], parent=root, bevel=0.05)
+    for sx in (-1, 1):
+        cyl('cn_wheel', 0.55, 0.14, (sx * 0.62, 0.4, 0.55), m=mm['beam'], parent=root, axis='X', verts=20)
+    col((x, y, z + 0.8), (1.4, 3.4, 1.6), rotz=rot)
+
+
+def tent(x, y, rot, mm, w=4, l=5, h=2.6):
+    root = empty('tent', (x, y, 0)); root.rotation_euler = (0, 0, math.radians(rot))
+    prof('tent_body', [(-w / 2, 0), (w / 2, 0), (0, h)], l, m=M('canvas', (0.55, 0.52, 0.4), 0.9), parent=root, plane='XZ', bevel=0.02)
+    col((x, y, h / 3), (w * 0.8, l, h * 0.66), rotz=rot)
+
+
+def map_canakkale():
+    mm = begin()
+    X0, X1, Y0, Y1 = -62, 56, -46, 46
+    grass = M('dry_grass', (0.5, 0.48, 0.28), 0.95)
+    ground('land', X0 - 260, Y0 - 260, X1 + 2, Y1 + 260, 0, grass)
+    box('path', (6, 92, 0.04), (-8, 0, 0.02), m=M('path_dirt', (0.55, 0.45, 0.32), 0.95))
+    # cliff edge and the strait (Boğaz) to the east, far shore on the Asian side
+    prof('cliff', [(0, 0), (6, 0), (9, -14), (0, -14)], 300, m=mm['stone'], plane='XZ', loc=(X1 + 2, 0, 0), bevel=0.2) if False else None
+    box('cliff', (8, 600, 14), (X1 + 6, 0, -7), m=M('cliff_rock', (0.6, 0.55, 0.45), 0.9))
+    box('beach', (30, 600, 1), (X1 + 22, 0, -2.6), m=M('sand', (0.82, 0.7, 0.5), 0.95))
+    box('sea', (3000, 3000, 0.1), (X1 + 1530, 0, -2.2), m=mm['water'])
+    box('far_shore', (120, 2400, 40), (X1 + 1300, 0, -10), m=M('far_hills', (0.45, 0.5, 0.35), 0.95))
+    for i in range(5):
+        box('far_ship', (80, 14, 14), (X1 + 500 + i * 120, -500 + i * 260, -2), m=mm['hull_dark'])
+    # ---- coastal fortress (north-east), enterable courtyard
+    FX, FY, FW, FD, FH = 22, 22, 40, 28, 7.0
+    stone = M('fort_stone', (0.72, 0.66, 0.55), 0.9)
+    for (cx, cy, sx, sy) in [(FX, FY + FD / 2, FW, 2.4), (FX - FW / 2, FY, 2.4, FD)]:
+        wall('fort_wall', cx, cy, 0, sx, sy, FH, stone, uv=0.25)
+    # east (sea) wall with gun embrasures, south wall with gate
+    for k in range(5):
+        a = FY - FD / 2 + 2.5 + k * 5.8
+        wall('fort_e', FX + FW / 2, a, 0, 2.4, 3.6, FH, stone, uv=0.25)
+    wall('fort_e_low', FX + FW / 2, FY, 0, 2.4, FD, 1.6, stone, uv=0.25)
+    for (a, b) in [(-20, -4), (4, 20)]:
+        wall('fort_s', FX + (a + b) / 2, FY - FD / 2, 0, b - a, 2.4, FH, stone, uv=0.25)
+    box('gate_arch', (8, 2.6, 2.2), (FX, FY - FD / 2, FH - 1.1), m=stone)
+    # merlons
+    for i in range(int(FW / 2.4)):
+        box('merlon', (1.3, 2.5, 1.2), (FX - FW / 2 + 1.2 + i * 2.4, FY + FD / 2, FH + 0.6), m=stone)
+    # wall-walk ramps (inside) so the battlements are playable
+    stairs('fort_r1', FX - FW / 2 + 3.2, FY + 2, 0, FH, 12, 3, stone, axis='Y', direction=1)
+    stairs('fort_r2', FX + 6, FY + FD / 2 - 3.2, 0, FH, 12, 3, stone, axis='X', direction=-1)
+    ground('walkway_n', FX - FW / 2, FY + FD / 2 - 4.7, FX + FW / 2, FY + FD / 2 - 1.2, FH - 0.05, stone, thick=0.3)
+    # bastion towers
+    for (tx, ty) in [(FX - FW / 2, FY + FD / 2), (FX + FW / 2, FY - FD / 2), (FX - FW / 2, FY - FD / 2)]:
+        cyl('bastion', 5.0, FH + 3, (tx, ty, (FH + 3) / 2), m=stone, axis='Z', verts=24, uv=0.25)
+        col((tx, ty, (FH + 3) / 2), (8.6, 8.6, FH + 3))
+    # cannons at the sea embrasures + cannonball stacks
+    for k in range(4):
+        cannon(FX + FW / 2 - 3.2, FY - FD / 2 + 5.4 + k * 5.8, -90, mm)
+    for (bx, by) in [(FX + 12, FY - 9), (FX + 12, FY + 7)]:
+        for i in range(10):
+            sphere('ball', 0.18, (bx + (i % 4) * 0.37 - 0.55, by + (i // 4) * 0.37, 0.18 + (i // 4) * 0.2), m=M('cannon_iron', (0.12, 0.12, 0.12), 0.45, 0.85))
+    for (cx, cy) in [(FX - 8, FY - 2), (FX + 4, FY + 6), (FX - 14, FY + 8)]:
+        crate(cx, cy, 0, 1.3, mm, rot=RND.uniform(-20, 20))
+        wood_barrel(cx + 1.6, cy, mm)
+    # flag on the bastion
+    cyl('flagpole', 0.08, 12, (FX - FW / 2, FY + FD / 2, FH + 3 + 6), m=mm['steel'], axis='Z', verts=8)
+    box('flag', (0.05, 5.4, 3.6), (FX - FW / 2, FY + FD / 2 + 2.75, FH + 3 + 10), m=mm['flag_tr'])
+    # ---- trench line (south-west), zig-zag earth berms
+    for (x, y, l, r) in [(-44, -20, 18, 0), (-38, -20, 18, 0), (-41, -6, 10, 90), (-30, -30, 14, 60), (-24, -24, 14, 60),
+                         (-48, 4, 14, 0), (-42, 4, 14, 0), (-34, 16, 12, 120), (-28, 12, 12, 120), (-52, -34, 10, 90)]:
+        berm(x, y, l, r, mm)
+    for (x, y, r) in [(-20, -8, 0), (-14, 8, 90), (-26, 28, 20), (0, -30, 90), (4, 12, 0), (-4, 30, 90)]:
+        sandbags(x, y, 4.5, 4, mm, rot=r)
+    for (x, y, r) in [(-46, 22, 0), (-52, 30, 90), (-36, 34, 30)]:
+        tent(x, y, r, mm)
+    # wooden barbed-wire posts (visual)
+    for i in range(14):
+        cyl('wire_post', 0.06, 1.3, (-60 + i * 3.2, -42, 0.65), m=mm['beam'], axis='Z', verts=6)
+    box('wire', (44, 0.03, 0.03), (-39, -42, 1.1), m=mm['cable'])
+    # rocks and pines
+    for i in range(18):
+        rx, ry = RND.uniform(X0 + 4, X1 - 8), RND.uniform(Y0 + 4, Y1 - 4)
+        if (FX - FW / 2 - 6 < rx < FX + FW / 2 + 6 and FY - FD / 2 - 6 < ry < FY + FD / 2 + 6) or abs(rx + 8) < 4:
+            continue
+        sphere('rock', RND.uniform(0.8, 1.6), (rx, ry, 0.3), m=M('rock', (0.55, 0.52, 0.47), 0.9), scale=(1.3, 1.0, 0.7))
+        col((rx, ry, 0.6), (2.0, 1.6, 1.2))
+    for i, (tx, ty) in enumerate([(-58, 40), (-50, 42), (-30, 40), (-12, 42), (-58, -10), (-6, -40), (8, -42), (30, -40), (-20, 22)]):
+        tree(tx, ty, mm, h=RND.uniform(6, 8), r=2.2, seed=i)
+    # modern visitor road with the military display
+    box('asphalt_road', (8, 92, 0.05), (40, -30, 0.03), (0, 0, 90), m=mm['asphalt'])
+    usd_prop('sr5', 30, -30, 90)
+    car(6, -36, 180, ('blue', (0.06, 0.15, 0.4)), mm)
+    for (jx, jy, r) in [(18, -24, 0), (44, -24, 0)]:
+        jersey(jx, jy, r, mm)
+    spawns_a = [(10, 18, 180), (16, 14, 200), (26, 16, 180), (32, 20, 160), (20, 26, 180), (28, 12, 210)]
+    spawns_b = [(-50, -30, 30), (-44, -36, 20), (-56, -18, 60), (-38, -40, 10), (-52, -4, 70), (-30, -40, 0)]
+    for i, (x, y, yaw) in enumerate(spawns_a + spawns_b):
+        spawn(x, y, 0.1, yaw, 'a' if i < 6 else 'b')
+    bounds_walls(X0, Y0, X1, Y1, 22)
+    finalize('canakkale', dict(preset='sunset', sun=[-24, 280], fog=0.008, sky='sunset', water=True), [X0, Y0, X1, Y1])
+
+
+ALL = dict(mahalle=map_mahalle, safranbolu=map_safranbolu, gemi=map_gemi, liman=map_liman, insaat=map_insaat, canakkale=map_canakkale)
 if __name__ == '__main__':
     for n in [a for a in sys.argv[1:] if a in ALL] or list(ALL):
         try:

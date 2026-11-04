@@ -208,32 +208,69 @@ func on_death(victim) -> void:
 	elif alive_count("a") == 0 and not planted:
 		_end_round("b", "TÜM KARTALLAR ETKİSİZ")
 
+var bomb_label: Label3D
+var planted_site := ""
+var banner_t := 0.0
+var typed := 0
+
+func _mat(c: Color, rough := 0.6, metal := 0.0, emit := 0.0) -> StandardMaterial3D:
+	var mt := StandardMaterial3D.new()
+	mt.albedo_color = c; mt.roughness = rough; mt.metallic = metal
+	if emit > 0.0:
+		mt.emission_enabled = true; mt.emission = c; mt.emission_energy_multiplier = emit
+	return mt
+
+func _part(parent: Node3D, mesh: Mesh, mat: Material, pos: Vector3, rot := Vector3.ZERO) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh; mi.material_override = mat; mi.position = pos; mi.rotation = rot
+	parent.add_child(mi)
+	return mi
+
 func _place_bomb(pos: Vector3, armed: bool) -> void:
 	if bomb_node == null:
+		# C4-style charge: four taped cylinders, keypad/timer box with a live display, wires and a blinking LED
 		bomb_node = Node3D.new()
 		add_child(bomb_node)
-		var mi := MeshInstance3D.new()
-		var bm := BoxMesh.new(); bm.size = Vector3(0.34, 0.12, 0.24)
-		mi.mesh = bm
-		var mat := StandardMaterial3D.new(); mat.albedo_color = Color(0.12, 0.13, 0.12); mat.roughness = 0.6
-		mi.material_override = mat
-		mi.position.y = 0.06
-		bomb_node.add_child(mi)
-		var led := MeshInstance3D.new()
-		var sm := SphereMesh.new(); sm.radius = 0.025; sm.height = 0.05
-		led.mesh = sm
-		var lm := StandardMaterial3D.new(); lm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; lm.albedo_color = Color(1, 0.1, 0.05)
-		led.material_override = lm
-		led.position = Vector3(0.1, 0.14, 0)
-		bomb_node.add_child(led)
+		var olive := _mat(Color(0.28, 0.3, 0.2), 0.75)
+		var tape := _mat(Color(0.05, 0.05, 0.05), 0.5)
+		for i in 4:
+			var cm := CylinderMesh.new(); cm.top_radius = 0.035; cm.bottom_radius = 0.035; cm.height = 0.3; cm.radial_segments = 14
+			_part(bomb_node, cm, olive, Vector3(-0.105 + i * 0.07, 0.036, 0), Vector3(0, 0, PI / 2))
+		for z in [-0.09, 0.09]:
+			var tb := BoxMesh.new(); tb.size = Vector3(0.3, 0.08, 0.035)
+			_part(bomb_node, tb, tape, Vector3(0, 0.04, z))
+		var box := BoxMesh.new(); box.size = Vector3(0.17, 0.05, 0.12)
+		_part(bomb_node, box, _mat(Color(0.1, 0.1, 0.11), 0.4, 0.4), Vector3(0, 0.095, -0.01))
+		var scr := BoxMesh.new(); scr.size = Vector3(0.11, 0.006, 0.04)
+		_part(bomb_node, scr, _mat(Color(0.02, 0.05, 0.02), 0.2), Vector3(0, 0.122, -0.035))
+		for k in 9:
+			var kbm := BoxMesh.new(); kbm.size = Vector3(0.022, 0.008, 0.016)
+			_part(bomb_node, kbm, _mat(Color(0.6, 0.62, 0.6), 0.5), Vector3(-0.03 + (k % 3) * 0.03, 0.122, 0.01 + (k / 3) * 0.02))
+		for w in [[Color(0.9, 0.1, 0.08), -0.06], [Color(0.1, 0.35, 0.95), 0.06], [Color(0.95, 0.8, 0.1), 0.0]]:
+			var wm := CylinderMesh.new(); wm.top_radius = 0.004; wm.bottom_radius = 0.004; wm.height = 0.16
+			_part(bomb_node, wm, _mat(w[0], 0.5), Vector3(w[1], 0.11, 0.07), Vector3(PI / 2 - 0.3, 0, 0))
+		bomb_label = Label3D.new()
+		bomb_label.text = "--:--"
+		bomb_label.font_size = 48
+		bomb_label.pixel_size = 0.0009
+		bomb_label.modulate = Color(1, 0.15, 0.1)
+		bomb_label.outline_size = 0
+		bomb_label.shaded = false
+		bomb_label.position = Vector3(0, 0.127, -0.035)
+		bomb_label.rotation = Vector3(-PI / 2, 0, 0)
+		bomb_node.add_child(bomb_label)
+		var led := SphereMesh.new(); led.radius = 0.012; led.height = 0.024
+		_part(bomb_node, led, _mat(Color(1, 0.1, 0.05), 0.3, 0.0, 4.0), Vector3(0.07, 0.125, -0.05))
 		bomb_light = OmniLight3D.new()
 		bomb_light.light_color = Color(1, 0.15, 0.05)
-		bomb_light.omni_range = 3.0
+		bomb_light.omni_range = 3.5
 		bomb_light.light_energy = 0.0
 		bomb_light.position.y = 0.3
 		bomb_node.add_child(bomb_light)
 	bomb_node.global_position = pos
 	bomb_node.set_meta("armed", armed)
+	if bomb_label:
+		bomb_label.visible = armed
 
 # ------------------------------------------------------------------ per frame
 func _near_site(p: Vector3) -> int:
@@ -298,7 +335,8 @@ func _process(delta: float) -> void:
 			beep_t = 0.0
 			_place_bomb(bomb_pos, true)
 			progress = 0.0; prog_kind = ""
-			m.hud.center_msg("BOMBA KURULDU!  (%s)" % sites[_near_site(bomb_pos) if _near_site(bomb_pos) >= 0 else 0]["name"], UI.RED)
+			planted_site = sites[_near_site(bomb_pos) if _near_site(bomb_pos) >= 0 else 0]["name"]
+			banner_t = 3.0
 			SFX.play("beep_go", 0)
 			_assign_objectives()
 	elif phase == "planted":
@@ -312,6 +350,8 @@ func _process(delta: float) -> void:
 				bomb_light.light_energy = 3.0
 		if bomb_light:
 			bomb_light.light_energy = maxf(bomb_light.light_energy - delta * 12.0, 0.0)
+		if bomb_label:
+			bomb_label.text = "%02d.%d" % [int(m.time_left), int(fmod(m.time_left, 1.0) * 10.0)]
 		if m.time_left <= 0:
 			_explode()
 			return
@@ -335,6 +375,7 @@ func _progress(who, kind: String, delta: float) -> void:
 	if who == null:
 		if prog_kind == kind:
 			progress = 0.0; prog_kind = ""; prog_who = null
+			typed = 0
 		return
 	if prog_who != who or prog_kind != kind:
 		progress = 0.0
@@ -343,6 +384,13 @@ func _progress(who, kind: String, delta: float) -> void:
 	prog_who = who
 	prog_kind = kind
 	progress += delta
+	if who == m.player and kind == "plant":
+		var dg := int(progress / PLANT_T * 7.0)
+		if dg > typed and dg <= 7:
+			typed = dg
+			SFX.play("tick", -2, 1.0 + dg * 0.06)
+	elif kind == "plant":
+		typed = 0
 
 func _explode() -> void:
 	m.fx.explosion(bomb_pos)
@@ -377,7 +425,21 @@ class SabUI extends Control:
 		draw_string(f, Vector2(c.x - 150, 104), rs, HORIZONTAL_ALIGNMENT_CENTER, 300, 17, Color(1, 1, 1, 0.75))
 		if sab.phase == "planted":
 			var a := 0.55 + 0.45 * sin(Time.get_ticks_msec() / 1000.0 * (6.0 + 10.0 * (1.0 - sab.m.time_left / sab.BOMB_TIME)))
-			draw_string(fr, Vector2(c.x - 150, 132), "BOMBA KURULU", HORIZONTAL_ALIGNMENT_CENTER, 300, 22, Color(1, 0.2, 0.15, a))
+			var pr := Rect2(c.x - 170, 116, 340, 34)
+			draw_set_transform(Vector2(pr.position.x + 170, pr.position.y), 0.0, Vector2.ONE)
+			draw_colored_polygon(PackedVector2Array([Vector2(-160, 0), Vector2(170, 0), Vector2(160, 34), Vector2(-170, 34)]), Color(0.35, 0.02, 0.02, 0.75 * a + 0.2))
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			draw_string(fr, Vector2(c.x - 170, 141), "BOMBA KURULU  •  %s  •  %d sn" % [sab.planted_site, int(sab.m.time_left)], HORIZONTAL_ALIGNMENT_CENTER, 340, 19, Color(1, 0.85, 0.8, 0.6 + 0.4 * a))
+		# big banner right after planting
+		if sab.banner_t > 0.0:
+			sab.banner_t -= get_process_delta_time()
+			var k2 := clampf(sab.banner_t / 3.0, 0.0, 1.0)
+			var al := minf(1.0, k2 * 3.0)
+			var w := 620.0 * minf(1.0, (1.0 - k2) * 8.0 + 0.2)
+			draw_rect(Rect2(c.x - w / 2, c.y - 190, w, 70), Color(0.45, 0.02, 0.02, 0.8 * al))
+			draw_rect(Rect2(c.x - w / 2, c.y - 190, w, 4), Color(1, 0.3, 0.2, al))
+			draw_rect(Rect2(c.x - w / 2, c.y - 124, w, 4), Color(1, 0.3, 0.2, al))
+			draw_string(fr, Vector2(c.x - 310, c.y - 143), "BOMBA KURULDU  —  %s NOKTASI" % sab.planted_site, HORIZONTAL_ALIGNMENT_CENTER, 620, 36, Color(1, 1, 1, al))
 		# carrier badge
 		if sab.carrier == pl:
 			var r := Rect2(c.x - 120, size.y - 210, 240, 34)
@@ -391,10 +453,37 @@ class SabUI extends Control:
 		if sab.prog_kind != "" and sab.prog_who == pl:
 			var total: float = sab.PLANT_T if sab.prog_kind == "plant" else sab.DEFUSE_T
 			var k := clampf(sab.progress / total, 0.0, 1.0)
-			var br := Rect2(c.x - 200, c.y + 70, 400, 16)
-			draw_rect(br.grow(3), Color(0, 0, 0, 0.6))
-			draw_rect(Rect2(br.position, Vector2(br.size.x * k, br.size.y)), Color(1, 0.55, 0.12) if sab.prog_kind == "plant" else Color(0.35, 0.75, 1.0))
-			draw_string(fr, Vector2(c.x - 200, c.y + 60), "KURULUYOR..." if sab.prog_kind == "plant" else "ÇÖZÜLÜYOR...", HORIZONTAL_ALIGNMENT_CENTER, 400, 20, Color.WHITE)
+			var col := Color(1, 0.55, 0.12) if sab.prog_kind == "plant" else Color(0.35, 0.75, 1.0)
+			var pnl := Rect2(c.x - 210, c.y + 40, 420, 150)
+			draw_rect(pnl, Color(0.02, 0.025, 0.035, 0.85))
+			draw_rect(pnl, Color(col.r, col.g, col.b, 0.8), false, 2.0)
+			draw_string(fr, pnl.position + Vector2(0, 30), "BOMBA KURULUYOR" if sab.prog_kind == "plant" else "BOMBA ÇÖZÜLÜYOR", HORIZONTAL_ALIGNMENT_CENTER, 420, 22, col)
+			if sab.prog_kind == "plant":
+				# keypad display: the arming code is typed digit by digit
+				var code := "1923145"
+				var shown := code.substr(0, int(k * 7.0))
+				var disp := Rect2(pnl.position + Vector2(60, 44), Vector2(300, 46))
+				draw_rect(disp, Color(0.03, 0.08, 0.03))
+				draw_rect(disp, Color(0.2, 0.5, 0.2), false, 1.5)
+				var txt := ""
+				for i in 7:
+					txt += (shown[i] if i < shown.length() else "*") + " "
+				draw_string(fr, disp.position + Vector2(0, 34), txt, HORIZONTAL_ALIGNMENT_CENTER, 300, 30, Color(0.45, 1.0, 0.45))
+			else:
+				# wires: cut one after another
+				var wcols := [Color(0.9, 0.15, 0.1), Color(0.95, 0.85, 0.1), Color(0.2, 0.45, 1.0)]
+				for i in 3:
+					var y := pnl.position.y + 56 + i * 14
+					var cut := k > (i + 1) / 3.0
+					if cut:
+						draw_line(Vector2(pnl.position.x + 60, y), Vector2(c.x - 14, y + 4), wcols[i], 4.0)
+						draw_line(Vector2(c.x + 14, y - 4), Vector2(pnl.position.x + 360, y), wcols[i], 4.0)
+					else:
+						draw_line(Vector2(pnl.position.x + 60, y), Vector2(pnl.position.x + 360, y), wcols[i], 4.0)
+			var br := Rect2(pnl.position.x + 30, pnl.position.y + 112, 360, 12)
+			draw_rect(br.grow(2), Color(0, 0, 0, 0.7))
+			draw_rect(Rect2(br.position, Vector2(br.size.x * k, br.size.y)), col)
+			draw_string(f, Vector2(pnl.position.x, pnl.position.y + 143), "%.1f sn" % maxf(total - sab.progress, 0.0), HORIZONTAL_ALIGNMENT_CENTER, 420, 16, Color(1, 1, 1, 0.75))
 		# dead: waiting for next round
 		if not pl.alive and sab.phase != "post":
 			draw_string(fr, Vector2(c.x - 300, size.y - 150), "ÖLDÜN  •  TUR SONUNU BEKLE   (Kalan: %s %d  -  %d %s)" % [GS.TEAMS["a"], sab.alive_count("a"), sab.alive_count("b"), GS.TEAMS["b"]], HORIZONTAL_ALIGNMENT_CENTER, 600, 20, Color(1, 1, 1, 0.85))

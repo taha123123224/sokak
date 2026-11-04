@@ -65,6 +65,15 @@ static func _add_xp(p: Dictionary, amount: int) -> int:
 		p["crates"] = int(p.get("crates", 0)) + 1
 	return ups
 
+## competitive rank points: 18 ranks (names/emblems in GS.RANKS)
+const RANK_RP := [0, 100, 200, 320, 450, 600, 780, 980, 1200, 1450, 1720, 2000, 2320, 2680, 3080, 3520, 4000, 4600]
+
+static func rp_delta(won: bool, kills: int, head: int, ranked: bool) -> int:
+	var d: int = (18 + mini(kills, 20) / 2 + (3 if head >= 5 else 0)) if won else -(14 - mini(kills, 12) / 2)
+	if not ranked:
+		d = d / 2
+	return d
+
 const SLOT_DEFAULT := {"ana": "ak47", "tabanca": "glock", "bicak": "knife", "bomba": "frag"}
 const DAY := 86400.0
 
@@ -267,6 +276,12 @@ static func _crate_add(p: Dictionary, t: String, n: int) -> void:
 
 static func _roll(p: Dictionary, cat: Dictionary, t: String) -> Dictionary:
 	var cd: Dictionary = cat["crates"][t]
+	# weapons first: crates are the main source of (mostly timed) weapons
+	var ws: Array = cd.get("weapons", [])
+	if ws.size() > 0 and randf() < float(cd.get("wchance", 0.0)):
+		var r2 := randf()
+		var days: int = 0 if r2 < 0.08 else (30 if r2 < 0.3 else (7 if r2 < 0.65 else 3))
+		return {"type": "weapon", "id": ws[randi() % ws.size()], "days": days}
 	var r := randf()
 	var epic_min: bool = t == "efsane"
 	if not epic_min and r < (0.3 if t == "sokak" else 0.18):
@@ -277,11 +292,6 @@ static func _roll(p: Dictionary, cat: Dictionary, t: String) -> Dictionary:
 	var parts: Array = cd.get("parts", [])
 	if parts.size() > 0 and randf() < (0.85 if t == "eklenti" else 0.12):
 		return {"type": "part", "id": parts[randi() % parts.size()]}
-	var ws: Array = cd.get("weapons", [])
-	if ws.size() > 0 and randf() < 0.14:
-		var r2 := randf()
-		var days: int = 0 if r2 < 0.15 else (30 if r2 < 0.45 else (7 if r2 < 0.8 else 3))
-		return {"type": "weapon", "id": ws[randi() % ws.size()], "days": days}
 	var chs: Array = cd.get("chars", [])
 	if chs.size() > 0 and randf() < 0.06:
 		return {"type": "char", "id": chs[randi() % chs.size()]}
@@ -363,6 +373,10 @@ static func _match_end(p: Dictionary, s: Dictionary, now: float) -> Dictionary:
 	var mats := {"demir": (randi_range(6, 14) + kills) if full else 0, "krom": randi_range(2, 6) if full and randf() < 0.75 else 0,
 		"titanyum": randi_range(1, 3) if full and randf() < 0.35 + (0.2 if won else 0.0) else 0, "kobalt": 1 if full and randf() < 0.12 + (0.1 if won else 0.0) else 0}
 	var ups := _add_xp(p, xp)
+	var rpd := rp_delta(won, kills, head, bool(s.get("ranked", false))) if full else 0
+	var rp_old := int(p.get("rp", 0))
+	p["rp"] = maxi(0, rp_old + rpd)
+	p["rp_peak"] = maxi(int(p.get("rp_peak", 0)), int(p["rp"]))
 	p["gold"] = _gold(p) + gold
 	for m in mats.keys():
 		p["mats"][m] = int(p["mats"].get(m, 0)) + int(mats[m])
@@ -381,7 +395,7 @@ static func _match_end(p: Dictionary, s: Dictionary, now: float) -> Dictionary:
 	if won:
 		st["wins"] = int(st["wins"]) + 1
 		ms["wins"] = int(ms.get("wins", 0)) + 1
-	return _ok({"xp": xp, "gold": gold, "mats": mats, "ups": ups, "won": won})
+	return _ok({"xp": xp, "gold": gold, "mats": mats, "ups": ups, "won": won, "rp": int(p["rp"]), "rp_old": rp_old, "rpd": int(p["rp"]) - rp_old})
 
 static func _sync(p: Dictionary, cat: Dictionary, s: Dictionary) -> void:
 	## cosmetic / loadout fields proposed by the client; every value is checked against ownership

@@ -28,6 +28,12 @@ var WEAPONS := {
 	"deagle": {"name": "Deagle .50", "cat": "tabanca", "cls": "Tabanca", "dmg": 54, "rpm": 210, "mag": 7, "reserve": 35, "reload": 1.9, "spread": 0.022, "ads_spread": 0.004, "move": 0.04, "recoil": 0.055, "hrec": 0.012, "auto": false, "range": 120.0, "speed": 1.05, "price": 1800, "snd": "shot_deagle", "zoom": 1.2, "head": 2.6},
 	"r870":   {"name": "870 Pompalı", "cat": "ana", "cls": "Pompalı", "dmg": 19, "rpm": 62, "mag": 6, "reserve": 30, "reload": 0.6, "spread": 0.068, "ads_spread": 0.05, "move": 0.02, "recoil": 0.075, "hrec": 0.02, "auto": false, "range": 45.0, "pellets": 8, "speed": 0.97, "price": 2800, "snd": "shot_shotgun", "zoom": 1.15, "head": 1.6, "shell_reload": true},
 	"fn502":  {"name": "FN 502 Taktik", "cat": "tabanca", "cls": "Tabanca", "dmg": 21, "rpm": 480, "mag": 15, "reserve": 60, "reload": 1.5, "spread": 0.017, "ads_spread": 0.004, "move": 0.012, "recoil": 0.014, "hrec": 0.005, "auto": false, "range": 75.0, "speed": 1.08, "price": 1400, "snd": "shot_pistol", "zoom": 1.2, "head": 2.5, "silenced": true},
+	"m1911":  {"name": "M1911 Susturuculu", "cat": "tabanca", "cls": "Tabanca", "dmg": 31, "rpm": 380, "mag": 8, "reserve": 48, "reload": 1.7, "spread": 0.016, "ads_spread": 0.003, "move": 0.012, "recoil": 0.024, "hrec": 0.007, "auto": false, "range": 70.0, "speed": 1.07, "price": 1900, "snd": "shot_pistol", "zoom": 1.2, "head": 2.6, "silenced": true},
+	"vityaz": {"name": "PP-19 Vityaz", "cat": "ana", "cls": "Hafif Makinalı", "dmg": 22, "rpm": 820, "mag": 30, "reserve": 150, "reload": 2.1, "spread": 0.025, "ads_spread": 0.006, "move": 0.02, "recoil": 0.011, "hrec": 0.007, "auto": true, "range": 85.0, "speed": 1.05, "price": 2700, "snd": "shot_smg", "zoom": 1.2, "head": 2.2},
+	"rpk16":  {"name": "RPK-16", "cat": "ana", "cls": "Ağır Makinalı", "dmg": 31, "rpm": 700, "mag": 95, "reserve": 190, "reload": 4.6, "spread": 0.031, "ads_spread": 0.006, "move": 0.07, "recoil": 0.018, "hrec": 0.01, "auto": true, "range": 175.0, "speed": 0.86, "price": 5600, "snd": "shot_ak", "zoom": 1.45, "head": 2.4},
+	"awm":    {"name": "AWM", "cat": "ana", "cls": "Nişancı", "dmg": 135, "rpm": 38, "mag": 5, "reserve": 20, "reload": 3.6, "spread": 0.09, "ads_spread": 0.0002, "move": 0.13, "recoil": 0.09, "hrec": 0.01, "auto": false, "range": 450.0, "scope": true, "zoom": 5.5, "speed": 0.84, "price": 6500, "snd": "shot_sniper", "head": 3.2, "bolt": true},
+	"uzi":    {"name": "Micro UZI", "cat": "ana", "cls": "Hafif Makinalı", "dmg": 18, "rpm": 1200, "mag": 32, "reserve": 160, "reload": 1.8, "spread": 0.032, "ads_spread": 0.011, "move": 0.012, "recoil": 0.009, "hrec": 0.011, "auto": true, "range": 55.0, "speed": 1.1, "price": 2100, "snd": "shot_smg", "zoom": 1.15, "head": 2.0},
+	"kuzgun": {"name": "BR-7 Kuzgun", "cat": "ana", "cls": "Savaş Tüfeği", "dmg": 36, "rpm": 900, "mag": 36, "reserve": 144, "reload": 2.5, "spread": 0.02, "ads_spread": 0.002, "move": 0.045, "recoil": 0.016, "hrec": 0.006, "auto": false, "burst": 3, "burst_delay": 0.32, "range": 220.0, "speed": 0.95, "price": 5200, "snd": "shot_m4", "zoom": 2.0, "head": 2.5},
 	"knife":  {"name": "Savaş Bıçağı", "cat": "bicak", "cls": "Bıçak", "dmg": 55, "rpm": 110, "melee": true, "speed": 1.15, "price": 0, "head": 1.0},
 	"karambit": {"name": "Karambit", "cat": "bicak", "cls": "Bıçak", "dmg": 60, "rpm": 130, "melee": true, "speed": 1.17, "price": 2000, "head": 1.0},
 	"frag":   {"name": "El Bombası MK3", "cat": "bomba", "cls": "Bomba", "dmg": 130, "count": 2, "throwable": true, "speed": 1.1, "price": 0, "head": 1.0},
@@ -50,18 +56,32 @@ var SKINS := {
 	"turkuaz": {"name": "Turkuaz Altın", "price": 3200, "rarity": 2},
 	"buz": {"name": "Buz Kristali", "price": 4200, "rarity": 3},
 	"lav": {"name": "Lav Akıntısı", "price": 4800, "rarity": 3},
+	"col": {"name": "Çöl Fırtınası", "price": 700, "rarity": 0},
+	"kan": {"name": "Kan Kırmızı Karbon", "price": 1600, "rarity": 1},
+	"lale": {"name": "Lale Devri", "price": 1900, "rarity": 1},
+	"okyanus": {"name": "Derin Okyanus", "price": 2100, "rarity": 1},
+	"siber": {"name": "Siber Neon", "price": 2800, "rarity": 2},
+	"nazar": {"name": "Nazar", "price": 2900, "rarity": 2},
+	"ejder": {"name": "Ejderha Pulu", "price": 3400, "rarity": 2},
+	"kehribar": {"name": "Kehribar", "price": 3600, "rarity": 2},
+	"zumrut": {"name": "Zümrüt", "price": 4400, "rarity": 3},
+	"mermer": {"name": "Marmara Mermeri", "price": 4600, "rarity": 3},
+	"aurora": {"name": "Kuzey Işığı", "price": 5200, "rarity": 3},
+	"ayyildiz": {"name": "Ay Yıldız", "price": 5500, "rarity": 3},
 }
 var CRATES := {
 	"sokak": {"name": "Sokak Kasası", "price": 1000, "color": Color("ff8a1f"), "desc": "Her şeyden biraz: malzeme, altın, stiller.",
-		"skins": ["kamuflaj", "kar", "dijital", "gece", "neon", "kizil", "galaksi", "altin"], "weapons": [], "chars": []},
-	"operasyon": {"name": "Operasyon Kasası", "price": 2000, "color": Color("4fb3ff"), "desc": "Taktik stiller ve yeni silah şansı (AUG, Vector, SCAR-H, UMP-45).",
-		"skins": ["dijital", "karbon", "kar", "kamuflaj", "gece", "buz"], "weapons": ["aug", "vector", "scar", "ump45", "m4a1", "p90", "r870", "fn502"], "chars": ["asker2", "asker3"]},
+		"skins": ["kamuflaj", "kar", "dijital", "gece", "neon", "kizil", "galaksi", "altin", "col", "kan", "okyanus", "siber"], "weapons": ["mp5", "ump45", "p90", "fn502", "deagle", "spas", "kar98"], "wchance": 0.2, "chars": []},
+	"silah": {"name": "Silah Kasası", "price": 1800, "color": Color("ff4d5e"), "desc": "Her açılışta yüksek silah şansı! Süreli (3/7/30 gün) veya nadiren SÜRESİZ silahlar.",
+		"skins": ["kamuflaj", "dijital", "karbon", "kizil"], "weapons": ["m4a1", "scar", "aug", "vector", "ump45", "p90", "vityaz", "rpk16", "m249", "awp", "awm", "kar98", "r870", "spas", "deagle", "revolver", "m1911", "fn502", "uzi", "kuzgun"], "wchance": 0.62, "chars": []},
+	"operasyon": {"name": "Operasyon Kasası", "price": 2000, "color": Color("4fb3ff"), "desc": "Taktik stiller ve %38 silah şansı (AUG, Vector, Vityaz, UZI...). Kasa silahları süreli gelir.",
+		"skins": ["dijital", "karbon", "kar", "kamuflaj", "gece", "buz", "col", "kan", "siber", "okyanus"], "weapons": ["aug", "vector", "scar", "ump45", "m4a1", "p90", "r870", "fn502", "vityaz", "m1911", "uzi"], "wchance": 0.38, "chars": ["asker2", "asker3"]},
 	"eklenti": {"name": "Eklenti Paketi", "price": 1500, "color": Color("7dff6a"), "desc": "Silah eklentileri: susturucu, nişangah, şarjör, tutamak, lazer.",
 		"skins": ["karbon", "dijital"], "weapons": [], "chars": [], "parts": ["sus", "kompen", "optik", "sarjor", "tutamak", "lazer"]},
 	"osmanli": {"name": "Osmanlı Kasası", "price": 2500, "color": Color("2fb6a8"), "desc": "Çini ve turkuaz desenler, Magnum ve Patron karakteri şansı.",
-		"skins": ["cini", "turkuaz", "altin", "kizil", "neon"], "weapons": ["revolver", "deagle", "karambit"], "chars": ["patron", "kapson"]},
+		"skins": ["cini", "turkuaz", "altin", "kizil", "neon", "lale", "nazar", "mermer", "ayyildiz", "kehribar"], "weapons": ["revolver", "deagle", "karambit", "m1911"], "wchance": 0.32, "chars": ["patron", "kapson"]},
 	"efsane": {"name": "Efsane Kasası", "price": 5000, "color": Color("ffb02e"), "desc": "En az Epik garantili! Lav, Buz, Galaksi, Altın.",
-		"skins": ["lav", "buz", "galaksi", "altin", "cini", "turkuaz"], "weapons": ["awp", "scar", "m249"], "chars": ["kot", "patron", "asker2"], "parts": ["sus", "optik", "sarjor"]},
+		"skins": ["lav", "buz", "galaksi", "altin", "cini", "turkuaz", "zumrut", "mermer", "aurora", "ayyildiz", "ejder", "kehribar"], "weapons": ["awp", "awm", "scar", "m249", "rpk16", "kuzgun"], "wchance": 0.4, "chars": ["kot", "patron", "asker2"], "parts": ["sus", "optik", "sarjor"]},
 }
 const RARITY_NAMES := ["Sıradan", "Nadir", "Epik", "Efsanevi"]
 const RARITY_COLORS := [Color("9aa4ad"), Color("3b8cff"), Color("b04bff"), Color("ffb02e")]
@@ -80,6 +100,12 @@ const BALLISTICS := {
 	"vector": {"ap": 0.1, "pen": 0.0, "f0": 10.0, "f1": 30.0, "fmin": 0.55, "limb": 0.85, "ability": "Dakikada 1150 atış: yakın mesafenin kralı"},
 	"r870":   {"ap": 0.1, "pen": 0.0, "f0": 7.0, "f1": 26.0, "fmin": 0.25, "limb": 0.9, "ability": "Sıkı saçma: pompalılar arasında en uzun menzil"},
 	"fn502":  {"ap": 0.15, "pen": 0.0, "f0": 14.0, "f1": 40.0, "fmin": 0.65, "limb": 0.8, "ability": "Namlu ucu susturuculu: haritada görünmezsin"},
+	"m1911":  {"ap": 0.3, "pen": 0.05, "f0": 14.0, "f1": 40.0, "fmin": 0.65, "limb": 0.8, "ability": ".45 ACP ve susturucu: sessiz ve ağır vuruş"},
+	"vityaz": {"ap": 0.2, "pen": 0.05, "f0": 14.0, "f1": 45.0, "fmin": 0.6, "limb": 0.8, "ability": "Rus SMG: düşük geri tepme, hızlı şarjör"},
+	"rpk16":  {"ap": 0.5, "pen": 0.35, "f0": 30.0, "f1": 95.0, "fmin": 0.72, "limb": 0.8, "abil": "suppress", "ability": "95'lik tambur + holografik nişangah: bastırma ateşi"},
+	"awm":    {"ap": 1.0, "pen": 0.75, "f0": 450.0, "f1": 550.0, "fmin": 1.0, "limb": 0.85, "ability": ".338 Magnum: her yerden tek atış, kalın duvar deler"},
+	"uzi":    {"ap": 0.1, "pen": 0.0, "f0": 9.0, "f1": 28.0, "fmin": 0.55, "limb": 0.85, "ability": "Cep makinalısı: en hızlı koşu, dakikada 1200 atış"},
+	"kuzgun": {"ap": 0.55, "pen": 0.3, "f0": 40.0, "f1": 120.0, "fmin": 0.75, "limb": 0.8, "ability": "3'lü seri atış + 2x dürbün: orta mesafede 1 seriyle kafadan öldürür"},
 	"spas":   {"ap": 0.1, "pen": 0.0, "f0": 6.0, "f1": 22.0, "fmin": 0.22, "limb": 0.9, "ability": "Yakın mesafede tek atışta öldürür"},
 	"awp":    {"ap": 0.95, "pen": 0.65, "f0": 400.0, "f1": 500.0, "fmin": 1.0, "limb": 0.85, "ability": "Gövdeden tek atış, duvar deler"},
 	"kar98":  {"ap": 0.85, "pen": 0.5, "f0": 400.0, "f1": 500.0, "fmin": 1.0, "limb": 0.8, "ability": "Hızlı sürgü, kafadan kesin ölüm"},
@@ -338,6 +364,8 @@ var MAPS := {
 	"safranbolu": {"name": "Safranbolu", "desc": "Osmanlı konakları, Arasta çarşısı ve teraslar. Çok katmanlı çatışma.", "size": "Büyük"},
 	"gemi": {"name": "Gemi", "desc": "Gün batımında Marmara'da yük gemisi. Konteyner koridorları.", "size": "Orta"},
 	"liman": {"name": "Liman Deposu", "desc": "Sisli sabah, konteyner sahası ve depo. Nişancı dostu.", "size": "Büyük"},
+	"insaat": {"name": "İnşaat", "desc": "Yarım kalmış 3 katlı beton bina, vinç ve şantiye. Küçük ve hızlı, yakın çatışma.", "size": "Küçük"},
+	"canakkale": {"name": "Çanakkale", "desc": "Boğaz kıyısında taş tabya, top mevzileri ve siper hattı. Gün batımında destansı çatışma.", "size": "Büyük"},
 }
 var MODES := {
 	"ffa": {"name": "Ölüm Maçı", "desc": "Herkes herkese karşı. En çok öldüren kazanır.", "teams": false},
@@ -349,7 +377,7 @@ var MODES := {
 }
 const TEAMS := {"a": "KARTAL", "b": "AKREP"}
 const TEAM_COLORS := {"a": Color("3d8bff"), "b": Color("ff4d3d")}
-const GUNGAME_ORDER := ["glock", "deagle", "mp5", "p90", "spas", "m4a1", "ak47", "kar98", "awp", "knife"]
+const GUNGAME_ORDER := ["glock", "deagle", "uzi", "mp5", "vityaz", "spas", "m4a1", "ak47", "kuzgun", "kar98", "awm", "knife"]
 
 var CHARACTERS := {
 	"takim": {"name": "Ajan", "desc": "Takım elbiseli şehir ajanı", "team": "a", "price": 0},
@@ -500,7 +528,7 @@ func catalog() -> Dictionary:
 	var cr := {}
 	for id in CRATES.keys():
 		var c: Dictionary = CRATES[id]
-		cr[id] = {"price": int(c["price"]), "skins": c.get("skins", []), "weapons": c.get("weapons", []), "chars": c.get("chars", []), "parts": c.get("parts", [])}
+		cr[id] = {"price": int(c["price"]), "skins": c.get("skins", []), "weapons": c.get("weapons", []), "chars": c.get("chars", []), "parts": c.get("parts", []), "wchance": float(c.get("wchance", 0.0))}
 	var ch := {}
 	for id in CHARACTERS.keys():
 		ch[id] = {"price": int(CHARACTERS[id]["price"])}
@@ -559,6 +587,27 @@ func wtime_label(id: String) -> String:
 	if t >= 3600.0:
 		return "%d SAAT" % int(ceil(t / 3600.0))
 	return "%d DK" % int(ceil(t / 60.0))
+
+# ---------------------------------------------------------------- competitive rank
+const RANKS := ["Er I", "Er II", "Er III", "Onbaşı I", "Onbaşı II", "Çavuş I", "Çavuş II", "Astsubay I", "Astsubay II",
+	"Teğmen", "Üsteğmen", "Yüzbaşı", "Binbaşı", "Yarbay", "Albay", "Tuğgeneral", "Korgeneral", "Mareşal"]
+const RANK_COLORS := [Color("c48a5a"), Color("c48a5a"), Color("c48a5a"), Color("c3ccd8"), Color("c3ccd8"), Color("f0be4a"), Color("f0be4a"), Color("f0be4a"), Color("f0be4a"),
+	Color("4fd8cc"), Color("4fd8cc"), Color("4fd8cc"), Color("b27cff"), Color("b27cff"), Color("b27cff"), Color("ff5a4a"), Color("ff5a4a"), Color("ffc43a")]
+
+func rank_index(rp: int) -> int:
+	var i := 0
+	for k in Econ.RANK_RP.size():
+		if rp >= int(Econ.RANK_RP[k]):
+			i = k
+	return i
+
+func rank_info(rp: int) -> Dictionary:
+	var i := rank_index(rp)
+	var lo: int = Econ.RANK_RP[i]
+	var hi: int = Econ.RANK_RP[i + 1] if i + 1 < Econ.RANK_RP.size() else lo
+	return {"i": i, "name": RANKS[i], "color": RANK_COLORS[i], "lo": lo, "hi": hi, "rp": rp,
+		"prog": 1.0 if hi == lo else clampf(float(rp - lo) / float(hi - lo), 0.0, 1.0),
+		"icon": load("res://assets/ui/ranks/r%d.png" % i)}
 
 func wskin(id: String) -> String:
 	return str(profile["owned"][id]["skin"]) if owned(id) else "std"
@@ -620,7 +669,7 @@ func default_settings() -> Dictionary:
 		"quality": "ultra", "resolution_scale": 1.0, "upscaler": "fsr2", "fullscreen": true, "vsync": false, "fps_cap": 0,
 		"msaa": 2, "taa": false, "fxaa": true, "shadows": 3, "ssao": true, "ssil": true, "ssr": true, "sdfgi": false, "glow": true, "volumetric": true,
 		"motion_blur": false, "draw_distance": 1.0, "sharpen": 0.3, "brightness": 1.0, "show_fps": true, "announcer": true,
-		"vol_master": 0.8, "vol_sfx": 1.0, "vol_music": 0.5, "vol_amb": 0.6,
+		"vol_master": 0.8, "vol_sfx": 1.0, "vol_music": 0.5, "vol_amb": 0.6, "vol_voice": 1.0, "voice_on": true,
 		"xh_style": 0, "xh_color": "3dff8a", "xh_size": 7.0, "xh_gap": 5.0, "xh_thick": 2.0, "xh_dot": false, "xh_outline": true, "xh_dynamic": true, "xh_alpha": 1.0,
 		"hit_marker": true, "kill_feed": true, "blood": true, "minimap": true, "damage_numbers": true,
 		"binds": {},
@@ -716,13 +765,13 @@ func _set_bus(n: String, v: float) -> void:
 const DEFAULT_BINDS := {
 	"move_forward": [KEY_W], "move_back": [KEY_S], "move_left": [KEY_A], "move_right": [KEY_D],
 	"jump": [KEY_SPACE], "crouch": [KEY_CTRL, KEY_C], "walk": [KEY_SHIFT], "reload": [KEY_R], "use": [KEY_E],
-	"slot1": [KEY_1], "slot2": [KEY_2], "slot3": [KEY_3], "slot4": [KEY_4], "grenade": [KEY_G], "inspect": [KEY_F],
+	"slot1": [KEY_1], "slot2": [KEY_2], "slot3": [KEY_3], "slot4": [KEY_4], "grenade": [KEY_G], "inspect": [KEY_F], "voice": [KEY_V], "team_chat": [KEY_Y],
 	"scoreboard": [KEY_TAB], "pause": [KEY_ESCAPE], "chat": [KEY_T], "last_weapon": [KEY_Q], "buy_menu": [KEY_B],
 }
 const BIND_NAMES := {
 	"move_forward": "İleri", "move_back": "Geri", "move_left": "Sol", "move_right": "Sağ", "jump": "Zıpla", "crouch": "Eğil",
 	"walk": "Yürü (sessiz)", "reload": "Şarjör Değiştir", "use": "Kullan", "slot1": "Ana Silah", "slot2": "Tabanca", "slot3": "Bıçak",
-	"slot4": "Bomba", "grenade": "Hızlı Bomba", "inspect": "Silahı İncele", "scoreboard": "Skor Tablosu", "last_weapon": "Son Silah", "buy_menu": "Silah Menüsü",
+	"slot4": "Bomba", "grenade": "Hızlı Bomba", "inspect": "Silahı İncele", "voice": "Sesli Konuş (bas-konuş)", "team_chat": "Takım Sohbeti", "chat": "Sohbet", "scoreboard": "Skor Tablosu", "last_weapon": "Son Silah", "buy_menu": "Silah Menüsü",
 }
 
 func setup_input() -> void:

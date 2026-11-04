@@ -280,10 +280,10 @@ func _bot_weapon(gg: int) -> String:
 		"knife":
 			return "knife" if randf() < 0.6 else "karambit"
 		"sniper":
-			return "awp" if randf() < 0.5 else "kar98"
+			return ["awp", "kar98", "awm"][randi() % 3]
 		"gungame":
 			return GS.GUNGAME_ORDER[min(gg, GS.GUNGAME_ORDER.size() - 1)]
-	var pool := ["ak47", "ak47", "m4a1", "m4a1", "scar", "aug", "vector", "m249", "mp5", "p90", "ump45", "spas", "awp", "kar98", "deagle", "revolver"]
+	var pool := ["ak47", "ak47", "m4a1", "m4a1", "scar", "aug", "vector", "m249", "mp5", "p90", "ump45", "spas", "awp", "kar98", "deagle", "revolver", "vityaz", "rpk16", "r870", "m1911", "fn502", "awm", "uzi", "kuzgun"]
 	return pool[randi() % pool.size()]
 
 var env_exp := 1.0
@@ -542,6 +542,14 @@ func _process(delta: float) -> void:
 			end_match()
 
 func _unhandled_input(e: InputEvent) -> void:
+	# text chat (T = everyone, Y = team) and push-to-talk voice (V, online only)
+	if hud and not hud.typing and not paused and not ended and (e.is_action_pressed("chat") or e.is_action_pressed("team_chat")):
+		hud.open_chat(e.is_action_pressed("team_chat"))
+		get_viewport().set_input_as_handled()
+		return
+	if net and e.is_action("voice") and not (hud and hud.typing):
+		Voice.enabled = bool(GS.settings.get("voice_on", true))
+		Voice.set_talking(e.is_pressed())
 	if e.is_action_pressed("pause") and not ended and player != null:
 		if hud and hud.buy_open:
 			hud.toggle_buy(false)
@@ -889,7 +897,8 @@ func end_match() -> void:
 		won = sorted[0]["node"] == player
 	var place := sorted.find(pe) + 1
 	var summary := {"mode": mode, "kills": int(pe["kills"]), "head": int(pe["head"]), "deaths": int(pe["deaths"]), "won": won, "place": place,
-		"shots": int(player.shots_fired) if player else 0, "hits": int(player.shots_hit) if player else 0, "online": net != null}
+		"shots": int(player.shots_fired) if player else 0, "hits": int(player.shots_hit) if player else 0, "online": net != null,
+		"ranked": net != null and bool(cfg.get("ranked", false))}
 	var rr: Dictionary = await GS.act("match_end", summary)
 	var rw: Dictionary = rr.get("res", {})
 	var xp: int = int(rw.get("xp", 0))
@@ -901,9 +910,11 @@ func end_match() -> void:
 	SFX.play("success" if won else "fail")
 	SFX.play_music("music_win" if won else "music_lose", -3, false)
 	if hud and bool(GS.settings.get("announcer", true)): hud._announce("ann_win" if won else "ann_lose")
-	hud.show_end({"won": won, "place": place, "xp": xp, "gold": gold, "mats": mats, "ups": ups, "sorted": sorted, "pe": pe})
+	hud.show_end({"won": won, "place": place, "xp": xp, "gold": gold, "mats": mats, "ups": ups, "sorted": sorted, "pe": pe,
+		"rp": int(rw.get("rp", GS.profile.get("rp", 0))), "rp_old": int(rw.get("rp_old", GS.profile.get("rp", 0))), "ranked": bool(summary["ranked"])})
 
 func leave() -> void:
+	Voice.clear()
 	SFX.stop_amb()
 	SFX.clear_world()
 	if net and Net.active():
@@ -983,6 +994,7 @@ func test_hook(i: int) -> void:
 		hud.kill_feed("Tilki", "Bora", "awp", false, "b", "a", false, false)
 		hud.kill_feed("Efsane06", "Oyuncu", "r870", false, "b", "a", false, true)
 		hud.kill_feed("Çelik", "GeceKurdu", "knife", false, "a", "b", false, false)
+		hud.kill_confirm(true, "", 1, player.cur, 3)
 		player.inspect_t = 3.2 * (1.0 - float(OS.get_environment("INSP_T")) if OS.has_environment("INSP_T") else 0.6)
 		hud.inspect_card(player.cur)
 	elif i == 15:

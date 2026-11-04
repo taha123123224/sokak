@@ -43,12 +43,51 @@ SPECS = {
                  parts={'pump': ['pump']}),
 }
 
+M19 = '/home/claude/ext3d/new/m1911/tex2k/m1911_'
+NEW = '/home/claude/ext3d/new'
+SPECS.update({
+    'vityaz': dict(file=NEW + '/5cc142c0-PP-19-01_Vityaz/scene.usdc', axis='Y', flip=True, real=0.70,
+                   rhand=(-0.073, -0.042), muzzle=(0.350, 0.0025), sight=(0.131, 0.0465), lhand=(0.2156, -0.0035), eject=(0.054, 0.016),
+                   keep_mats=True, drop_above=0.15, parts_mat={'mag': ['pp19mag']}),
+    'rpk16': dict(file=NEW + '/b9d78480-RPK-16/scene.usdc', axis='X', real=1.02,
+                  rhand=(0.097, 0.020), muzzle=(6.103, 0.502), sight=(1.40, 1.16), lhand=(2.82, 0.344), eject=(1.437, 0.53),
+                  keep_mats=True, mat_pbr={'mat0': (0.55, 0.35), 'mat0_001': (0.5, 0.5), 'mat0_002': (0.45, 0.45), 'mat0_004': (0.4, 0.6)},
+                  parts={'mag': ['Mag_']}),
+    'm1911': dict(file=NEW + '/m1911/source/1911 Sketchfab/m1911.fbx', axis='Y', real=0.362,
+                  rhand=(-0.0574, 0.0122), muzzle=(0.2408, 0.042), sight=(-0.077, 0.058), lhand=(-0.07, -0.06), eject=(-0.0176, 0.038),
+                  tex={'Mat_pistol': (M19 + 'pistol_albedo.png', M19 + 'pistol_normal.png', M19 + 'pistol_roughness.png', M19 + 'pistol_metallic.png'),
+                       'Mat_silencer': (M19 + 'silencer_albedo.png', M19 + 'silencer_normal.png', M19 + 'silencer_roughness.png', M19 + 'silencer_metallic.png')},
+                  drop=['Round_', 'Shell_'], parts={'slide': ['Shutter_lowTris'], 'mag': ['Magazine_', 'MagFollower_']}),
+})
+
+BR = NEW + '/br55/restyle/br_'
+SPECS.update({
+    'awm': dict(file=NEW + '/8aaf24d0-Sniper/scene.usdc', axis='Y', flip=True, real=1.20,
+                rhand=(0.237, 0.453), muzzle=(11.873, 1.030), sight=(2.201, 1.803), lhand=(4.655, 0.662), eject=(1.587, 1.092),
+                keep_mats=True, parts={'mag': ['mag_sniper', 'bullet_sniper'], 'bolt': ['bolt_sniper', 'boltback_sniper']}),
+    'glock': dict(file=NEW + '/0dfb7aa7-Pistol_9mm_-_semi_auto/scene.usdc', axis='Y', real=0.19,
+                  rhand=(-0.0809, 0.0253), muzzle=(0.1254, 0.0675), sight=(-0.098, 0.0839), lhand=(-0.09, -0.05), eject=(0.0202, 0.0698),
+                  keep_mats=True, drop=['Bullet'], parts={'slide': ['GL_Slide_'], 'mag': ['GL_Magazine', 'GL_Follower']}),
+    'spas': dict(file=NEW + '/933e0750-Shotgun/scene.usdc', axis='Y', flip=True, real=0.86,
+                 rhand=(0.199, 0.267), muzzle=(11.132, 1.206), sight=(3.671, 1.534), lhand=(5.923, 0.783), eject=(3.296, 0.971),
+                 keep_mats=True, drop=['slug_'], parts={'pump': ['pump_shotgun']}),
+    'uzi': dict(file=NEW + '/14cb0444-Low_Poly_Uzi/scene.usdc', axis='Y', flip=True, real=0.30,
+                rhand=(-0.0412, 0.0808), muzzle=(0.2203, 0.1648), sight=(-0.165, 0.223), lhand=(0.0888, 0.132), eject=(-0.0019, 0.2018),
+                keep_mats=True, drop=['SubMachineGun_Shell']),
+    'kuzgun': dict(file=NEW + '/br55/source/BR55 combined.fbx', axis='Y', flip=True, real=0.90,
+                   rhand=(-0.1466, -0.0549), muzzle=(0.531, 0.0107), sight=(-0.0035, 0.126), lhand=(0.207, -0.055), eject=(-0.0035, 0.004),
+                   tex_all=(BR + 'bc.png', BR + 'normal.png', BR + 'roughness.png', BR + 'metallic.png')),
+})
+
 
 def load(spec):
     for o in list(bpy.data.objects):
         bpy.data.objects.remove(o)
     f = spec['file']
-    if f.endswith('.blend'):
+    if f.endswith('.usdc') or f.endswith('.usdz'):
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        bpy.ops.wm.usd_import(filepath=f)
+    elif f.endswith('.blend'):
         bpy.ops.wm.open_mainfile(filepath=f, load_ui=False, use_scripts=False)
         for o in list(bpy.data.objects):
             if o.type != 'MESH':
@@ -69,6 +108,16 @@ def load(spec):
     for o in list(bpy.data.objects):
         if o.type != 'MESH':
             bpy.data.objects.remove(o)
+    meshes = [o for o in bpy.data.objects if o.type == 'MESH']
+    for o in list(meshes):
+        cz = sum((v.co.z for v in o.data.vertices)) / max(len(o.data.vertices), 1)
+        if any(o.name.startswith(d) for d in spec.get('drop', [])) or ('drop_above' in spec and cz > spec['drop_above']):
+            meshes.remove(o); bpy.data.objects.remove(o)
+    if spec.get('flip'):
+        # muzzle points to -long: turn the model 180 deg about the up axis
+        for o in meshes:
+            for v in o.data.vertices:
+                v.co.x = -v.co.x; v.co.y = -v.co.y
     return meshes
 
 
@@ -161,10 +210,38 @@ def build(wid):
                     if nm not in bpy.data.materials:
                         make_mat(nm, flat=spec['flat_mat'][key])
                     slot.material = bpy.data.materials[nm]
+    if 'tex_all' in spec:
+        nm = 'gun_paint_ext_%s_0' % wid
+        make_mat(nm, spec['tex_all'])
+        for o in meshes:
+            o.data.materials.clear(); o.data.materials.append(bpy.data.materials[nm])
+    if spec.get('keep_mats'):
+        names = []
+        for o in meshes:
+            for slot in o.material_slots:
+                m = slot.material
+                if m is None or m.name.startswith('gun_paint_ext_'):
+                    continue
+                key = m.name
+                if key not in names:
+                    names.append(key)
+                nm = 'gun_paint_ext_%s_%d' % (wid, names.index(key))
+                if nm not in bpy.data.materials:
+                    m2 = m.copy(); m2.name = nm
+                    pbr = spec.get('mat_pbr', {}).get(key)
+                    if pbr and m2.node_tree:
+                        b = m2.node_tree.nodes.get('Principled BSDF') or next((n for n in m2.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+                        if b:
+                            b.inputs['Roughness'].default_value = pbr[0]; b.inputs['Metallic'].default_value = pbr[1]
+                slot.material = bpy.data.materials[nm]
+                slot.material['src'] = key
     # ---- moving parts
     groups = {}
+    if 'parts_mat' in spec:
+        for part, mats in spec['parts_mat'].items():
+            groups[part] = [o for o in meshes if any((sl.material and sl.material.get('src', sl.material.name) in mats) for sl in o.material_slots)]
     if 'parts' in spec:
-        for part, names in spec['parts'].items():
+        for part, names in spec['parts'].items():  # noqa
             groups[part] = [o for o in meshes if any(o.name.startswith(nm.strip()) or o.name.strip() == nm.strip() for nm in names)]
     if 'split_mag' in spec:
         (y0, y1), (z0, z1) = spec['split_mag']

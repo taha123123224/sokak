@@ -60,6 +60,10 @@ func send(m: Dictionary) -> void:
 	if ws and _open:
 		ws.send_text(JSON.stringify(m))
 
+func send_binary(b: PackedByteArray) -> void:
+	if ws and _open:
+		ws.send(b, WebSocketPeer.WRITE_MODE_BINARY)
+
 func send_to(id: String, m: Dictionary) -> void:
 	m["to"] = id
 	send(m)
@@ -79,6 +83,9 @@ func _process(delta: float) -> void:
 			send({"t": "ping", "ts": Time.get_ticks_msec()})
 		while ws.get_available_packet_count() > 0:
 			var pkt := ws.get_packet()
+			if not ws.was_string_packet():
+				Voice.on_packet(pkt)
+				continue
 			var d = JSON.parse_string(pkt.get_string_from_utf8())
 			if d is Dictionary:
 				_handle(d)

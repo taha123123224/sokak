@@ -53,6 +53,31 @@ var DEFS := {
 	"rooftiles": ["rooftiles", 0.9, Color(1, 1, 1), -1, 0, {}],
 	"stonewall": ["stonewall", 0.62, Color(1.05, 1.02, 0.97), -1, 0, {}],
 	"grass": ["grass", 0.25, Color(1, 1, 1), -1, 0, {}],
+	# İnşaat / Çanakkale
+	"site_dirt": ["concrete", 0.22, Color(0.6, 0.53, 0.44), 0.97, 0, {}],
+	"gravel": ["cobble", 1.6, Color(0.72, 0.7, 0.66), 0.95, 0, {}],
+	"sand": ["concrete", 0.6, Color(0.95, 0.82, 0.6), 0.98, 0, {}],
+	"rebar_rust": ["paintmetal", 2.0, Color(0.5, 0.28, 0.16), 0.75, 0.6, {}],
+	"crane_yellow": ["paintmetal", 0.8, Color(1.0, 0.72, 0.08), 0.5, 0.3, {}],
+	"scaffold_net": ["", 1.0, Color(0.08, 0.26, 0.16, 0.8), 0.9, 0, {"cull": false}],
+	"fence_mesh": ["corrugated", 2.0, Color(0.7, 0.72, 0.74), 0.4, 0.8, {}],
+	"fence_banner": ["", 1.0, Color(0.08, 0.3, 0.55), 0.75, 0, {"cull": false}],
+	"mixer_white": ["paintmetal", 0.6, Color(0.92, 0.92, 0.9), 0.35, 0.3, {}],
+	"mixer_drum": ["paintmetal", 0.6, Color(0.95, 0.45, 0.06), 0.4, 0.3, {}],
+	"site_sign": ["", 1.0, Color(0.98, 0.76, 0.08), 0.5, 0, {}],
+	"cone_orange": ["", 1.0, Color(1.0, 0.36, 0.04), 0.5, 0, {}],
+	"cone_white": ["", 1.0, Color(0.95, 0.95, 0.95), 0.4, 0, {}],
+	"stripe_red": ["", 1.0, Color(0.8, 0.08, 0.06), 0.5, 0, {}],
+	"cable_black": ["", 1.0, Color(0.04, 0.04, 0.04), 0.6, 0, {}],
+	"dry_grass": ["grass", 0.3, Color(0.92, 0.88, 0.58), 0.95, 0, {}],
+	"path_dirt": ["concrete", 0.25, Color(0.72, 0.58, 0.42), 0.97, 0, {}],
+	"cliff_rock": ["stonewall", 0.35, Color(0.85, 0.8, 0.7), 0.9, 0, {}],
+	"far_hills": ["grass", 0.02, Color(0.6, 0.65, 0.48), 0.95, 0, {}],
+	"fort_stone": ["stonewall", 1.3, Color(0.98, 0.93, 0.82), -1, 0, {}],
+	"earth": ["concrete", 0.5, Color(0.5, 0.43, 0.34), 0.98, 0, {}],
+	"cannon_iron": ["paintmetal", 1.5, Color(0.16, 0.16, 0.17), 0.45, 0.85, {}],
+	"canvas": ["cloth_cotton", 0.8, Color(0.75, 0.7, 0.55), 0.9, 0, {"cull": false}],
+	"rock": ["stonewall", 0.8, Color(0.8, 0.76, 0.7), 0.9, 0, {}],
 	"dirt": ["concrete", 0.3, Color(0.6, 0.5, 0.38), 0.95, 0, {}],
 	"marble": ["concrete", 0.3, Color(1.25, 1.22, 1.18), 0.35, 0, {}],
 	"glass_window": ["", 1.0, Color(0.1, 0.13, 0.16), 0.04, 0.3, {"spec": 0.9}],
@@ -254,10 +279,7 @@ func get_mat(name: String) -> Material:
 		m = build(DEFS[name])
 		_tone(name, m)
 	else:
-		var s := StandardMaterial3D.new()
-		s.albedo_color = Color(0.7, 0.7, 0.7)
-		s.roughness = 0.8
-		m = s
+		m = null      # unknown name: keep the model's own (coloured) material instead of flat grey
 	cache[name] = m
 	return m
 
@@ -455,10 +477,13 @@ func skin_mat(skin: String) -> Material:
 		s.metallic = 0.15
 		s.uv1_scale = Vector3(0.6, 0.6, 0.6)
 		s.clearcoat_enabled = true; s.clearcoat = 0.5; s.clearcoat_roughness = 0.2
-		if skin == "gece" or skin == "galaksi" or skin == "lav":
+		if skin in ["gece", "galaksi", "lav", "aurora", "siber"]:
 			s.emission_enabled = true
 			s.emission_texture = s.albedo_texture
-			s.emission_energy_multiplier = {"galaksi": 0.35, "gece": 0.2, "lav": 1.2}[skin]
+			s.emission_energy_multiplier = {"galaksi": 0.35, "gece": 0.2, "lav": 1.2, "aurora": 0.6, "siber": 1.4}[skin]
+		if skin in ["zumrut", "nazar", "kehribar", "mermer", "okyanus", "ayyildiz", "kan", "ejder"]:
+			s.clearcoat = 1.0; s.clearcoat_roughness = 0.04
+			s.metallic = 0.35 if skin in ["zumrut", "ejder", "kehribar"] else 0.1
 		if skin == "karbon" or skin == "buz" or skin == "cini" or skin == "turkuaz":
 			s.clearcoat = 1.0; s.clearcoat_roughness = 0.05
 			s.metallic = 0.3 if skin != "turkuaz" else 0.5
@@ -550,7 +575,7 @@ func ext_skin_mat(orig: BaseMaterial3D, skin: String) -> Material:
 		m.set_shader_parameter("emission", src.emission_energy_multiplier * 0.6 if src.emission_enabled else 0.0)
 		# a solid metal finish (gold) should not darken the model's detail as much
 		m.set_shader_parameter("detail_mix", 0.35 if src.albedo_texture == null else 0.6)
-		m.set_shader_parameter("sheen", 0.25 if skin in ["galaksi", "buz", "turkuaz", "altin"] else 0.0)
+		m.set_shader_parameter("sheen", 0.25 if skin in ["galaksi", "buz", "turkuaz", "altin", "zumrut", "aurora", "nazar", "kehribar"] else 0.0)
 	cache[key] = m
 	return m
 

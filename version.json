@@ -1,25 +1,33 @@
 {
-	"version": "2.5.0",
-	"build": 25,
+	"version": "2.6.0",
+	"build": 26,
 	"parts": [
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v25.pck.part00",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v26.pck.part00",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v25.pck.part01",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v26.pck.part01",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v25.pck.part02",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v26.pck.part02",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v25.pck.part03",
-			"size": 84298992
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v26.pck.part03",
+			"size": 94371840
+		},
+		{
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v26.pck.part04",
+			"size": 94371840
+		},
+		{
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v26.pck.part05",
+			"size": 35785720
 		}
 	],
-	"pck_size": 367414512,
+	"pck_size": 507644920,
 	"installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
-	"notes": "Grafik yenilemesi (renk ayarı, gölge/AO, yansıma), yeni AK-47/AWP/FN 502/Remington 870 modelleri, sol el tutuş düzeltmesi, CS tarzı öldürme bildirimi, F ile modern inceleme, bıçakta sağ tık ağır saldırı, süreli/süresiz kasa silahları."
+	"notes": "Çanakkale ve İnşaat haritaları, AWM/RPK-16/Vityaz/Micro UZI/BR-7 Kuzgun/M1911, rütbe sistemi, yönetici paneli, oyun içi yazılı + sesli sohbet, yeni oda/çanta/market/kasa tasarımı, 12 yeni stil."
 }

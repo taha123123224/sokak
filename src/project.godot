@@ -20,6 +20,11 @@ Thumbs="*res://scripts/thumbs.gd"
 Online="*res://scripts/online.gd"
 Net="*res://scripts/net.gd"
 Updater="*res://scripts/updater.gd"
+Voice="*res://scripts/voice.gd"
+
+[audio]
+
+driver/enable_input=true
 
 [display]
 

@@ -100,7 +100,14 @@ var medals := {}
 var buy_panel: Control
 var buy_open := false
 
+func _exit_tree() -> void:
+	if Online.announced.is_connected(_on_announce): Online.announced.disconnect(_on_announce)
+
+func _on_announce(t: String) -> void:
+	center_msg("◆ DUYURU: " + t, Color("ff9aa6"))
+
 func _ready() -> void:
+	Online.announced.connect(_on_announce)
 	layer = 10
 	root = Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -265,7 +272,26 @@ func show_countdown() -> void:
 	pass
 
 # ---------------------------------------------------------------- per frame
+var voice_lbl: Label
+func _voice_ui() -> void:
+	if voice_lbl == null:
+		voice_lbl = UI.lbl("", 18, Color(0.6, 1.0, 0.7), "Rajdhani-Bold")
+		voice_lbl.anchor_left = 0; voice_lbl.anchor_top = 1; voice_lbl.anchor_bottom = 1
+		voice_lbl.offset_left = 24; voice_lbl.offset_top = -455; voice_lbl.offset_bottom = -430
+		voice_lbl.add_theme_constant_override("outline_size", 5)
+		voice_lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+		voice_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(voice_lbl)
+	var names: Array = []
+	if Voice.talking:
+		names.append("SEN")
+	for id in Voice.speaking.keys():
+		names.append(str(Net.members.get(id, {}).get("name", "?")))
+	voice_lbl.text = ("◉ KONUŞUYOR: " + ", ".join(names)) if names.size() > 0 else ""
+
 func _process(delta: float) -> void:
+	if match_node and match_node.net and root:
+		_voice_ui()
 	if player == null or match_node == null:
 		return
 	var m = match_node
@@ -495,13 +521,149 @@ func _kf_icon(wid: String) -> Texture2D:
 	_kf_cache[wid] = t
 	return t
 
+# ---------------------------------------------------------------- in-match chat
+var typing := false
+var chat_box: VBoxContainer
+var chat_in: LineEdit
+var chat_team := false
+
+func _ensure_chat() -> void:
+	if chat_box and is_instance_valid(chat_box):
+		return
+	chat_box = UI.vbox(2)
+	chat_box.anchor_left = 0; chat_box.anchor_top = 1; chat_box.anchor_bottom = 1
+	chat_box.offset_left = 24; chat_box.offset_top = -420; chat_box.offset_bottom = -170; chat_box.offset_right = 560
+	chat_box.alignment = BoxContainer.ALIGNMENT_END
+	chat_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(chat_box)
+	chat_in = LineEdit.new()
+	chat_in.anchor_left = 0; chat_in.anchor_top = 1; chat_in.anchor_bottom = 1
+	chat_in.offset_left = 24; chat_in.offset_right = 560; chat_in.offset_top = -164; chat_in.offset_bottom = -130
+	chat_in.max_length = 120
+	chat_in.visible = false
+	chat_in.add_theme_stylebox_override("normal", UI.sb(Color(0, 0, 0, 0.75), UI.ACCENT, 1, 4, 8))
+	chat_in.text_submitted.connect(_chat_send)
+	chat_in.gui_input.connect(func(ev): if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE: _chat_close())
+	root.add_child(chat_in)
+
+func open_chat(team: bool) -> void:
+	_ensure_chat()
+	chat_team = team
+	typing = true
+	chat_in.placeholder_text = "TAKIM'a yaz... (Enter gönder, Esc iptal)" if team else "HERKESE yaz... (Enter gönder, Esc iptal)"
+	chat_in.visible = true
+	chat_in.text = ""
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	chat_in.grab_focus()
+	for c in chat_box.get_children():
+		(c as CanvasItem).modulate.a = 1.0
+
+func _chat_close() -> void:
+	typing = false
+	if chat_in:
+		chat_in.visible = false
+		chat_in.release_focus()
+	if match_node and not match_node.paused and not match_node.ended:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+func _chat_send(t: String) -> void:
+	t = t.strip_edges()
+	_chat_close()
+	if t == "":
+		return
+	var me: String = Online.username if Online.is_logged_in() else str(GS.profile.get("name", "Oyuncu"))
+	var myteam: String = player.team if player and "team" in player else ""
+	if match_node and match_node.net:
+		Net.send({"t": "chat", "n": me, "m": t, "team": myteam if chat_team else ""})
+	chat_line(me, t, chat_team, GS.TEAM_COLORS.get(myteam, UI.ACCENT2))
+
+func chat_line(who: String, t: String, team: bool, col: Color) -> void:
+	_ensure_chat()
+	var l := RichTextLabel.new()
+	l.bbcode_enabled = true
+	l.fit_content = true
+	l.scroll_active = false
+	l.custom_minimum_size = Vector2(530, 0)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.add_theme_constant_override("outline_size", 4)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	l.text = "%s[color=#%s][b]%s:[/b][/color] %s" % ["[color=#7fd1ff][TAKIM][/color] " if team else "", col.to_html(false), who, t.replace("[", "(")]
+	chat_box.add_child(l)
+	while chat_box.get_child_count() > 7:
+		chat_box.get_child(0).queue_free()
+	var tw := l.create_tween()
+	tw.tween_interval(9.0)
+	tw.tween_property(l, "modulate:a", 0.0, 1.0)
+	SFX.play("ui_click", -10)
+
+var kb: Control
+## modern kill banner under the crosshair: slanted plate, weapon silhouette, points, streak pips
+func _kill_banner(head: bool, wid: String, streak: int) -> void:
+	if kb and is_instance_valid(kb):
+		kb.queue_free()
+	var col: Color = UI.GOLD if head else Color(1.0, 0.36, 0.28)
+	kb = Control.new()
+	kb.set_anchors_preset(Control.PRESET_CENTER)
+	kb.position = Vector2(-230, 120)
+	kb.size = Vector2(460, 74)
+	kb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	kb.pivot_offset = Vector2(230, 37)
+	root.add_child(kb)
+	var plate := Panel.new()
+	var sbx := StyleBoxFlat.new()
+	sbx.bg_color = Color(0.03, 0.035, 0.05, 0.78)
+	sbx.skew = Vector2(-0.35, 0)
+	sbx.border_width_bottom = 3; sbx.border_color = col
+	sbx.corner_radius_top_left = 3; sbx.corner_radius_bottom_right = 3
+	plate.add_theme_stylebox_override("panel", sbx)
+	plate.set_anchors_preset(Control.PRESET_FULL_RECT)
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	kb.add_child(plate)
+	var glow := ColorRect.new()
+	glow.color = Color(col.r, col.g, col.b, 0.35)
+	glow.position = Vector2(0, 0); glow.size = Vector2(6, 74)
+	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	kb.add_child(glow)
+	var h := UI.hbox(14)
+	h.position = Vector2(26, 6); h.size = Vector2(420, 62)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	kb.add_child(h)
+	var hs := _kf_icon("_head") if head else null
+	var ic := TextureRect.new()
+	ic.texture = hs if hs else _kf_icon(wid)
+	ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	ic.custom_minimum_size = Vector2(48 if head else 120, 44)
+	ic.modulate = col
+	h.add_child(ic)
+	var tv := UI.vbox(-4)
+	h.add_child(tv)
+	tv.add_child(UI.lbl("KAFADAN VURUŞ" if head else "DÜŞMAN ETKİSİZ", 26, col, "RussoOne-Regular"))
+	tv.add_child(UI.lbl(("+150" if head else "+100") + "   •   " + str(GS.WEAPONS.get(wid, {}).get("name", "")).to_upper(), 17, Color(1, 1, 1, 0.8), "Rajdhani-Bold"))
+	var pips := UI.hbox(3)
+	pips.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(pips)
+	for i in mini(streak, 10):
+		var pp := ColorRect.new()
+		pp.custom_minimum_size = Vector2(6, 22)
+		pp.color = col if i == streak - 1 else Color(1, 1, 1, 0.55)
+		pips.add_child(pp)
+	_ignore_mouse(kb)
+	kb.scale = Vector2(1.35, 1.35)
+	kb.modulate = Color(2.2, 2.2, 2.2, 0.0)
+	var tw := kb.create_tween().set_parallel(true)
+	tw.tween_property(kb, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(kb, "modulate", Color(1, 1, 1, 1), 0.2)
+	tw.tween_property(glow, "size:x", 460.0, 0.25).set_ease(Tween.EASE_OUT)
+	tw.tween_property(glow, "color:a", 0.0, 0.45).set_delay(0.05)
+	tw.chain().tween_interval(1.5)
+	tw.chain().tween_property(kb, "modulate:a", 0.0, 0.35)
+	tw.chain().tween_callback(kb.queue_free)
+
 func kill_confirm(head: bool, big: String, multi: int = 1, wid: String = "", streak: int = 1) -> void:
-	center2.text = ("+150  KAFADAN VURUŞ" if head else "+100  ETKİSİZ HALE GETİRİLDİ")
-	center2.add_theme_color_override("font_color", UI.GOLD if head else Color(1, 1, 1, 0.9))
-	center2.modulate.a = 1.0
-	var tw := center2.create_tween()
-	tw.tween_interval(1.4)
-	tw.tween_property(center2, "modulate:a", 0.0, 0.5)
+	center2.text = ""
+	_kill_banner(head, wid, streak)
 	# pick medal
 	var w: Dictionary = GS.WEAPONS.get(wid, {})
 	var key := "kill"
@@ -653,7 +815,34 @@ func show_death(killer: String, wid: String, head: bool) -> void:
 	death_panel.visible = true
 	death_t = 3.5
 	var wn: String = GS.WEAPONS[wid]["name"] if GS.WEAPONS.has(wid) else ""
-	death_lbl.text = "%s seni etkisiz hale getirdi%s" % [killer, ("  [" + wn + "]" if wn != "" else "")] + ("  — KAFADAN!" if head else "")
+	death_lbl.text = "ÖLDÜRÜLDÜN"
+	death_lbl.add_theme_color_override("font_color", Color(1, 0.35, 0.3))
+	var dv: Node = death_lbl.get_parent()
+	var old_card := dv.get_node_or_null("KillerCard")
+	if old_card:
+		old_card.queue_free()
+	var card := UI.panel(Color(0.03, 0.03, 0.045, 0.85), UI.GOLD if head else Color(1, 0.35, 0.3), 14, 2)
+	card.name = "KillerCard"
+	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var ch := UI.hbox(14)
+	card.add_child(ch)
+	var kv := UI.vbox(0)
+	ch.add_child(kv)
+	kv.add_child(UI.lbl("SENİ VURAN", 14, UI.DIM, "Rajdhani-Bold"))
+	kv.add_child(UI.lbl(killer, 30, Color.WHITE, "RussoOne-Regular"))
+	var ic := TextureRect.new()
+	ic.texture = _kf_icon(wid)
+	ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	ic.custom_minimum_size = Vector2(150, 50)
+	ch.add_child(ic)
+	var wv := UI.vbox(0)
+	ch.add_child(wv)
+	wv.add_child(UI.lbl(wn.to_upper(), 20, Color.WHITE, "Rajdhani-Bold"))
+	wv.add_child(UI.lbl("KAFADAN!" if head else "gövdeden", 18, UI.GOLD if head else UI.DIM, "Rajdhani-Bold"))
+	dv.add_child(card)
+	dv.move_child(card, death_lbl.get_index() + 1)
+	_ignore_mouse(card)
 
 # ---------------------------------------------------------------- scoreboard
 func _ignore_mouse(n: Node) -> void:
@@ -810,6 +999,36 @@ func show_end(r: Dictionary) -> void:
 		t2.tween_callback(func(): SFX.play("tick", -6))
 		t2.tween_property(p, "modulate:a", 1.0, 0.25)
 		i += 1
+	# competitive rank change
+	var ri: Dictionary = GS.rank_info(int(r.get("rp", 0)))
+	var ro: Dictionary = GS.rank_info(int(r.get("rp_old", 0)))
+	var rpd: int = int(r.get("rp", 0)) - int(r.get("rp_old", 0))
+	var rk := UI.panel(Color(ri["color"].r * 0.12, ri["color"].g * 0.12, ri["color"].b * 0.12, 0.9), ri["color"], 12, 2)
+	rk.custom_minimum_size = Vector2(620, 0)
+	rk.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	v.add_child(rk)
+	var rkh := UI.hbox(16)
+	rk.add_child(rkh)
+	var em := TextureRect.new()
+	em.texture = ri["icon"]; em.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; em.custom_minimum_size = Vector2(96, 96)
+	em.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rkh.add_child(em)
+	var rkv := UI.vbox(2)
+	rkv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rkh.add_child(rkv)
+	var up_txt := ""
+	if ri["i"] > ro["i"]: up_txt = "   ▲ TERFİ!"
+	elif ri["i"] < ro["i"]: up_txt = "   ▼ RÜTBE DÜŞTÜ"
+	rkv.add_child(UI.lbl(str(ri["name"]).to_upper() + up_txt, 30, ri["color"], "RussoOne-Regular"))
+	rkv.add_child(UI.lbl(("%+d RP" % rpd) + ("   •   DERECELİ MAÇ" if r.get("ranked", false) else "   •   bot/normal maç (yarım puan)"), 20, UI.GREEN if rpd >= 0 else UI.RED, "Rajdhani-Bold"))
+	var rbar := UI.bar(float(ro["prog"]) * 100.0, 100.0, ri["color"], 10)
+	rkv.add_child(rbar)
+	rkv.add_child(UI.lbl("%d RP%s" % [int(r.get("rp", 0)), ("  —  sonraki rütbe %d RP" % int(ri["hi"])) if ri["hi"] > ri["lo"] else "  —  EN YÜKSEK RÜTBE"], 16, UI.DIM, "Rajdhani-SemiBold"))
+	var t3 := rbar.create_tween()
+	t3.tween_interval(1.2)
+	t3.tween_property(rbar, "value", float(ri["prog"]) * 100.0, 0.8)
+	if ri["i"] > ro["i"]:
+		t3.tween_callback(func(): SFX.play("success", -2))
 	if r["ups"] > 0:
 		v.add_child(UI.lbl("SEVİYE ATLADIN!  Yeni seviye: %d  (+500 Altın, +1 Kasa)" % int(GS.profile["level"]), 30, UI.GOLD, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER))
 	var xpb := UI.bar(float(GS.profile["xp"]), float(GS.xp_for_level(int(GS.profile["level"]))), Color("7fd1ff"), 10)
@@ -1221,8 +1440,8 @@ class MedalRing extends Control:
 
 
 # ---------------------------------------------------------------- weapon menu (B)
-const BUY_GROUPS := [["TÜFEKLER", ["ak47", "m4a1", "scar", "aug", "m249"]], ["HAFİF MAKİNALI", ["mp5", "p90", "ump45", "vector"]], ["POMPALI", ["spas"]],
-	["KESKİN NİŞANCI", ["awp", "kar98"]], ["TABANCALAR", ["glock", "deagle", "revolver"]], ["BIÇAKLAR", ["knife", "karambit"]]]
+const BUY_GROUPS := [["TÜFEKLER", ["ak47", "m4a1", "scar", "aug", "m249", "rpk16", "kuzgun"]], ["HAFİF MAKİNALI", ["mp5", "p90", "ump45", "vector", "vityaz", "uzi"]], ["POMPALI", ["spas"]],
+	["KESKİN NİŞANCI", ["awp", "awm", "kar98"]], ["TABANCALAR", ["glock", "deagle", "revolver", "fn502", "m1911"]], ["BIÇAKLAR", ["knife", "karambit"]]]
 
 func toggle_buy(open: bool) -> void:
 	if buy_panel:

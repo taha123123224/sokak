@@ -53,12 +53,22 @@
 				"galaksi",
 				"altin",
 				"cini",
-				"turkuaz"
+				"turkuaz",
+				"zumrut",
+				"mermer",
+				"aurora",
+				"ayyildiz",
+				"ejder",
+				"kehribar"
 			],
+			"wchance": 0.4,
 			"weapons": [
 				"awp",
+				"awm",
 				"scar",
-				"m249"
+				"m249",
+				"rpk16",
+				"kuzgun"
 			]
 		},
 		"eklenti": {
@@ -76,6 +86,7 @@
 				"karbon",
 				"dijital"
 			],
+			"wchance": 0.0,
 			"weapons": []
 		},
 		"operasyon": {
@@ -91,8 +102,13 @@
 				"kar",
 				"kamuflaj",
 				"gece",
-				"buz"
+				"buz",
+				"col",
+				"kan",
+				"siber",
+				"okyanus"
 			],
+			"wchance": 0.38,
 			"weapons": [
 				"aug",
 				"vector",
@@ -101,7 +117,10 @@
 				"m4a1",
 				"p90",
 				"r870",
-				"fn502"
+				"fn502",
+				"vityaz",
+				"m1911",
+				"uzi"
 			]
 		},
 		"osmanli": {
@@ -116,12 +135,53 @@
 				"turkuaz",
 				"altin",
 				"kizil",
-				"neon"
+				"neon",
+				"lale",
+				"nazar",
+				"mermer",
+				"ayyildiz",
+				"kehribar"
 			],
+			"wchance": 0.32,
 			"weapons": [
 				"revolver",
 				"deagle",
-				"karambit"
+				"karambit",
+				"m1911"
+			]
+		},
+		"silah": {
+			"chars": [],
+			"parts": [],
+			"price": 1800,
+			"skins": [
+				"kamuflaj",
+				"dijital",
+				"karbon",
+				"kizil"
+			],
+			"wchance": 0.62,
+			"weapons": [
+				"m4a1",
+				"scar",
+				"aug",
+				"vector",
+				"ump45",
+				"p90",
+				"vityaz",
+				"rpk16",
+				"m249",
+				"awp",
+				"awm",
+				"kar98",
+				"r870",
+				"spas",
+				"deagle",
+				"revolver",
+				"m1911",
+				"fn502",
+				"uzi",
+				"kuzgun"
 			]
 		},
 		"sokak": {
@@ -136,9 +196,22 @@
 				"neon",
 				"kizil",
 				"galaksi",
-				"altin"
+				"altin",
+				"col",
+				"kan",
+				"okyanus",
+				"siber"
 			],
-			"weapons": []
+			"wchance": 0.2,
+			"weapons": [
+				"mp5",
+				"ump45",
+				"p90",
+				"fn502",
+				"deagle",
+				"spas",
+				"kar98"
+			]
 		}
 	},
 	"default": {
@@ -356,7 +429,13 @@
 				"glock",
 				"deagle",
 				"r870",
-				"fn502"
+				"fn502",
+				"m1911",
+				"vityaz",
+				"rpk16",
+				"awm",
+				"uzi",
+				"kuzgun"
 			],
 			"price": 700,
 			"slot": "namlu"
@@ -379,7 +458,13 @@
 				"glock",
 				"deagle",
 				"r870",
-				"fn502"
+				"fn502",
+				"m1911",
+				"vityaz",
+				"rpk16",
+				"awm",
+				"uzi",
+				"kuzgun"
 			],
 			"price": 850,
 			"slot": "alt"
@@ -388,7 +473,11 @@
 			"fits": [
 				"ak47",
 				"mp5",
-				"p90"
+				"p90",
+				"vityaz",
+				"rpk16",
+				"uzi",
+				"kuzgun"
 			],
 			"price": 800,
 			"slot": "optik"
@@ -411,7 +500,13 @@
 				"glock",
 				"deagle",
 				"r870",
-				"fn502"
+				"fn502",
+				"m1911",
+				"vityaz",
+				"rpk16",
+				"awm",
+				"uzi",
+				"kuzgun"
 			],
 			"price": 1000,
 			"slot": "sarjor"
@@ -432,7 +527,13 @@
 				"revolver",
 				"glock",
 				"deagle",
-				"fn502"
+				"fn502",
+				"m1911",
+				"vityaz",
+				"rpk16",
+				"awm",
+				"uzi",
+				"kuzgun"
 			],
 			"price": 900,
 			"slot": "namlu"
@@ -451,7 +552,12 @@
 				"aug",
 				"vector",
 				"m249",
-				"r870"
+				"r870",
+				"vityaz",
+				"rpk16",
+				"awm",
+				"uzi",
+				"kuzgun"
 			],
 			"price": 750,
 			"slot": "alt"
@@ -463,6 +569,14 @@
 			"price": 5000,
 			"rarity": 3
 		},
+		"aurora": {
+			"price": 5200,
+			"rarity": 3
+		},
+		"ayyildiz": {
+			"price": 5500,
+			"rarity": 3
+		},
 		"buz": {
 			"price": 4200,
 			"rarity": 3
@@ -471,9 +585,17 @@
 			"price": 3000,
 			"rarity": 2
 		},
+		"col": {
+			"price": 700,
+			"rarity": 0
+		},
 		"dijital": {
 			"price": 700,
 			"rarity": 0
+		},
+		"ejder": {
+			"price": 3400,
+			"rarity": 2
 		},
 		"galaksi": {
 			"price": 3500,
@@ -487,6 +609,10 @@
 			"price": 600,
 			"rarity": 0
 		},
+		"kan": {
+			"price": 1600,
+			"rarity": 1
+		},
 		"kar": {
 			"price": 800,
 			"rarity": 1
@@ -495,16 +621,40 @@
 			"price": 1500,
 			"rarity": 1
 		},
+		"kehribar": {
+			"price": 3600,
+			"rarity": 2
+		},
 		"kizil": {
 			"price": 2200,
 			"rarity": 2
+		},
+		"lale": {
+			"price": 1900,
+			"rarity": 1
 		},
 		"lav": {
 			"price": 4800,
 			"rarity": 3
 		},
+		"mermer": {
+			"price": 4600,
+			"rarity": 3
+		},
+		"nazar": {
+			"price": 2900,
+			"rarity": 2
+		},
 		"neon": {
 			"price": 1400,
+			"rarity": 2
+		},
+		"okyanus": {
+			"price": 2100,
+			"rarity": 1
+		},
+		"siber": {
+			"price": 2800,
 			"rarity": 2
 		},
 		"std": {
@@ -514,6 +664,10 @@
 		"turkuaz": {
 			"price": 3200,
 			"rarity": 2
+		},
+		"zumrut": {
+			"price": 4400,
+			"rarity": 3
 		}
 	},
 	"weapons": {
@@ -535,6 +689,16 @@
 			"pellets": 1,
 			"price": 4400,
 			"rpm": 700.0,
+			"throwable": false
+		},
+		"awm": {
+			"cat": "ana",
+			"dmg": 135.0,
+			"head": 3.2,
+			"melee": false,
+			"pellets": 1,
+			"price": 6500,
+			"rpm": 38.0,
 			"throwable": false
 		},
 		"awp": {
@@ -617,6 +781,26 @@
 			"rpm": 110.0,
 			"throwable": false
 		},
+		"kuzgun": {
+			"cat": "ana",
+			"dmg": 36.0,
+			"head": 2.5,
+			"melee": false,
+			"pellets": 1,
+			"price": 5200,
+			"rpm": 900.0,
+			"throwable": false
+		},
+		"m1911": {
+			"cat": "tabanca",
+			"dmg": 31.0,
+			"head": 2.6,
+			"melee": false,
+			"pellets": 1,
+			"price": 1900,
+			"rpm": 380.0,
+			"throwable": false
+		},
 		"m249": {
 			"cat": "ana",
 			"dmg": 30.0,
@@ -677,6 +861,16 @@
 			"rpm": 150.0,
 			"throwable": false
 		},
+		"rpk16": {
+			"cat": "ana",
+			"dmg": 31.0,
+			"head": 2.4,
+			"melee": false,
+			"pellets": 1,
+			"price": 5600,
+			"rpm": 700.0,
+			"throwable": false
+		},
 		"scar": {
 			"cat": "ana",
 			"dmg": 38.0,
@@ -707,6 +901,16 @@
 			"rpm": 650.0,
 			"throwable": false
 		},
+		"uzi": {
+			"cat": "ana",
+			"dmg": 18.0,
+			"head": 2.0,
+			"melee": false,
+			"pellets": 1,
+			"price": 2100,
+			"rpm": 1200.0,
+			"throwable": false
+		},
 		"vector": {
 			"cat": "ana",
 			"dmg": 19.0,
@@ -715,6 +919,16 @@
 			"pellets": 1,
 			"price": 3800,
 			"rpm": 1150.0,
+			"throwable": false
+		},
+		"vityaz": {
+			"cat": "ana",
+			"dmg": 22.0,
+			"head": 2.2,
+			"melee": false,
+			"pellets": 1,
+			"price": 2700,
+			"rpm": 820.0,
 			"throwable": false
 		}
 	}

@@ -278,7 +278,7 @@ func _build_ui() -> void:
 	clip.offset_top = -40; clip.offset_left = 150; clip.offset_right = -260
 	ui.add_child(clip)
 	ui.add_child(bp)
-	ticker = UI.lbl("YENİ: Animasyonlu şarjör değiştirme ve bıçak hareketleri   •   SCAR-H, UMP-45 ve Magnum .357 markette   •   Osmanlı, Operasyon ve Efsane kasaları   •   Eklenti desteği: kendi silah ve stillerini ekle!   •   Büyütülen Eski Mahalle ve Gemi haritaları   •   Haftasonu 2x malzeme", 19, Color(1, 1, 1, 0.9), "Rajdhani-SemiBold")
+	ticker = UI.lbl("YENİ v2.6: ÇANAKKALE ve İNŞAAT haritaları   •   AWM, RPK-16, PP-19 Vityaz, Micro UZI, BR-7 Kuzgun, M1911   •   RÜTBE sistemi ve dereceli maçlar   •   12 yeni stil   •   Silah Kasası: bol silah!", 19, Color(1, 1, 1, 0.9), "Rajdhani-SemiBold")
 	ticker.position = Vector2(1400, 8)
 	clip.add_child(ticker)
 	var ver := UI.lbl("SOKAK: Operasyon  v%s   " % Updater.VERSION, 16, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_RIGHT)

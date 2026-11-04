@@ -119,6 +119,9 @@ begin
   if uid is null then raise exception 'Giriş yapmalısın'; end if;
   select pr.data into p from profiles pr where pr.id = uid for update;
   if p is null then raise exception 'Profil bulunamadı'; end if;
+  if exists (select 1 from profiles pr where pr.id = uid and pr.banned_until > now()) then
+    raise exception 'Hesabın yasaklandı: %', (select coalesce(pr.ban_reason, '') from profiles pr where pr.id = uid);
+  end if;
   select c.data into cat from sokak_catalog c where c.id = 1;
   nowt := extract(epoch from clock_timestamp());
   if not (p ? 'parts') or jsonb_typeof(p->'parts') <> 'object' then p := jsonb_set(p, '{parts}', '{}'); end if;
@@ -184,22 +187,24 @@ begin
     else
       p := _pay(p, _si(cat, array['crates', t, 'price']));
     end if;
-    r := random();
     it := null;
-    if t <> 'efsane' and r < (case when t = 'sokak' then 0.3 else 0.18 end) then
+    -- weapons first: crates are the main source of (mostly timed) weapons
+    if jsonb_array_length(coalesce(cat->'crates'->t->'weapons', '[]')) > 0
+       and random() < coalesce((cat->'crates'->t->>'wchance')::float8, 0) then
+      r := random();
+      it := jsonb_build_object('type', 'weapon', 'id', _pick(cat->'crates'->t->'weapons'),
+        'days', case when r < 0.08 then 0 when r < 0.3 then 30 when r < 0.65 then 7 else 3 end);
+    end if;
+    r := random();
+    if it is null and t <> 'efsane' and r < (case when t = 'sokak' then 0.3 else 0.18 end) then
       m := (array['demir','demir','krom','titanyum','kobalt'])[1 + floor(random() * 5)::int];
       it := jsonb_build_object('type', 'mat', 'id', m, 'n', (jsonb_build_object('demir',40,'krom',20,'titanyum',8,'kobalt',3)->>m)::int);
-    elsif t <> 'efsane' and r < (case when t = 'sokak' then 0.5 else 0.3 end) then
+    elsif it is null and t <> 'efsane' and r < (case when t = 'sokak' then 0.5 else 0.3 end) then
       it := jsonb_build_object('type', 'gold', 'n', (array[500,800,1200,2500])[1 + floor(random() * 4)::int]);
     end if;
     if it is null and jsonb_array_length(coalesce(cat->'crates'->t->'parts', '[]')) > 0
        and random() < (case when t = 'eklenti' then 0.85 else 0.12 end) then
       it := jsonb_build_object('type', 'part', 'id', _pick(cat->'crates'->t->'parts'));
-    end if;
-    if it is null and jsonb_array_length(coalesce(cat->'crates'->t->'weapons', '[]')) > 0 and random() < 0.14 then
-      r := random();
-      it := jsonb_build_object('type', 'weapon', 'id', _pick(cat->'crates'->t->'weapons'),
-        'days', case when r < 0.15 then 0 when r < 0.45 then 30 when r < 0.8 then 7 else 3 end);
     end if;
     if it is null and jsonb_array_length(coalesce(cat->'crates'->t->'chars', '[]')) > 0 and random() < 0.06 then
       it := jsonb_build_object('type', 'char', 'id', _pick(cat->'crates'->t->'chars'));
@@ -319,6 +324,16 @@ begin
       mats := '{"demir":0,"krom":0,"titanyum":0,"kobalt":0}';
     end if;
     select np, x.ups into p, ups from _add_xp(p, xp) x;
+    -- competitive rank points (same rule as econ.gd rp_delta); bot / unranked matches count half
+    i := 0;
+    if is_full then
+      if won then i := 18 + least(kills, 20) / 2 + (case when head >= 5 then 3 else 0 end);
+      else i := -(14 - least(kills, 12) / 2); end if;
+      if not coalesce((args->>'ranked')::boolean, false) then i := trunc(i / 2.0)::int; end if;
+    end if;
+    lvl := _si(p, '{rp}')::int;
+    p := jsonb_set(p, '{rp}', to_jsonb(greatest(0, lvl + i)));
+    p := jsonb_set(p, '{rp_peak}', to_jsonb(greatest(_si(p, '{rp_peak}'), _si(p, '{rp}'))));
     p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + gold));
     foreach m in array array['demir','krom','titanyum','kobalt'] loop
       p := jsonb_set(p, array['mats', m], to_jsonb(_si(p, array['mats', m]) + _si(mats, array[m])));
@@ -338,7 +353,8 @@ begin
       p := jsonb_set(p, '{stats,wins}', to_jsonb(_si(p, '{stats,wins}') + 1));
       p := jsonb_set(p, '{missions,wins}', to_jsonb(_si(p, '{missions,wins}') + 1));
     end if;
-    res := jsonb_build_object('xp', xp, 'gold', gold, 'mats', mats, 'ups', ups, 'won', won);
+    res := jsonb_build_object('xp', xp, 'gold', gold, 'mats', mats, 'ups', ups, 'won', won,
+      'rp', _si(p, '{rp}'), 'rp_old', lvl, 'rpd', _si(p, '{rp}') - lvl);
 
   when 'sync' then
     s := args;
@@ -397,6 +413,9 @@ begin
   when 'get' then
     null;
 
+  when 'mail_ack' then
+    p := jsonb_set(p, '{mail}', '[]'::jsonb);
+
   else
     raise exception 'Bilinmeyen işlem';
   end case;
@@ -407,3 +426,121 @@ end $$;
 
 revoke all on function public.sokak_act(text, jsonb) from public, anon;
 grant execute on function public.sokak_act(text, jsonb) to authenticated;
+
+-- =====================================================================================
+-- v2.6 YÖNETİCİ (ADMIN) SİSTEMİ
+-- Yetki sunucuda tutulur; oyun dosyalarında hiçbir şifre yoktur.
+-- Kurucu hesap: kullanıcı adı "sokakoperasyon" olan hesap (önce oyunda bu adla KAYIT OL, sonra bu SQL'i çalıştır).
+-- =====================================================================================
+create table if not exists public.sokak_admins (user_id uuid primary key references public.profiles(id) on delete cascade);
+alter table public.sokak_admins enable row level security;
+revoke all on public.sokak_admins from anon, authenticated;
+insert into public.sokak_admins (user_id)
+  select id from public.profiles where lower(username) = 'sokakoperasyon'
+  on conflict do nothing;
+
+alter table public.profiles add column if not exists banned_until timestamptz;
+alter table public.profiles add column if not exists ban_reason text;
+
+create table if not exists public.sokak_announcements (
+  id bigserial primary key, text text not null check (length(text) between 1 and 300),
+  created_at timestamptz not null default now());
+alter table public.sokak_announcements enable row level security;
+drop policy if exists "announcements readable" on public.sokak_announcements;
+create policy "announcements readable" on public.sokak_announcements for select to authenticated using (true);
+revoke insert, update, delete on public.sokak_announcements from anon, authenticated;
+
+create or replace function public._is_admin() returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from sokak_admins where user_id = auth.uid())
+$$;
+
+-- gift helper: adds gold / materials / crates / skin / weapon to one profile and drops a mail note
+create or replace function public._gift(p jsonb, g jsonb, nowt float8) returns jsonb language plpgsql as $$
+declare m text; wid text; sk text; days int;
+begin
+  if _si(g, '{gold}') > 0 then p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + least(_si(g, '{gold}'), 10000000))); end if;
+  foreach m in array array['demir','krom','titanyum','kobalt'] loop
+    if _si(g, array['mats', m]) > 0 then
+      p := jsonb_set(p, array['mats', m], to_jsonb(_si(p, array['mats', m]) + least(_si(g, array['mats', m]), 100000)));
+    end if;
+  end loop;
+  if _si(g, '{crates}') > 0 then p := jsonb_set(p, '{crates}', to_jsonb(_si(p, '{crates}') + least(_si(g, '{crates}'), 1000))); end if;
+  if g ? 'crate_type' and _si(g, '{crate_n}') > 0 then p := _crate_add(p, g->>'crate_type', least(_si(g, '{crate_n}'), 1000)::int); end if;
+  wid := g->>'weapon';
+  if wid is not null and wid <> '' then
+    days := coalesce((g->>'days')::int, 0);
+    if p->'owned' ? wid then
+      if days = 0 then p := jsonb_set(p, array['owned', wid], (p->'owned'->wid) - 'exp');
+      elsif coalesce((p->'owned'->wid->>'exp')::float8, 0) > 0 then
+        p := jsonb_set(p, array['owned', wid, 'exp'], to_jsonb(floor(greatest((p->'owned'->wid->>'exp')::float8, nowt) + days * 86400)));
+      end if;
+    else
+      p := _give_weapon(p, wid, case when days = 0 then 0 else nowt + days * 86400 end);
+    end if;
+  end if;
+  sk := g->>'skin'; wid := coalesce(g->>'skin_wid', g->>'weapon');
+  if sk is not null and sk <> '' and wid is not null and p->'owned' ? wid and not ((p->'owned'->wid->'skins') ? sk) then
+    p := jsonb_set(p, array['owned', wid, 'skins'], coalesce(p->'owned'->wid->'skins', '["std"]') || to_jsonb(sk));
+  end if;
+  p := jsonb_set(p, '{mail}', coalesce(p->'mail', '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+    't', floor(nowt), 'msg', coalesce(g->>'msg', 'Yöneticiden hediye!'), 'gift', g - 'msg')));
+  return p;
+end $$;
+
+create or replace function public.sokak_admin(a text, args jsonb default '{}'::jsonb) returns jsonb
+language plpgsql security definer set search_path = public, auth as $$
+declare res jsonb := '{}'::jsonb; target uuid; hrs numeric; nowt float8; r record; n int := 0; q text;
+begin
+  if a = 'whoami' then return jsonb_build_object('admin', _is_admin()); end if;
+  if not _is_admin() then raise exception 'Yetkin yok'; end if;
+  nowt := extract(epoch from clock_timestamp());
+  case a
+  when 'stats' then
+    select jsonb_build_object(
+      'online', (select count(*) from profiles where last_seen > now() - interval '90 seconds'),
+      'in_match', (select count(*) from profiles where last_seen > now() - interval '90 seconds' and status = 'match'),
+      'total', (select count(*) from profiles),
+      'today', (select count(*) from profiles where created_at > now() - interval '1 day'),
+      'banned', (select count(*) from profiles where banned_until > now()),
+      'rooms', (select count(*) from rooms where updated_at > now() - interval '2 minutes')) into res;
+  when 'users' then
+    q := coalesce(args->>'q', '');
+    select coalesce(jsonb_agg(x), '[]'::jsonb) into res from (
+      select id, username, level, status, last_seen, created_at, banned_until, ban_reason,
+        (data->>'gold')::bigint as gold, (data->>'rp')::int as rp, (data->'stats'->>'kills')::int as kills,
+        exists (select 1 from sokak_admins s where s.user_id = profiles.id) as admin
+      from profiles where q = '' or username ilike q || '%'
+      order by (last_seen > now() - interval '90 seconds') desc, last_seen desc limit 60) x;
+  when 'ban' then
+    target := (args->>'id')::uuid;
+    if exists (select 1 from sokak_admins where user_id = target) then raise exception 'Yönetici yasaklanamaz'; end if;
+    hrs := coalesce((args->>'hours')::numeric, 0);
+    update profiles set banned_until = case when hrs <= 0 then 'infinity'::timestamptz else now() + hrs * interval '1 hour' end,
+      ban_reason = left(coalesce(args->>'reason', 'Kurallara aykırı davranış'), 120) where id = target;
+  when 'unban' then
+    update profiles set banned_until = null, ban_reason = null where id = (args->>'id')::uuid;
+  when 'delete' then
+    target := (args->>'id')::uuid;
+    if exists (select 1 from sokak_admins where user_id = target) then raise exception 'Yönetici silinemez'; end if;
+    delete from auth.users where id = target;
+  when 'announce' then
+    insert into sokak_announcements (text) values (left(args->>'text', 300));
+  when 'gift' then
+    if args->>'id' = 'all' then
+      for r in select id, data from profiles where banned_until is null or banned_until < now() loop
+        update profiles set data = _gift(r.data, args->'gift', nowt) where id = r.id;
+        n := n + 1;
+      end loop;
+    else
+      update profiles set data = _gift(data, args->'gift', nowt) where id = (args->>'id')::uuid;
+      n := 1;
+    end if;
+    res := jsonb_build_object('count', n);
+  else
+    raise exception 'Bilinmeyen yönetici işlemi';
+  end case;
+  return jsonb_build_object('ok', true, 'res', res);
+end $$;
+revoke all on function public.sokak_admin(text, jsonb) from public, anon;
+grant execute on function public.sokak_admin(text, jsonb) to authenticated;
+revoke all on function public._gift(jsonb, jsonb, float8) from public, anon, authenticated;

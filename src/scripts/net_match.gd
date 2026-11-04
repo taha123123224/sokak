@@ -119,3 +119,9 @@ func _on_msg(d: Dictionary) -> void:
 		"sys":
 			if mt.hud:
 				mt.hud.center_msg(str(d.get("msg", "")), UI.RED)
+		"chat":
+			if mt.hud:
+				var tm := str(d.get("team", ""))
+				var mine: String = mt.player.team if mt.player and "team" in mt.player else ""
+				if tm == "" or tm == mine:
+					mt.hud.chat_line(str(d.get("n", "?")), str(d.get("m", "")), tm != "", GS.TEAM_COLORS.get(_team_of(from), Color.WHITE))

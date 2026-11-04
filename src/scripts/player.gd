@@ -52,6 +52,7 @@ const HOLSTER := 0.11
 var bolt_t := 0.0
 var inspect_t := 0.0
 var insp_mag := false
+var busy_k := 0.0
 var melee_t := 0.0
 var melee_heavy := false
 var throw_t := 0.0
@@ -74,6 +75,7 @@ var grenades := 0
 var ads := false
 var ads_k := 0.0
 var shots_in_burst := 0
+var burst_left := 0
 var bloom := 0.0
 var trigger_released := true
 var wdata := {}
@@ -138,7 +140,7 @@ func setup_loadout(set: Dictionary, mode: String) -> void:
 	elif mode == "sniper":
 		var sn: String = set.get("ana", "awp")
 		if not GS.WEAPONS.get(sn, {}).get("scope", false):
-			sn = "awp" if GS.owned("awp") else "kar98"
+			sn = "awm" if GS.owned("awm") else ("awp" if GS.owned("awp") else "kar98")
 		slots = {"ana": sn, "tabanca": set.get("tabanca", "glock"), "bicak": set.get("bicak", "knife")}
 	elif mode == "gungame":
 		var lv: int = match_node.gg_level(self)
@@ -184,7 +186,7 @@ func _look(e: InputEventMouseMotion) -> void:
 	mouse_delta += e.relative
 
 func _unhandled_input(e: InputEvent) -> void:
-	if not alive or match_node.paused or match_node.ended:
+	if not alive or match_node.paused or match_node.ended or (match_node.hud != null and match_node.hud.typing):
 		return
 	if e is InputEventMouseButton and e.pressed:
 		if e.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -239,7 +241,7 @@ func _cycle(d: int) -> void:
 func _physics_process(delta: float) -> void:
 	if not alive:
 		return
-	var frozen: bool = match_node.paused or match_node.ended or match_node.countdown > 0
+	var frozen: bool = match_node.paused or match_node.ended or match_node.countdown > 0 or (match_node.hud != null and match_node.hud.typing)
 	var input := Vector2.ZERO
 	if not frozen:
 		input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
@@ -315,7 +317,7 @@ func _try_step(delta: float) -> void:
 func _process(delta: float) -> void:
 	if not alive:
 		return
-	var frozen: bool = match_node.paused or match_node.ended or match_node.countdown > 0
+	var frozen: bool = match_node.paused or match_node.ended or match_node.countdown > 0 or (match_node.hud != null and match_node.hud.typing)
 	# recoil recovery
 	if recoil_vel.length() > 0.0001:
 		var step = recoil_vel * min(delta * 22.0, 1.0)
@@ -462,7 +464,13 @@ func _try_fire() -> void:
 			reload_t = 0
 		else:
 			return
-	if not wdata.get("auto", false) and not trigger_released:
+	var is_burst := int(wdata.get("burst", 0)) > 0
+	if is_burst:
+		if trigger_released:
+			burst_left = int(wdata["burst"])
+		elif burst_left <= 0:
+			return
+	elif not wdata.get("auto", false) and not trigger_released:
 		return
 	trigger_released = false
 	if ammo[cur][0] <= 0:
@@ -473,6 +481,10 @@ func _try_fire() -> void:
 		return
 	ammo[cur][0] -= 1
 	fire_cd = 60.0 / float(wdata["rpm"])
+	if is_burst:
+		burst_left -= 1
+		if burst_left <= 0:
+			fire_cd = float(wdata.get("burst_delay", 0.3))
 	inspect_t = 0
 	shots_in_burst += 1
 	shots_fired += 1
@@ -1099,7 +1111,7 @@ func _spawn_flash() -> void:
 	var fv := randi() % 3
 	((flash_mi.mesh as QuadMesh).material as StandardMaterial3D).albedo_texture = flash_tex[fv]
 	((flash_side.mesh as QuadMesh).material as StandardMaterial3D).albedo_texture = flash_side_tex[fv]
-	var s := randf_range(0.8, 1.3) * (1.6 if cur in ["spas", "awp", "kar98", "deagle"] else 1.0)
+	var s := randf_range(0.8, 1.3) * (1.6 if cur in ["spas", "awp", "awm", "kar98", "deagle", "kuzgun"] else 1.0)
 	flash_mi.scale = Vector3(s, s, s)
 	flash_mi.visible = ads_k < 0.9 or not wdata.get("scope", false)
 	flash_side.global_position = p + Vector3(0, 0, -0.09) * s
@@ -1240,6 +1252,14 @@ func _update_viewmodel(delta: float) -> void:
 		ca.dof_blur_far_enabled = ca.dof_blur_amount > 0.002
 		ca.dof_blur_far_distance = 4.0
 		ca.dof_blur_far_transition = 6.0
+	# sabotage: weapon lowered while planting / defusing (hands busy with the charge)
+	var busy := 0.0
+	if match_node and "sab" in match_node and match_node.sab and match_node.sab.prog_who == self:
+		busy = 1.0
+	busy_k = move_toward(busy_k, busy, delta * 4.0)
+	if busy_k > 0.0:
+		pos += Vector3(0.05, -0.32, 0.12) * busy_k
+		rot += Vector3(0.9, 0.2, 0.3) * busy_k
 	if inspect_t <= 0 and insp_mag:
 		insp_mag = false
 		if reload_t <= 0 and vm_parts.has("mag") and is_instance_valid(vm_parts["mag"]) and (vm_parts["mag"] as Node3D).has_meta("rest"):
