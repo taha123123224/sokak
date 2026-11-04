@@ -3,6 +3,18 @@
 // the other players in the room (or to one player when it has a "to" field). The first player is the
 // host (runs the match rules); if the host leaves, the oldest remaining player becomes the host.
 
+import { WEAPONS } from "./weapons.js";
+
+// ---- anti-cheat: every "hit" is checked against the real weapon table before it reaches the victim ----
+const MAX_LVL_BONUS = 1.30;      // +7 upgrade = +28% damage, small margin
+const STRIKES_TO_KICK = 6;
+
+function hitLimit(w, head) {
+  const wd = WEAPONS[w];
+  if (!wd) return 0;
+  return wd.dmg * (head ? wd.head : 1.0) * MAX_LVL_BONUS * (w === "frag" ? 1.0 : 1.0);
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
@@ -76,6 +88,10 @@ export class Room {
     try { data = JSON.parse(msg); } catch (e) { return; }
     if (data.t === "ping") { this.send(ws, { t: "pong", ts: data.ts }); return; }
     data.from = me.id;
+    if (data.t === "hit") {
+      const ok = this.checkHit(ws, me, data);
+      if (!ok) return;
+    }
     const out = JSON.stringify(data);
     if (data.to) {
       for (const o of this.state.getWebSockets()) {
@@ -85,6 +101,28 @@ export class Room {
     } else {
       this.broadcast(out, ws);
     }
+  }
+
+  checkHit(ws, me, data) {
+    const w = String(data.w || "");
+    const dmg = Number(data.d);
+    const lim = hitLimit(w, !!data.h);
+    const now = Date.now();
+    const wd = WEAPONS[w];
+    let bad = !wd || !isFinite(dmg) || dmg < 0 || dmg > lim + 0.5;
+    // rate: at most (rpm/60 * pellets) hits per second (+ slack), tracked per sender
+    const st = this.rate || (this.rate = {});
+    const r = st[me.id] || (st[me.id] = { t: now, n: 0, strikes: 0 });
+    if (now - r.t > 1000) { r.t = now; r.n = 0; }
+    r.n += 1;
+    if (wd && r.n > Math.ceil((wd.rpm / 60) * wd.pel * 1.6) + 3) bad = true;
+    if (!bad) return true;
+    r.strikes += 1;
+    if (r.strikes >= STRIKES_TO_KICK) {
+      this.broadcast({ t: "sys", msg: me.name + " hile şüphesiyle odadan atıldı." }, ws);
+      try { ws.close(4003, "hile"); } catch (e) {}
+    }
+    return false;
   }
 
   async webSocketClose(ws) { this.leave(ws); }

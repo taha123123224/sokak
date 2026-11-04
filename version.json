@@ -1,25 +1,25 @@
 {
-	"version": "2.3.0",
-	"build": 23,
+	"version": "2.4.0",
+	"build": 24,
 	"parts": [
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v23.pck.part00",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v24.pck.part00",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v23.pck.part01",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v24.pck.part01",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v23.pck.part02",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v24.pck.part02",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v23.pck.part03",
-			"size": 50090212
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v24.pck.part03",
+			"size": 53055988
 		}
 	],
-	"pck_size": 333205732,
+	"pck_size": 336171508,
 	"installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
-	"notes": "Yeni SOKAK Başlatıcı (indirme penceresi + BAŞLAT), kurulum programı, yeni logo ve otomatik güncelleme."
+	"notes": "Sabotaj modu, canlı sıralama, Bot/Çevrimiçi mod seçimi, sunucu taraflı hile koruması, yeni geri tepme, dürbün düzeltmesi ve yeni yükseltme efekti."
 }

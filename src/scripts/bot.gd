@@ -4,6 +4,8 @@ extends CharacterBody3D
 var match_node
 var display_name := "Bot"
 var team := ""
+var dbg_shots := 0
+var dbg_hits := 0
 var is_player := false
 var alive := true
 var health := 100.0
@@ -43,6 +45,8 @@ var aim_pitch := 0.0
 var aim_err := Vector2.ZERO
 var heard_pos := Vector3.ZERO
 var heard_t := -100.0
+var nopath_t := 0.0
+var obj_goal := Vector3.INF   # game-mode objective (sabotage site / bomb)
 var death_t := 0.0
 var death_axis := Vector3.RIGHT
 var death_head := false
@@ -50,11 +54,11 @@ var death_spin := 0.0
 var death_fx_done := false
 var name_tag: Label3D
 
-const D_REACT := [0.75, 0.42, 0.22]
-const D_AIM := [2.6, 4.5, 7.5]
-const D_SPREAD := [0.075, 0.042, 0.022]
+const D_REACT := [0.6, 0.32, 0.18]
+const D_AIM := [3.0, 5.5, 8.5]
+const D_SPREAD := [0.065, 0.034, 0.018]
 const D_VIEW := [55.0, 80.0, 120.0]
-const D_HEAD := [0.08, 0.18, 0.35]
+const D_HEAD := [0.1, 0.22, 0.38]
 
 func _ready() -> void:
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_ON
@@ -382,10 +386,17 @@ func _physics_process(delta: float) -> void:
 		var right := Vector3(cos(aim_yaw), 0, -sin(aim_yaw))
 		var dist := to.length()
 		move_dir = right * strafe_dir
-		if dist > float(wdata.get("range", 100.0)) * 0.6:
-			move_dir += -Vector3(sin(aim_yaw), 0, cos(aim_yaw)) * 0.8
-		elif wdata.get("melee", false) or (wid == "spas" and dist > 8):
-			move_dir = -Vector3(sin(aim_yaw), 0, cos(aim_yaw)) + right * strafe_dir * 0.4
+		# close to the weapon's preferred fighting distance along the nav mesh (no standing still at 80 m)
+		var pref := _pref_dist()
+		if dist > pref * 1.25:
+			if nav.target_position.distance_to(target.global_position) > 2.0:
+				nav.target_position = target.global_position
+			var nx := nav.get_next_path_position() - global_position
+			nx.y = 0
+			var adv := nx.normalized() if nx.length() > 0.1 else -Vector3(sin(aim_yaw), 0, cos(aim_yaw))
+			move_dir = adv + right * strafe_dir * (0.25 if wdata.get("melee", false) else 0.45)
+		elif dist < pref * 0.45 and not wdata.get("melee", false) and wid != "spas":
+			move_dir = Vector3(sin(aim_yaw), 0, cos(aim_yaw)) * 0.6 + right * strafe_dir
 		speed *= 0.55 if not wdata.get("melee", false) else 1.0
 		if crouching: speed *= 0.4
 		if slow_t > 0:
@@ -399,13 +410,19 @@ func _physics_process(delta: float) -> void:
 		crouching = false
 		var goal := Vector3.ZERO
 		var has_goal := false
-		if t - last_seen_t < 7.0:
+		var at_obj := false
+		if obj_goal != Vector3.INF and t - last_seen_t >= 2.5:
+			goal = obj_goal; has_goal = true
+			at_obj = global_position.distance_to(obj_goal) < 1.3
+		elif t - last_seen_t < 7.0:
 			goal = last_seen; has_goal = true
 		elif t - heard_t < 5.0:
 			goal = heard_pos; has_goal = true
 		elif has_roam:
 			goal = roam_target; has_goal = true
-		if not has_goal or global_position.distance_to(goal) < 2.0:
+		if at_obj:
+			pass   # hold the objective (plant / defuse / guard)
+		elif not has_goal or global_position.distance_to(goal) < 2.0:
 			if t - last_seen_t < 7.0 and global_position.distance_to(last_seen) < 2.0:
 				last_seen_t = -100
 			if t - heard_t < 5.0 and global_position.distance_to(heard_pos) < 2.0:
@@ -417,6 +434,16 @@ func _physics_process(delta: float) -> void:
 		var nxt := nav.get_next_path_position()
 		var d := nxt - global_position
 		d.y = 0
+		# unreachable goal (no path): pick another one instead of standing still
+		if d.length() <= 0.1 and global_position.distance_to(goal) > 2.0:
+			nopath_t += delta
+			if nopath_t > 1.5:
+				nopath_t = 0.0
+				last_seen_t = -100
+				heard_t = -100
+				_pick_roam()
+		else:
+			nopath_t = 0.0
 		if d.length() > 0.1:
 			move_dir = d.normalized()
 			var want := atan2(-move_dir.x, -move_dir.z)
@@ -519,10 +546,44 @@ func _try_step(delta: float) -> void:
 	global_position.y += 0.42
 	apply_floor_snap()
 
+func _pref_dist() -> float:
+	if wdata.get("melee", false):
+		return 1.2
+	if wid == "spas":
+		return 7.0
+	if wdata.get("scope", false):
+		return 45.0
+	if wdata["cat"] == "tabanca":
+		return 15.0
+	if str(wdata.get("cls", "")).begins_with("Hafif"):
+		return 14.0
+	return 24.0
+
+func intel(pos: Vector3) -> void:
+	## a teammate spotted an enemy: go there if we are not fighting
+	if target_visible:
+		return
+	last_seen = pos
+	last_seen_t = Time.get_ticks_msec() / 1000.0
+
 func _pick_roam() -> void:
 	var map := get_world_3d().navigation_map
+	# hunt: head for a random living enemy's area (always in knife arena, often in team modes)
+	var hunt := 0.75 if match_node.mode == "knife" else (0.45 if match_node.teams else 0.3)
+	if randf() < hunt:
+		var foes := []
+		for c in match_node.combatants:
+			var n = c["node"]
+			if n != self and is_instance_valid(n) and n.alive and (team == "" or n.team != team):
+				foes.append(n)
+		if foes.size() > 0:
+			var f = foes[randi() % foes.size()]
+			var guess: Vector3 = f.global_position + Vector3(randf_range(-8, 8), 0, randf_range(-8, 8))
+			roam_target = NavigationServer3D.map_get_closest_point(map, guess)
+			has_roam = true
+			return
 	var p := NavigationServer3D.map_get_random_point(map, 1, false)
-	if p == Vector3.ZERO or p.distance_to(global_position) < 6:
+	if p.length() < 0.5 or p.distance_to(global_position) < 6 or not NavigationServer3D.map_is_active(map) or NavigationServer3D.map_get_iteration_id(map) == 0:
 		var sp: Array = match_node.spawn_points
 		if sp.size() > 0:
 			p = sp[randi() % sp.size()]["pos"]
@@ -559,6 +620,11 @@ func _perceive() -> void:
 	if best != null:
 		if best != target or not was:
 			react_t = D_REACT[difficulty] * randf_range(0.8, 1.3)
+		if not was and team != "":
+			for c in match_node.combatants:
+				var mt = c["node"]
+				if mt != self and not c["is_player"] and is_instance_valid(mt) and mt.alive and mt.team == team and mt.global_position.distance_to(global_position) < 45.0 and mt.has_method("intel"):
+					mt.intel(best.global_position)
 		target = best
 		target_visible = true
 		last_seen = best.global_position
@@ -601,13 +667,15 @@ func _fire(tp: Vector3, dist: float) -> void:
 	if randf() < D_HEAD[difficulty]:
 		aim_pt = target.global_position + Vector3.UP * (1.62 if not target.crouching else 1.05)
 	var dir := (aim_pt - eye).normalized()
-	var sp: float = D_SPREAD[difficulty] * (1.0 + dist / 60.0)
+	var sp: float = D_SPREAD[difficulty] * (1.0 + dist / 90.0)
 	if wdata.get("scope", false):
 		sp *= 0.5
 	var pellets := int(wdata.get("pellets", 1))
 	for i in pellets:
 		var d2 := _spread(dir, sp + (float(wdata.get("spread", 0.0)) if pellets > 1 else 0.0))
 		var res: Dictionary = match_node.hitscan(self, eye, d2, wid, float(wdata["dmg"]), float(wdata.get("range", 150.0)), float(wdata.get("head", 2.5)))
+		dbg_shots += 1
+		if res.get("hit_char", false): dbg_hits += 1
 		if i < 2:
 			var mp: Vector3 = muzzle.global_position if muzzle else eye
 			match_node.fx.tracer(mp, res.get("pos", eye + d2 * 60.0))

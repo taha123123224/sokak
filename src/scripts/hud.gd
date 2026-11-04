@@ -23,6 +23,47 @@ var center: Label
 var center2: Label
 var target_lbl: Label
 var scope_ov: Control
+var scope_rect: ColorRect
+const SCOPE_SHADER := """
+shader_type canvas_item;
+uniform float aspect = 1.7778;
+uniform float radius = 0.47;
+uniform vec2 sway = vec2(0.0);
+float line_mask(float d, float w) { return 1.0 - smoothstep(w, w + fwidth(d) * 1.5, d); }
+void fragment() {
+	vec2 p = (UV - 0.5) * vec2(aspect, 1.0) - sway;
+	float d = length(p);
+	float aa = fwidth(d) * 1.5;
+	float outside = smoothstep(radius - aa, radius + aa, d);
+	// tube edge: dark ring + soft inner vignette
+	float ring = smoothstep(radius - 0.035, radius, d);
+	float vig = smoothstep(radius * 0.55, radius, d);
+	float a = max(outside, ring * 0.85 + vig * 0.22);
+	vec3 c = vec3(0.0);
+	// reticle: thin cross, thick posts towards the edge, mil-dots
+	float thin = max(line_mask(abs(p.y), 0.0009) * step(abs(p.x), radius), line_mask(abs(p.x), 0.0009) * step(abs(p.y), radius));
+	float posts = max(line_mask(abs(p.y), 0.004) * step(0.14, abs(p.x)), line_mask(abs(p.x), 0.004) * step(0.14, p.y));
+	posts = max(posts, line_mask(abs(p.x), 0.004) * step(0.14, -p.y));
+	float dots = 0.0;
+	for (int i = 1; i <= 5; i++) {
+		float o = float(i) * 0.025;
+		dots = max(dots, 1.0 - smoothstep(0.0028, 0.0028 + aa, length(abs(p) - vec2(o, 0.0))));
+		dots = max(dots, 1.0 - smoothstep(0.0028, 0.0028 + aa, length(abs(p) - vec2(0.0, o))));
+	}
+	float ret = max(max(thin * 0.9, posts), dots) * (1.0 - outside);
+	a = max(a, ret);
+	// red illuminated centre dot with a soft glow
+	float cd = 1.0 - smoothstep(0.0024, 0.0024 + aa, d);
+	float glow = exp(-d * d / 0.00004) * 0.35;
+	c = mix(c, vec3(1.0, 0.12, 0.06), clamp(cd + glow, 0.0, 1.0));
+	a = max(a, clamp(cd + glow, 0.0, 1.0));
+	// faint lens glare in the upper-left of the glass
+	float glare = smoothstep(0.2, 0.0, length(p - vec2(-0.16, -0.18))) * 0.06 * (1.0 - outside);
+	c = mix(c, vec3(0.75, 0.85, 1.0), glare / max(a + glare, 0.001));
+	a = max(a, glare);
+	COLOR = vec4(c, a);
+}
+"""
 var vignette: TextureRect
 var death_panel: Control
 var death_lbl: Label
@@ -79,21 +120,16 @@ func setup(p) -> void:
 	scope_ov.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	scope_ov.visible = false
 	root.add_child(scope_ov)
-	var sc := TextureRect.new()
-	sc.texture = load("res://assets/fx/scope.png")
-	sc.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	sc.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	sc.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scope_ov.add_child(sc)
-	for side in [0, 1]:
-		var cr := ColorRect.new()
-		cr.color = Color.BLACK
-		cr.anchor_top = 0; cr.anchor_bottom = 1
-		if side == 0:
-			cr.anchor_left = 0; cr.anchor_right = 0.5; cr.offset_right = -540
-		else:
-			cr.anchor_left = 0.5; cr.anchor_right = 1; cr.offset_left = 540
-		scope_ov.add_child(cr)
+	# procedural sniper scope: clear lens, thin reticle with mil-dots, red centre dot, black outside the tube
+	scope_rect = ColorRect.new()
+	scope_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scope_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sm := ShaderMaterial.new()
+	var sh := Shader.new()
+	sh.code = SCOPE_SHADER
+	sm.shader = sh
+	scope_rect.material = sm
+	scope_ov.add_child(scope_rect)
 	# vignette (low hp)
 	vignette = TextureRect.new()
 	var gt := GradientTexture2D.new()
@@ -269,6 +305,9 @@ func _process(delta: float) -> void:
 		reload_bar.value = 1.0 - player.reload_t / max(player.reload_total, 0.01)
 	# scope
 	scope_ov.visible = player.wdata.get("scope", false) and player.ads_k > 0.92 and player.alive
+	if scope_ov.visible and scope_rect:
+		var sz := scope_rect.size
+		(scope_rect.material as ShaderMaterial).set_shader_parameter("aspect", sz.x / maxf(sz.y, 1.0))
 	xhair.visible = player.alive and not scope_ov.visible and not (player.ads_k > 0.6 and not player.wdata.get("melee", false))
 	xhair.queue_redraw()
 	hit_t = max(hit_t - delta, 0.0)

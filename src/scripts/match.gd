@@ -12,6 +12,7 @@ var hud
 var player
 var combatants: Array = []
 var net = null   # net_match.gd when playing online
+var sab = null   # sabotage.gd in SABOTAJ mode
 var spawn_points: Array = []
 var world_env: WorldEnvironment
 var sun: DirectionalLight3D
@@ -207,6 +208,11 @@ func _build() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	countdown = 3.0
 	hud.show_countdown()
+	if mode == "sabotaj":
+		sab = preload("res://scripts/sabotage.gd").new()
+		add_child(sab)
+		sab.setup(self)
+	GS.act("match_start")   # the server measures real match time (bounds the rewards)
 
 func _prewarm() -> void:
 	## draw every effect once behind the loading screen so shaders/pipelines are compiled now,
@@ -234,7 +240,10 @@ func _prewarm() -> void:
 			MatLib.apply(w, GS.wskin(wid))
 			tmp.add_child(w)
 	for i in 3:
-		await RenderingServer.frame_post_draw
+		if DisplayServer.get_name() == "headless":
+			await get_tree().process_frame   # no renderer: frame_post_draw never fires
+		else:
+			await RenderingServer.frame_post_draw
 	tmp.queue_free()
 	SFX.silent = false
 	# pre-load all sound streams into memory
@@ -289,10 +298,10 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	sun = DirectionalLight3D.new()
 	# bright, colourful, high sun for every map (narrow streets need a steep sun)
 	var P := {
-		"day":      {"elev": -58.0, "az": 35.0, "sun": Color(1.0, 0.96, 0.88), "se": 2.8, "top": Color("4579bd"), "hor": Color("a8d0f5"), "amb": Color(0.74, 0.74, 0.76), "ae": 1.1, "fog": Color("b6d3f0"), "exp": 1.0, "sat": 1.02, "fill": Color(0.85, 0.85, 0.88)},
-		"golden":   {"elev": -38.0, "az": 220.0, "sun": Color(1.0, 0.84, 0.62), "se": 2.6, "top": Color("3a7cd0"), "hor": Color("f2c79a"), "amb": Color(0.72, 0.66, 0.62), "ae": 1.05, "fog": Color("f0cfa8"), "exp": 0.98, "sat": 1.05, "fill": Color(0.85, 0.8, 0.82)},
-		"sunset":   {"elev": -24.0, "az": 280.0, "sun": Color(1.0, 0.72, 0.48), "se": 2.3, "top": Color("2f5fae"), "hor": Color("ffb27a"), "amb": Color(0.7, 0.6, 0.62), "ae": 1.0, "fog": Color("f5b48a"), "exp": 0.95, "sat": 1.05, "fill": Color(0.8, 0.72, 0.8)},
-		"overcast": {"elev": -55.0, "az": 120.0, "sun": Color(1.0, 0.97, 0.92), "se": 2.4, "top": Color("4a7fbf"), "hor": Color("c4dcf0"), "amb": Color(0.75, 0.75, 0.77), "ae": 1.2, "fog": Color("c8dcee"), "exp": 1.0, "sat": 1.02, "fill": Color(0.85, 0.86, 0.9)},
+		"day":      {"elev": -58.0, "az": 35.0, "sun": Color(1.0, 0.96, 0.88), "se": 2.8, "top": Color("4579bd"), "hor": Color("a8d0f5"), "amb": Color(0.74, 0.74, 0.76), "ae": 1.1, "fog": Color("b6d3f0"), "exp": 1.0, "sat": 0.86, "fill": Color(0.85, 0.85, 0.88)},
+		"golden":   {"elev": -38.0, "az": 220.0, "sun": Color(1.0, 0.84, 0.62), "se": 2.6, "top": Color("3a7cd0"), "hor": Color("f2c79a"), "amb": Color(0.72, 0.66, 0.62), "ae": 1.05, "fog": Color("f0cfa8"), "exp": 0.98, "sat": 0.88, "fill": Color(0.85, 0.8, 0.82)},
+		"sunset":   {"elev": -24.0, "az": 280.0, "sun": Color(1.0, 0.72, 0.48), "se": 2.3, "top": Color("2f5fae"), "hor": Color("ffb27a"), "amb": Color(0.7, 0.6, 0.62), "ae": 1.0, "fog": Color("f5b48a"), "exp": 0.95, "sat": 0.9, "fill": Color(0.8, 0.72, 0.8)},
+		"overcast": {"elev": -55.0, "az": 120.0, "sun": Color(1.0, 0.97, 0.92), "se": 2.4, "top": Color("4a7fbf"), "hor": Color("c4dcf0"), "amb": Color(0.75, 0.75, 0.77), "ae": 1.2, "fog": Color("c8dcee"), "exp": 1.0, "sat": 0.84, "fill": Color(0.85, 0.86, 0.9)},
 	}
 	var c: Dictionary = P.get(preset, P["day"])
 	sun.rotation_degrees = Vector3(c["elev"], c["az"], 0)
@@ -373,7 +382,7 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	e.volumetric_fog_sky_affect = 0.0
 	e.adjustment_enabled = true
 	e.adjustment_brightness = 1.0
-	e.adjustment_contrast = 1.04
+	e.adjustment_contrast = 1.07
 	e.adjustment_saturation = c["sat"]
 	world_env.environment = e
 	var ca := CameraAttributesPractical.new()
@@ -508,8 +517,10 @@ func _process(delta: float) -> void:
 			hud.center_msg("ÇATIŞMA BAŞLADI!", UI.ACCENT)
 		return
 	if not paused:
-		time_left -= delta
 		match_time += delta
+		if sab:
+			return   # round timer and bomb timer are run by sabotage.gd
+		time_left -= delta
 		if time_left <= 0:
 			time_left = 0
 			end_match()
@@ -691,7 +702,7 @@ func on_death(victim, attacker, wid: String, head: bool) -> void:
 		ae["kills"] += 1
 		ae["score"] += 100 + (50 if head else 0)
 		if head: ae["head"] += 1
-		if teams:
+		if teams and sab == null:
 			team_score[ae["team"]] += 1
 	elif teams:
 		pass
@@ -703,7 +714,6 @@ func on_death(victim, attacker, wid: String, head: bool) -> void:
 		hud.show_death(ae.get("name", "Kendini"), wid, head)
 		if attacker != null and is_instance_valid(attacker) and attacker != player:
 			_killcam(attacker)
-		GS.profile["stats"]["deaths"] = int(GS.profile["stats"]["deaths"]) + 1
 	# gun game progression
 	if mode == "gungame" and not ae.is_empty():
 		var a = attacker
@@ -721,16 +731,15 @@ func on_death(victim, attacker, wid: String, head: bool) -> void:
 			hud.center_msg("YENİ SİLAH: " + GS.WEAPONS[nw]["name"], UI.ACCENT2)
 		elif a.alive:
 			a.set_weapon(nw)
+	if sab:
+		sab.on_death(victim)   # rounds: no respawn until the next round
+		return
 	# respawn timer
 	get_tree().create_timer(3.5 if victim == player else 3.0).timeout.connect(func(): if not ended: _spawn(ve, false))
 	_check_win()
 
 func _player_kill(head: bool, wid: String) -> void:
-	GS.profile["stats"]["kills"] = int(GS.profile["stats"]["kills"]) + 1
-	GS.profile["missions"]["kills"] = int(GS.profile["missions"]["kills"]) + 1
-	if head:
-		GS.profile["stats"]["headshots"] = int(GS.profile["stats"]["headshots"]) + 1
-		GS.profile["missions"]["head"] = int(GS.profile["missions"]["head"]) + 1
+	# kills / headshots are reported once at match end (economy rules count them, see econ.gd)
 	player_streak += 1
 	var now := match_time
 	if now - last_kill_t < 4.0:
@@ -863,19 +872,16 @@ func end_match() -> void:
 	else:
 		won = sorted[0]["node"] == player
 	var place := sorted.find(pe) + 1
-	var xp: int = 200 + pe["kills"] * 100 + pe["head"] * 50 + (600 if won else 0) + max(0, 4 - place) * 100
-	var gold: int = 150 + pe["kills"] * 45 + (400 if won else 0)
-	var mats := {"demir": randi_range(6, 14) + pe["kills"], "krom": randi_range(2, 6) if randf() < 0.75 else 0, "titanyum": randi_range(1, 3) if randf() < 0.35 + (0.2 if won else 0.0) else 0, "kobalt": 1 if randf() < 0.12 + (0.1 if won else 0.0) else 0}
-	var ups := GS.add_xp(xp)
-	GS.profile["gold"] = int(GS.profile["gold"]) + gold
-	for m in mats.keys():
-		GS.profile["mats"][m] = int(GS.profile["mats"].get(m, 0)) + mats[m]
-	GS.profile["stats"]["matches"] = int(GS.profile["stats"]["matches"]) + 1
-	GS.profile["missions"]["matches"] = int(GS.profile["missions"]["matches"]) + 1
-	if won:
-		GS.profile["stats"]["wins"] = int(GS.profile["stats"]["wins"]) + 1
-		GS.profile["missions"]["wins"] = int(GS.profile["missions"].get("wins", 0)) + 1
-	GS.save_profile()
+	var summary := {"mode": mode, "kills": int(pe["kills"]), "head": int(pe["head"]), "deaths": int(pe["deaths"]), "won": won, "place": place,
+		"shots": int(player.shots_fired) if player else 0, "hits": int(player.shots_hit) if player else 0, "online": net != null}
+	var rr: Dictionary = await GS.act("match_end", summary)
+	var rw: Dictionary = rr.get("res", {})
+	var xp: int = int(rw.get("xp", 0))
+	var gold: int = int(rw.get("gold", 0))
+	var mats: Dictionary = rw.get("mats", {"demir": 0, "krom": 0, "titanyum": 0, "kobalt": 0})
+	var ups: int = int(rw.get("ups", 0))
+	if not rr["ok"] and hud:
+		hud.center_msg("Ödüller kaydedilemedi: " + str(rr["err"]), UI.RED)
 	SFX.play("success" if won else "fail")
 	SFX.play_music("music_win" if won else "music_lose", -3, false)
 	if hud and bool(GS.settings.get("announcer", true)): hud._announce("ann_win" if won else "ann_lose")
@@ -922,6 +928,23 @@ func test_hook(i: int) -> void:
 		c.current = true
 		if player: player.vm_rect.visible = false
 		if OS.has_environment("NOHUD") and hud: hud.visible = false
+	elif i == 19:
+		# scoped sniper view at the nearest bot: player gets an AWP and aims
+		var b = null
+		var bd := 1e9
+		for e in combatants:
+			if not e["is_player"]:
+				var dd: float = e["node"].global_position.distance_to(player.global_position)
+				if dd < bd:
+					bd = dd; b = e["node"]
+		player.switch_to("awp", true)
+		if b:
+			b.set_physics_process(false)
+			var tgt: Vector3 = b.global_position + Vector3.UP * 1.5
+			var dir: Vector3 = (tgt - player.cam.global_position).normalized()
+			player.rotation.y = atan2(-dir.x, -dir.z)
+			player.pitch = asin(dir.y)
+		player.test_ads = true
 	elif i == 15:
 		# close-up of a bot's hands on the weapon: HC env = "angle" (0 side, 1 front-left, 2 top)
 		var b = null
@@ -1021,7 +1044,7 @@ func test_hook(i: int) -> void:
 		player.switch_to("ak47", true)
 		if i == 18:
 			await get_tree().create_timer(0.3).timeout
-			player.ads = true
+			player.test_ads = true
 	elif i == 2:
 		# kill test: player headshots two bots in a row -> medal + blood
 		var bots := []

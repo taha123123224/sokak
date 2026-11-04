@@ -116,3 +116,6 @@ func _on_msg(d: Dictionary) -> void:
 		"end":
 			if not mt.ended:
 				mt.end_match()
+		"sys":
+			if mt.hud:
+				mt.hud.center_msg(str(d.get("msg", "")), UI.RED)

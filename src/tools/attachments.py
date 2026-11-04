@@ -54,24 +54,33 @@ def compensator():
 
 
 def holosight():
-    # EOTech-style: low base on a picatinny clamp, open window with a hood, glass and a red ring+dot reticle
+    # EOTech-style holographic sight: low base (stays BELOW the sight line), battery box under the window,
+    # thin open frame, one almost clear glass with a red ring + dot reticle
     reset(); m = mats(); root = empty('ATT_optik')
-    box('ho_clamp', (0.032, 0.075, 0.008), (0, 0, 0.004), m=m['dark'], parent=root, bevel=0.002)
-    box('ho_base', (0.034, 0.1, 0.014), (0, 0.005, 0.015), m=m['dark'], parent=root, bevel=0.004)
-    box('ho_bat', (0.03, 0.03, 0.02), (0, -0.032, 0.03), m=m['dark'], parent=root, bevel=0.004)
-    for i in range(3):
-        box(f'ho_btn{i}', (0.006, 0.005, 0.003), (-0.009 + i * 0.009, -0.047, 0.033), m=m['rubber'], parent=root, bevel=0.001)
-    zc = 0.048   # window centre height
+    m['hglass'] = mat('gun_holo_glass', (0.7, 0.9, 0.95), 0.0, 0.02, alpha=0.07)
+    box('ho_clamp', (0.03, 0.07, 0.008), (0, 0.0, 0.004), m=m['dark'], parent=root, bevel=0.002)
+    for i in range(2):
+        box(f'ho_screw{i}', (0.036, 0.006, 0.006), (0, -0.02 + i * 0.04, 0.005), m=m['grey'], parent=root, bevel=0.0015)
+    box('ho_base', (0.034, 0.075, 0.012), (0, 0.016, 0.014), m=m['dark'], parent=root, bevel=0.003)
+    # battery compartment in front, under the window (top at z=0.024)
+    box('ho_bat', (0.028, 0.034, 0.008), (0, 0.03, 0.022), m=m['dark'], parent=root, bevel=0.002)
+    cyl('ho_batcap', 0.0065, 0.004, (0.015, 0.03, 0.02), m=m['grey'], parent=root, axis='X', verts=16)
+    # buttons at the rear of the base, low
+    for i in range(2):
+        box(f'ho_btn{i}', (0.003, 0.007, 0.006), (0.0185, -0.004 + i * 0.01, 0.014), m=m['rubber'], parent=root, bevel=0.001)
+    zc = 0.054          # window centre height
+    wh = 0.044          # window opening height
+    ww = 0.054          # window opening width
+    bot = zc - wh / 2   # 0.029, above every part of the base
     for s in (-1, 1):
-        box(f'ho_wall{s}', (0.004, 0.06, 0.046), (s * 0.0185, 0.01, zc - 0.004), m=m['dark'], parent=root, bevel=0.0015)
-    box('ho_hood', (0.041, 0.064, 0.005), (0, 0.01, zc + 0.022), m=m['dark'], parent=root, bevel=0.002)
-    box('ho_hood_lip', (0.041, 0.004, 0.008), (0, 0.042, zc + 0.019), m=m['dark'], parent=root, bevel=0.0015)
-    box('ho_glass_r', (0.033, 0.002, 0.036), (0, -0.012, zc), m=m['lens'], parent=root)
-    box('ho_glass_f', (0.033, 0.002, 0.036), (0, 0.032, zc), m=m['lens'], parent=root)
+        box(f'ho_wall{s}', (0.003, 0.05, wh + 0.006), (s * (ww / 2 + 0.0015), 0.012, zc), m=m['dark'], parent=root, bevel=0.001)
+        box(f'ho_foot{s}', (0.004, 0.05, 0.008), (s * (ww / 2 + 0.0015), 0.012, bot - 0.001), m=m['dark'], parent=root, bevel=0.001)
+    box('ho_hood', (ww + 0.006, 0.05, 0.003), (0, 0.012, zc + wh / 2 + 0.0015), m=m['dark'], parent=root, bevel=0.001)
+    box('ho_glass', (ww, 0.0015, wh), (0, 0.03, zc), m=m['hglass'], parent=root)
     torus = bpy.ops.mesh.primitive_torus_add
-    torus(major_radius=0.0062, minor_radius=0.0004, location=(0, 0.031, zc), rotation=(math.radians(90), 0, 0), major_segments=32, minor_segments=4)
+    torus(major_radius=0.0058, minor_radius=0.00035, location=(0, 0.0295, zc), rotation=(math.radians(90), 0, 0), major_segments=40, minor_segments=4)
     t = bpy.context.active_object; t.name = 'ho_ring'; t.parent = root; t.data.materials.append(m['ret'])
-    sphere('ho_dot', 0.0007, (0, 0.031, zc), m=m['ret'], parent=root, seg=8, rings=4)
+    sphere('ho_dot', 0.00055, (0, 0.0295, zc), m=m['ret'], parent=root, seg=10, rings=5)
     empty('sight', (0, 0.0, zc), root)
     done('optik')
 

@@ -42,6 +42,7 @@ var content: Control
 var topbar: HBoxContainer
 var cur_box: HBoxContainer
 var nav_btns := {}
+var mode_chip: Button
 var modal: Control
 # 3D showcase
 var world: Node3D
@@ -468,15 +469,20 @@ func _build_topbar() -> void:
 	logo.texture = load("res://assets/ui/logo_bar.png")
 	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	logo.custom_minimum_size = Vector2(210, 70)
+	logo.custom_minimum_size = Vector2(170, 64)
 	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	topbar.add_child(logo)
-	topbar.add_child(UI.spacer(false, 14))
-	for it in [["lobby", "LOBİ"], ["rooms", "ODALAR"], ["friends", "ARKADAŞLAR"], ["bag", "ÇANTA"], ["market", "MARKET"], ["crate", "KASA"], ["mods", "EKLENTİLER"], ["profile", "PROFİL"], ["settings", "AYARLAR"]]:
-		var b := UI.btn(it[1], func(): show_page(it[0]), 18, false, 0, 86)
+	topbar.add_child(UI.spacer(false, 6))
+	mode_chip = UI.btn("", func(): show_page("mode"), 15, false, 0, 40)
+	mode_chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	mode_chip.tooltip_text = "Oyun modunu değiştir"
+	topbar.add_child(mode_chip)
+	topbar.add_child(UI.spacer(false, 8))
+	for it in [["lobby", "LOBİ"], ["rooms", "ODALAR"], ["friends", "ARKADAŞLAR"], ["leader", "SIRALAMA"], ["bag", "ÇANTA"], ["market", "MARKET"], ["crate", "KASA"], ["mods", "EKLENTİLER"], ["profile", "PROFİL"], ["settings", "AYARLAR"]]:
+		var b := UI.btn(it[1], func(): show_page(it[0]), 16, false, 0, 86)
 		for st in ["normal", "hover", "pressed"]:
 			var sbx := UI.sb(Color(1, 1, 1, 0.05) if st == "hover" else Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0, 0, 0)
-			sbx.content_margin_left = 13; sbx.content_margin_right = 13
+			sbx.content_margin_left = 9; sbx.content_margin_right = 9
 			b.add_theme_stylebox_override(st, sbx)
 		nav_btns[it[0]] = b
 		topbar.add_child(b)
@@ -615,7 +621,7 @@ func show_page(p: String) -> void:
 		nsb.bg_color = Color(1, 0.55, 0.12, 0.10) if on else Color(0, 0, 0, 0)
 		nsb.border_color = UI.ACCENT
 		nsb.border_width_bottom = 4 if on else 0
-		nsb.content_margin_left = 13; nsb.content_margin_right = 13
+		nsb.content_margin_left = 9; nsb.content_margin_right = 9
 		b.add_theme_stylebox_override("normal", nsb)
 	UI.clear(content)
 	if p != "lobby" and char_view != "" and char_view != GS.cur_char():
@@ -627,7 +633,11 @@ func show_page(p: String) -> void:
 	cam_target = Vector3(0.5, 1.5, 4.6)
 	cam_look = Vector3(0.5, 1.1, 0)
 	soldier.visible = true
+	_refresh_mode_chip()
+	if mode_chip:
+		mode_chip.visible = p != "mode"
 	match p:
+		"mode": _page_mode()
 		"lobby": _page_lobby()
 		"bag": _page_bag()
 		"market": _page_market()
@@ -636,6 +646,7 @@ func show_page(p: String) -> void:
 		"rooms": _page_rooms()
 		"room": _page_room()
 		"friends": online.page_friends()
+		"leader": online.page_leaderboard()
 		"netroom": online.page_room()
 		"profile": _page_profile()
 		"settings": _page_settings()
@@ -653,8 +664,8 @@ func _sets_panel(compact: bool = false) -> Control:
 	v.add_child(UI.header("SETLER", 22))
 	var tabs := UI.hbox(4)
 	v.add_child(tabs)
-	for i in 3:
-		var b := UI.btn("Set %d" % (i + 1), func(): GS.profile["active_set"] = i; GS.save_profile(); show_page(page), 18, GS.profile["active_set"] == i, 0, 38)
+	for i in GS.Econ.SET_COUNT:
+		var b := UI.btn("Set %d" % (i + 1), func(): GS.profile["active_set"] = i; GS.save_profile(); show_page(page), 15, GS.profile["active_set"] == i, 0, 38)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tabs.add_child(b)
 	var set := GS.active_set()
@@ -740,18 +751,10 @@ func _char_picker() -> Control:
 	else:
 		var price := int(info["price"])
 		var b := UI.btn("SATIN AL   %s ALTIN" % UI.money(price), func():
-			if int(GS.profile["gold"]) >= price:
-				GS.profile["gold"] = int(GS.profile["gold"]) - price
-				var own: Array = GS.profile.get("chars", ["takim", "deri", "asker1"])
-				own.append(c)
-				GS.profile["chars"] = own
-				GS.profile["char"] = c
-				GS.save_profile()
+			var r: Dictionary = await _act("buy_char", {"id": c})
+			if r["ok"]:
 				SFX.play("buy")
-				_refresh_currency()
-				show_page("lobby")
-			else:
-				SFX.play("fail"), 20, false, 0, 44)
+				show_page("lobby"), 20, false, 0, 44)
 		b.disabled = int(GS.profile["gold"]) < price
 		v.add_child(b)
 	return p
@@ -855,17 +858,15 @@ func _rank(l: int) -> String:
 	return ranks[min(l / 5, ranks.size() - 1)]
 
 func _claim(ms: Dictionary) -> void:
-	for k in ms["reward"].keys():
-		if k == "gold":
-			GS.profile["gold"] = int(GS.profile["gold"]) + int(ms["reward"][k])
-		else:
-			GS.profile["mats"][k] = int(GS.profile["mats"].get(k, 0)) + int(ms["reward"][k])
-	GS.profile["missions"]["claimed"][ms["id"]] = true
-	GS.save_profile()
-	SFX.play("buy")
+	var r: Dictionary = await _act("claim_mission", {"id": ms["id"]})
+	if r["ok"]:
+		SFX.play("buy")
 	show_page("lobby")
 
 func _quick_play() -> void:
+	if GS.play_mode == "online":
+		online.quick_join()
+		return
 	var maps := GS.MAPS.keys()
 	var cfg := {"name": "Hızlı Oyun", "map": maps[randi() % maps.size()], "mode": ["ffa", "tdm", "tdm", "ffa", "gungame"][randi() % 5], "bots": 9, "diff": 1, "time": 8, "target": 40, "team": "a", "no": randi_range(100, 999)}
 	if cfg["mode"] == "tdm": cfg["target"] = 60
@@ -1155,11 +1156,8 @@ func _parts_dialog(id: String) -> void:
 				b = UI.btn("TAK  (x%d)" % GS.parts_owned(pid), func(): GS.fit_part(id, pid); SFX.play("bolt_fwd", -4); set_showcase(id); _parts_dialog(id), 15, true, 0, 34)
 			else:
 				b = UI.btn("◉ %s" % UI.money(int(pd["price"])), func():
-					if int(GS.profile["gold"]) < int(pd["price"]):
-						_toast("Yetersiz altın!", UI.RED); return
-					GS.profile["gold"] = int(GS.profile["gold"]) - int(pd["price"])
-					if not GS.profile.has("parts"): GS.profile["parts"] = {}
-					GS.profile["parts"][pid] = GS.parts_owned(pid) + 1
+					var r: Dictionary = await _act("buy_part", {"id": pid})
+					if not r["ok"]: return
 					GS.fit_part(id, pid)
 					SFX.play("buy"); _refresh_currency(); set_showcase(id); _parts_dialog(id), 15, false, 0, 34)
 			cv.add_child(b)
@@ -1226,7 +1224,8 @@ func _upgrade_dialog(id: String) -> void:
 		pv.add_child(UI.lbl("%s (%s)" % [r[1], UI.money(have)], 14, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
 		p.custom_minimum_size = Vector2(120, 0)
 		ch.add_child(p)
-	v.add_child(UI.lbl("Başarı şansı: %%%d   (başarısız olursa malzemeler harcanır, seviye düşmez)" % cost["chance"], 18, UI.ACCENT2, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+	var risk := "başarısız olursa malzemeler harcanır ve silah 1 seviye DÜŞER" if lvl >= GS.Econ.FAIL_DROP_FROM else "başarısız olursa malzemeler harcanır, seviye düşmez"
+	v.add_child(UI.lbl("Başarı şansı: %%%d   (%s)" % [cost["chance"], risk], 18, UI.RED if lvl >= GS.Econ.FAIL_DROP_FROM else UI.ACCENT2, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
 	var pb := UI.bar(0, 1, UI.ACCENT, 14)
 	v.add_child(pb)
 	var res := UI.lbl("", 40, UI.GOLD, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
@@ -1236,8 +1235,11 @@ func _upgrade_dialog(id: String) -> void:
 	v.add_child(go)
 	go.pressed.connect(func():
 		go.disabled = true
-		GS.pay(cost)
-		GS.save_profile()
+		var ur: Dictionary = await _act("upgrade", {"wid": id})
+		if not ur["ok"]:
+			go.disabled = false
+			return
+		var up: Dictionary = ur["res"]
 		SFX.play("upgrade_charge", -2)
 		spin_speed = 9.0
 		# charging: repeated light sweeps over the weapon, getting faster and brighter
@@ -1254,10 +1256,8 @@ func _upgrade_dialog(id: String) -> void:
 		tw.tween_callback(func():
 			spin_speed = 0.5
 			rim.light_energy = 9
-			var ok := randi_range(1, 100) <= int(cost["chance"])
+			var ok := bool(up.get("success", false))
 			if ok:
-				GS.profile["owned"][id]["lvl"] = lvl + 1
-				GS.save_profile()
 				SFX.play("success")
 				res.text = "BAŞARILI!  +%d" % (lvl + 1)
 				res.add_theme_color_override("font_color", UI.GOLD)
@@ -1281,7 +1281,7 @@ func _upgrade_dialog(id: String) -> void:
 				var t5 := tr.create_tween()
 				t5.tween_method(func(x): gm.set_shader_parameter("glow", x), 1.4, 0.0, 0.9)
 				t5.parallel().tween_method(func(x): gm.set_shader_parameter("outline", x), 1.2, 0.0, 0.9)
-				res.text = "BAŞARISIZ!"
+				res.text = "BAŞARISIZ!" if int(up.get("lvl", lvl)) >= lvl else "BAŞARISIZ!  SEVİYE DÜŞTÜ: +%d" % int(up.get("lvl", lvl))
 				res.add_theme_color_override("font_color", UI.RED)
 				var t4 := v.create_tween()
 				for k in 6:
@@ -1327,11 +1327,9 @@ func _page_market() -> void:
 			fv.add_child(UI.lbl("★ " + str(GS.ball(feat).get("ability", "")), 17, UI.TEXT, "Rajdhani-SemiBold"))
 			var fp: int = int(GS.WEAPONS[feat]["price"] * 0.8)
 			var fbb := UI.btn("◉ %s   (-%%20)  SATIN AL" % UI.money(fp), func():
-				if int(GS.profile["gold"]) < fp:
-					_toast("Yetersiz altın!", UI.RED); return
-				GS.profile["gold"] = int(GS.profile["gold"]) - fp
-				GS.profile["owned"][feat] = {"lvl": 0, "skin": "std", "skins": ["std"]}
-				GS.save_profile(); SFX.play("buy"); _refresh_currency(); _toast(GS.WEAPONS[feat]["name"] + " alındı!", UI.GREEN); show_page("market"), 20, true, 330, 50)
+				var r: Dictionary = await _act("buy_weapon", {"id": feat})
+				if not r["ok"]: return
+				SFX.play("buy"); _toast(GS.WEAPONS[feat]["name"] + " alındı!", UI.GREEN); show_page("market"), 20, true, 330, 50)
 			fh.add_child(fbb)
 			fbb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var sc := ScrollContainer.new()
@@ -1399,12 +1397,9 @@ func _page_market() -> void:
 				else:
 					var pr := int(cd["price"])
 					cv.add_child(UI.btn("◉ " + UI.money(pr) + "  SATIN AL", func():
-						if int(GS.profile["gold"]) < pr:
-							_toast("Yetersiz altın!", UI.RED); return
-						GS.profile["gold"] = int(GS.profile["gold"]) - pr
-						var own: Array = GS.profile.get("chars", ["takim", "deri", "asker1"])
-						own.append(c); GS.profile["chars"] = own
-						GS.save_profile(); SFX.play("buy"); _refresh_currency(); show_page("market"), 18, true, 0, 38))
+						var r: Dictionary = await _act("buy_char", {"id": c})
+						if not r["ok"]: return
+						SFX.play("buy"); show_page("market"), 18, true, 0, 38))
 				card.mouse_entered.connect(func(): _swap_soldier(c))
 				grid.add_child(card)
 			soldier.visible = true
@@ -1425,16 +1420,9 @@ func _page_market() -> void:
 				cv.add_child(dl)
 				cv.add_child(UI.lbl("Sende: %d" % _crate_count(t), 16, Color.WHITE, "Rajdhani-Bold"))
 				cv.add_child(UI.btn("◉ " + UI.money(int(cd["price"])) + "  SATIN AL", func():
-					if int(GS.profile["gold"]) < int(cd["price"]):
-						_toast("Yetersiz altın!", UI.RED); return
-					GS.profile["gold"] = int(GS.profile["gold"]) - int(cd["price"])
-					if t == "sokak":
-						GS.profile["crates"] = int(GS.profile.get("crates", 0)) + 1
-					else:
-						var d: Dictionary = GS.profile.get("crates2", {})
-						d[t] = int(d.get(t, 0)) + 1
-						GS.profile["crates2"] = d
-					GS.save_profile(); SFX.play("buy"); _refresh_currency(); show_page("market"), 18, true, 0, 38))
+					var r: Dictionary = await _act("buy_crate", {"id": t})
+					if not r["ok"]: return
+					SFX.play("buy"); show_page("market"), 18, true, 0, 38))
 				grid.add_child(card)
 		"eklenti":
 			set_showcase(GS.active_set().get("ana", "ak47"))
@@ -1452,65 +1440,54 @@ func _page_market() -> void:
 				cv.add_child(dl)
 				cv.add_child(UI.lbl("Sende: %d   •   Yuva: %s" % [GS.parts_owned(pid), str(pd["slot"]).to_upper()], 15, Color.WHITE, "Rajdhani-Bold"))
 				cv.add_child(UI.btn("◉ " + UI.money(int(pd["price"])) + "  SATIN AL", func():
-					if int(GS.profile["gold"]) < int(pd["price"]):
-						_toast("Yetersiz altın!", UI.RED); return
-					GS.profile["gold"] = int(GS.profile["gold"]) - int(pd["price"])
-					if not GS.profile.has("parts"): GS.profile["parts"] = {}
-					GS.profile["parts"][pid] = GS.parts_owned(pid) + 1
-					GS.save_profile(); SFX.play("buy"); _refresh_currency(); _toast(pd["name"] + " alındı! Çanta > Özelleştir ile tak.", UI.GREEN); show_page("market"), 18, true, 0, 38))
+					var r: Dictionary = await _act("buy_part", {"id": pid})
+					if not r["ok"]: return
+					SFX.play("buy"); _toast(pd["name"] + " alındı! Çanta > Özelleştir ile tak.", UI.GREEN); show_page("market"), 18, true, 0, 38))
 				grid.add_child(card)
 		"malzeme":
 			set_showcase("frag")
-			for pack in [["Demir Paketi", "demir", 50, 600], ["Krom Paketi", "krom", 25, 900], ["Titanyum Paketi", "titanyum", 10, 1500], ["Kobalt Paketi", "kobalt", 5, 2500], ["Kasa Anahtarı", "crate", 1, 1000]]:
+			for pi in GS.Econ.PACKS.size():
+				var pack: Array = GS.Econ.PACKS[pi]
 				var card := UI.panel(Color(0.07, 0.085, 0.11, 0.96), UI.LINE, 14)
 				card.custom_minimum_size = Vector2(300, 170)
 				var cv := UI.vbox(8)
 				card.add_child(cv)
 				cv.add_child(UI.lbl(pack[0], 24, Color.WHITE, "RussoOne-Regular"))
 				cv.add_child(UI.lbl("x%d" % pack[2], 40, Color("c8d2dc"), "Teko"))
-				cv.add_child(UI.btn("◉ " + UI.money(pack[3]) + "  SATIN AL", func(): _buy_pack(pack), 18, true, 0, 40))
+				cv.add_child(UI.btn("◉ " + UI.money(pack[3]) + "  SATIN AL", func(): _buy_pack(pi), 18, true, 0, 40))
 				grid.add_child(card)
 
 func _buy_weapon(id: String) -> void:
-	var price: int = GS.WEAPONS[id]["price"]
-	if int(GS.profile["gold"]) < price:
-		_toast("Yetersiz altın!", UI.RED)
-		SFX.play("fail", -6)
+	var r: Dictionary = await _act("buy_weapon", {"id": id})
+	if not r["ok"]:
 		return
-	GS.profile["gold"] = int(GS.profile["gold"]) - price
-	GS.profile["owned"][id] = {"lvl": 0, "skins": ["std"], "skin": "std"}
-	GS.save_profile()
 	SFX.play("buy")
 	_toast(GS.WEAPONS[id]["name"] + " çantana eklendi!", UI.GREEN)
 	show_page("market")
 
 func _buy_skin(id: String, sk: String) -> void:
-	var price: int = GS.SKINS[sk]["price"]
-	if int(GS.profile["gold"]) < price:
-		_toast("Yetersiz altın!", UI.RED)
-		SFX.play("fail", -6)
+	var r: Dictionary = await _act("buy_skin", {"wid": id, "skin": sk})
+	if not r["ok"]:
 		return
-	GS.profile["gold"] = int(GS.profile["gold"]) - price
-	GS.profile["owned"][id]["skins"].append(sk)
-	GS.profile["owned"][id]["skin"] = sk
-	GS.save_profile()
 	SFX.play("buy")
 	_toast(GS.SKINS[sk]["name"] + " stili alındı ve uygulandı!", UI.GREEN)
 	show_page("market")
 
-func _buy_pack(pack: Array) -> void:
-	if int(GS.profile["gold"]) < int(pack[3]):
-		_toast("Yetersiz altın!", UI.RED)
-		SFX.play("fail", -6)
+func _buy_pack(i: int) -> void:
+	var r: Dictionary = await _act("buy_pack", {"i": i})
+	if not r["ok"]:
 		return
-	GS.profile["gold"] = int(GS.profile["gold"]) - int(pack[3])
-	if pack[1] == "crate":
-		GS.profile["crates"] = int(GS.profile.get("crates", 0)) + 1
-	else:
-		GS.profile["mats"][pack[1]] = int(GS.profile["mats"].get(pack[1], 0)) + int(pack[2])
-	GS.save_profile()
 	SFX.play("buy")
-	_toast(pack[0] + " alındı!", UI.GREEN)
+	_toast(str(GS.Econ.PACKS[i][0]) + " alındı!", UI.GREEN)
+
+func _act(a: String, args: Dictionary = {}) -> Dictionary:
+	## server-checked economy action (online) or local rules (offline); shows the error itself
+	var r: Dictionary = await GS.act(a, args)
+	if not r["ok"]:
+		_toast(r["err"] if r["err"] != "" else "İşlem yapılamadı", UI.RED)
+		SFX.play("fail", -6)
+	_refresh_currency()
+	return r
 
 func _toast(t: String, c: Color) -> void:
 	var p := UI.panel(Color(0.03, 0.04, 0.06, 0.95), c, 14)
@@ -1545,6 +1522,7 @@ func _page_crate() -> void:
 	var p := UI.panel(UI.BG, UI.LINE, 20)
 	p.anchor_left = 0.5; p.anchor_right = 0.5
 	p.offset_left = -640; p.offset_right = 640; p.offset_top = 24
+	p.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	content.add_child(p)
 	var v := UI.vbox(14)
 	p.add_child(v)
@@ -1619,15 +1597,13 @@ func _page_crate() -> void:
 	refresh.call()
 	hb.add_child(open)
 	open.pressed.connect(func():
-		if _crate_count(crate_type) > 0:
-			_crate_take(crate_type)
-		elif int(GS.profile["gold"]) >= cprice:
-			GS.profile["gold"] = int(GS.profile["gold"]) - cprice
-		else:
-			_toast("Yetersiz altın!", UI.RED); return
 		open.disabled = true
+		var cr: Dictionary = await _act("open_crate", {"id": crate_type})
+		if not cr["ok"]:
+			open.disabled = false
+			return
 		var win_i := 38
-		var win: Dictionary = _roll_item(crate_type)
+		var win: Dictionary = _item_display(cr["res"])
 		crate_items[win_i] = win
 		var old := strip.get_child(win_i)
 		strip.remove_child(old); old.queue_free()
@@ -1660,7 +1636,7 @@ func _page_crate() -> void:
 				SFX.play("tick", -8)
 		tw.parallel().tween_method(ticker, 0.0, 1.0, 5.5)
 		tw.tween_callback(func():
-			var label := _grant(win)
+			var label: String = win["label"] + ("  (zaten vardı: +%s altın)" % UI.money(int(win["dup"])) if win.has("dup") else "")
 			SFX.play("success")
 			res.text = "KAZANDIN: " + label
 			res.add_theme_color_override("font_color", win["color"])
@@ -1817,6 +1793,27 @@ func _crate_card(it: Dictionary) -> Control:
 	v.add_child(t)
 	return p
 
+func _item_display(it: Dictionary) -> Dictionary:
+	## raw crate result from the economy rules -> card data (label / colour / rarity)
+	var d := it.duplicate()
+	match str(it.get("type", "")):
+		"mat":
+			d["label"] = "%d %s" % [int(it["n"]), GS.MATS.get(it["id"], it["id"])]; d["color"] = Color("c8d2dc"); d["rarity"] = 0
+		"gold":
+			d["label"] = "%s Altın" % UI.money(int(it["n"])); d["color"] = UI.GOLD; d["rarity"] = 1
+		"part":
+			d["label"] = "EKLENTİ: " + str(GS.PARTS.get(it["id"], {}).get("name", it["id"])); d["color"] = Color("7dff6a"); d["rarity"] = 2
+		"weapon":
+			d["label"] = "SİLAH: " + str(GS.WEAPONS.get(it["id"], {}).get("name", it["id"])); d["color"] = Color("ff5a5a"); d["rarity"] = 3
+		"char":
+			d["label"] = "KARAKTER: " + str(GS.CHARACTERS.get(it["id"], {}).get("name", it["id"])); d["color"] = Color("ff4df0"); d["rarity"] = 3
+		_:
+			var sd: Dictionary = GS.SKINS.get(it.get("id", "std"), {"name": "?", "rarity": 0})
+			d["type"] = "skin"
+			d["label"] = "%s | %s" % [GS.WEAPONS.get(it.get("wid", "ak47"), {}).get("name", "?"), sd["name"]]
+			d["color"] = GS.RARITY_COLORS[int(sd["rarity"])]; d["rarity"] = int(sd["rarity"])
+	return d
+
 func _grant(it: Dictionary) -> String:
 	match it["type"]:
 		"part":
@@ -1847,9 +1844,206 @@ func _grant(it: Dictionary) -> String:
 			GS.profile["chars"] = own
 	return it["label"]
 
+# ================================================================ MODE SELECT (after login)
+func _refresh_mode_chip() -> void:
+	if mode_chip == null:
+		return
+	var on := GS.play_mode == "online"
+	mode_chip.text = ("●  ÇEVRİMİÇİ" if on else "◆  BOT MODU") + "   ⇄"
+	var c: Color = UI.GREEN if on else UI.ACCENT
+	for st in ["normal", "hover", "pressed"]:
+		var b := UI.sb(Color(c.r, c.g, c.b, 0.22 if st == "hover" else 0.12), Color(c.r, c.g, c.b, 0.7), 1, 4, 0)
+		b.content_margin_left = 12; b.content_margin_right = 12
+		mode_chip.add_theme_stylebox_override(st, b)
+	mode_chip.add_theme_color_override("font_color", c.lightened(0.25))
+	mode_chip.add_theme_color_override("font_hover_color", Color.WHITE)
+
+func _choose_mode(md: String) -> void:
+	if md == "online" and not Online.is_logged_in():
+		_toast("Çevrimiçi oynamak için hesabınla giriş yapmalısın.", UI.RED)
+		main.go_login()
+		return
+	GS.play_mode = md
+	SFX.play("success", -8)
+	show_page("rooms" if md == "online" else "lobby")
+
+func _page_mode() -> void:
+	soldier.visible = false
+	if studio:
+		studio.visible = false
+	cam_target = Vector3(0.5, 1.7, 7.5)
+	var root := Control.new()
+	_margin(root, 0, 0, 0, 0)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(root)
+	var shade := ColorRect.new()
+	shade.color = Color(0.015, 0.02, 0.03, 0.62)
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(shade)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(cc)
+	var v := UI.vbox(10)
+	cc.add_child(v)
+	var hi := "Hoş geldin, %s!" % (Online.username if Online.is_logged_in() else str(GS.profile.get("name", "Oyuncu")))
+	v.add_child(UI.lbl(hi.to_upper(), 20, UI.ACCENT2, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UI.lbl("OYUN MODUNU SEÇ", 54, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UI.lbl("İstediğin zaman üst çubuktaki mod düğmesinden değiştirebilirsin.", 19, UI.DIM, "Rajdhani-SemiBold", HORIZONTAL_ALIGNMENT_CENTER))
+	var acc := UI.hbox(10)
+	acc.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(acc)
+	if Online.is_logged_in():
+		acc.add_child(UI.lbl("Hesap: %s" % Online.username, 18, UI.GREEN, "Rajdhani-Bold"))
+	else:
+		acc.add_child(UI.lbl("Çevrimdışı profil", 18, UI.DIM, "Rajdhani-Bold"))
+	acc.add_child(UI.btn("HESAP DEĞİŞTİR / YENİ HESAP", func():
+		if Online.is_logged_in():
+			await Online.logout()
+		main.go_login(), 15, false, 0, 34))
+	v.add_child(UI.spacer(false, 0, 16))
+	var row := UI.hbox(34)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(row)
+	# BOT card
+	var bot := _mode_card("res://assets/ui/mode_bot.jpg", UI.ACCENT, "ANTRENMAN  •  İNTERNETSİZ", "BOT MODU",
+		"Yapay zekâ botlarına karşı oyna. Bütün haritalar, 5 oyun modu ve istediğin zorluk.", "BOTLARLA OYNA", func(): _choose_mode("bot"))
+	row.add_child(bot[0])
+	var bs := UI.hbox(26)
+	bot[1].add_child(bs)
+	for pair in [[str(GS.MAPS.size()), "HARİTA"], [str(GS.MODES.size()), "OYUN MODU"], ["3", "ZORLUK"]]:
+		bs.add_child(_mode_stat(pair[0], pair[1], UI.ACCENT2))
+	# ONLINE card
+	var on := _mode_card("res://assets/ui/mode_online.jpg", UI.GREEN, "●  CANLI  •  GERÇEK OYUNCULAR", "ÇEVRİMİÇİ",
+		"Gerçek oyuncularla oyna. Oda kur, arkadaşlarını davet et ya da açık odalara katıl.",
+		"ÇEVRİMİÇİ OYNA" if Online.is_logged_in() else "GİRİŞ YAP VE OYNA", func(): _choose_mode("online"))
+	row.add_child(on[0])
+	var os := UI.hbox(26)
+	on[1].add_child(os)
+	if Online.is_logged_in():
+		var l1 := _mode_stat("…", "ÇEVRİMİÇİ OYUNCU", UI.GREEN)
+		var l2 := _mode_stat("…", "AÇIK ODA", UI.GREEN)
+		var l3 := _mode_stat("…", "ARKADAŞ ÇEVRİMİÇİ", UI.GREEN)
+		for x in [l1, l2, l3]:
+			os.add_child(x)
+		_mode_live(l1, l2, l3)
+		var tm := Timer.new()
+		tm.wait_time = 10.0
+		tm.autostart = true
+		tm.timeout.connect(func(): _mode_live(l1, l2, l3))
+		root.add_child(tm)
+	else:
+		os.add_child(UI.lbl("Çevrimiçi oynamak için hesabınla giriş yapmalısın.", 19, UI.ACCENT2, "Rajdhani-Bold"))
+
+func _mode_stat(val: String, cap: String, c: Color) -> VBoxContainer:
+	var vv := UI.vbox(-6)
+	var n := UI.lbl(val, 40, c, "Teko")
+	n.name = "N"
+	vv.add_child(n)
+	vv.add_child(UI.lbl(cap, 14, Color(0.85, 0.88, 0.92), "Rajdhani-Bold"))
+	return vv
+
+func _mode_live(l1: Control, l2: Control, l3: Control) -> void:
+	var n: int = await Online.count_online()
+	var rooms: Array = await Online.list_rooms()
+	var fo := 0
+	for f in Online.friends:
+		if f is Dictionary and bool(f.get("online", false)) and not bool(f.get("pending", false)):
+			fo += 1
+	for pair in [[l1, maxi(n, 1)], [l2, rooms.size()], [l3, fo]]:
+		if is_instance_valid(pair[0]):
+			(pair[0].get_node("N") as Label).text = str(pair[1])
+
+func _mode_card(img: String, accent: Color, tag: String, title: String, desc: String, btn_text: String, cb: Callable) -> Array:
+	## returns [card, stats_box]
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(640, 620)
+	card.pivot_offset = Vector2(320, 310)
+	var sb0 := UI.sb(Color(0.03, 0.035, 0.05, 1), Color(accent.r, accent.g, accent.b, 0.35), 2, 6, 0)
+	var sb1 := UI.sb(Color(0.03, 0.035, 0.05, 1), accent, 3, 6, 0)
+	card.add_theme_stylebox_override("panel", sb0)
+	card.clip_contents = true
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var layer := Control.new()
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(layer)
+	var tr := TextureRect.new()
+	tr.texture = load(img)
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	tr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(tr)
+	var gr := TextureRect.new()
+	var gt := GradientTexture2D.new()
+	var g := Gradient.new()
+	g.set_color(0, Color(0.02, 0.025, 0.035, 0.05))
+	g.set_color(1, Color(0.02, 0.025, 0.035, 0.98))
+	g.add_point(0.38, Color(0.02, 0.025, 0.035, 0.5))
+	g.add_point(0.62, Color(0.02, 0.025, 0.035, 0.88))
+	gt.gradient = g
+	gt.fill_from = Vector2(0, 0); gt.fill_to = Vector2(0, 1)
+	gr.texture = gt
+	gr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	gr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	gr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(gr)
+	var top := ColorRect.new()
+	top.color = accent
+	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	top.custom_minimum_size = Vector2(0, 5)
+	top.size = Vector2(640, 5)
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(top)
+	var mg := MarginContainer.new()
+	mg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	for k in ["left", "right"]:
+		mg.add_theme_constant_override("margin_" + k, 34)
+	mg.add_theme_constant_override("margin_bottom", 30)
+	mg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(mg)
+	var v := UI.vbox(10)
+	v.alignment = BoxContainer.ALIGNMENT_END
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mg.add_child(v)
+	v.add_child(UI.lbl(tag, 17, accent.lightened(0.2), "Rajdhani-Bold"))
+	var t := UI.lbl(title, 58, Color.WHITE, "RussoOne-Regular")
+	v.add_child(t)
+	var d := UI.lbl(desc, 20, Color(0.82, 0.85, 0.9), "Rajdhani-SemiBold")
+	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	d.custom_minimum_size = Vector2(560, 0)
+	v.add_child(d)
+	var stats := UI.vbox(0)
+	stats.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(stats)
+	v.add_child(UI.spacer(false, 0, 8))
+	var b := UI.btn("▶   " + btn_text, cb, 26, true, 0, 66)
+	b.add_theme_font_override("font", UI.font("RussoOne-Regular"))
+	if accent == UI.GREEN:
+		for st in ["normal", "hover", "pressed"]:
+			var bb := UI.sb(accent.darkened(0.45 if st == "normal" else 0.3), accent, 2, 4, 0)
+			b.add_theme_stylebox_override(st, bb)
+		b.add_theme_color_override("font_color", Color.WHITE)
+	v.add_child(b)
+	card.mouse_entered.connect(func():
+		card.add_theme_stylebox_override("panel", sb1)
+		var tw := card.create_tween(); tw.tween_property(card, "scale", Vector2(1.025, 1.025), 0.12)
+		SFX.play("ui_hover", -14))
+	card.mouse_exited.connect(func():
+		card.add_theme_stylebox_override("panel", sb0)
+		var tw := card.create_tween(); tw.tween_property(card, "scale", Vector2.ONE, 0.12))
+	card.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			cb.call())
+	return [card, stats]
+
 # ================================================================ ROOMS
 var fake_rooms: Array = []
 func _page_rooms() -> void:
+	if GS.play_mode == "online":
+		online.page_online_rooms()
+		return
 	set_showcase(GS.active_set().get("ana", "ak47"))
 	if fake_rooms.is_empty():
 		_gen_rooms()
@@ -1860,11 +2054,11 @@ func _page_rooms() -> void:
 	p.add_child(v)
 	var th := UI.hbox(8)
 	v.add_child(th)
-	th.add_child(UI.header("ODA LİSTESİ", 28))
+	th.add_child(UI.header("BOT ODALARI", 28))
 	th.add_child(UI.spacer())
 	th.add_child(UI.btn("YENİLE", func(): _gen_rooms(); show_page("rooms"), 18, false, 120, 42))
 	th.add_child(UI.btn("ODA KUR (BOTLARLA)", _create_room_dialog, 18, false, 210, 42))
-	online.rooms_panel(v)
+	th.add_child(UI.btn("● ÇEVRİMİÇİ MODA GEÇ", func(): _choose_mode("online"), 16, false, 220, 42))
 	var head := UI.hbox(0)
 	v.add_child(head)
 	var cols := [["No", 70], ["Oda Adı", 360], ["Harita", 180], ["Mod", 200], ["Oyuncu", 110], ["Durum", 130]]
@@ -1914,6 +2108,11 @@ func _gen_rooms() -> void:
 		fake_rooms.append({"no": randi_range(10, 400), "name": names[i], "map": mp, "mode": md, "bots": randi_range(3, 13), "diff": randi_range(0, 2), "time": [5, 8, 10][randi() % 3], "target": 40 if md != "tdm" and md != "sniper" else 60, "team": "a", "playing": randf() < 0.3, "pass": randf() < 0.15})
 
 func _create_room_dialog() -> void:
+	if GS.play_mode == "online":
+		if not Online.is_logged_in():
+			show_page("mode"); return
+		online.create_room()
+		return
 	var cfg := {"name": str(GS.profile["name"]) + " odası", "map": "mahalle", "mode": "ffa", "bots": 9, "diff": 1, "time": 8, "target": 40, "team": "a", "no": randi_range(100, 999)}
 	_room_dialog(cfg)
 

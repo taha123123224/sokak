@@ -216,6 +216,268 @@ func rooms_panel(v: VBoxContainer) -> void:
 		rh.add_child(UI.spacer())
 		rh.add_child(UI.btn("KATIL" if str(r["state"]) == "lobby" else "MAÇTA", func(): join_room(str(r["code"])), 15, str(r["state"]) == "lobby", 100, 34))
 
+# ================================================================ ONLINE HUB (rooms page in online mode)
+var _hub_list: VBoxContainer
+var _hub_count: Label
+var _hub_friends: VBoxContainer
+
+func page_online_rooms() -> void:
+	if need_login():
+		return
+	m.set_showcase(GS.active_set().get("ana", "ak47"))
+	var p := UI.panel(UI.BG, UI.GREEN.darkened(0.45), 18)
+	m._margin(p, 28, 18, 560, 24)
+	m.content.add_child(p)
+	var v := UI.vbox(12)
+	p.add_child(v)
+	var th := UI.hbox(10)
+	v.add_child(th)
+	th.add_child(UI.lbl("● ÇEVRİMİÇİ ODALAR", 30, UI.GREEN, "RussoOne-Regular"))
+	th.add_child(UI.spacer())
+	_hub_count = UI.lbl("", 20, Color.WHITE, "Rajdhani-Bold")
+	th.add_child(_hub_count)
+	var bar := UI.hbox(10)
+	v.add_child(bar)
+	bar.add_child(UI.btn("▶  HIZLI KATIL", quick_join, 20, true, 200, 48))
+	bar.add_child(UI.btn("ODA KUR", create_room, 20, false, 150, 48))
+	var code_e := LineEdit.new()
+	code_e.placeholder_text = "Oda kodu"
+	code_e.custom_minimum_size = Vector2(160, 48)
+	bar.add_child(code_e)
+	bar.add_child(UI.btn("KODLA KATIL", func(): if code_e.text.strip_edges().length() >= 4: join_room(code_e.text.strip_edges().to_upper()), 18, false, 150, 48))
+	bar.add_child(UI.spacer())
+	bar.add_child(UI.btn("YENİLE", _hub_refresh, 16, false, 110, 48))
+	var head := UI.hbox(0)
+	v.add_child(head)
+	for c in [["Oda", 330], ["Harita", 170], ["Mod", 200], ["Oyuncu", 110], ["Kurucu", 170], ["", 120]]:
+		var l := UI.lbl(c[0], 17, UI.DIM, "Rajdhani-Bold")
+		l.custom_minimum_size = Vector2(c[1], 28)
+		head.add_child(l)
+	var sc := ScrollContainer.new()
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(sc)
+	_hub_list = UI.vbox(6)
+	_hub_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(_hub_list)
+	# online friends strip
+	var fp := UI.panel(Color(0.04, 0.07, 0.05, 0.9), UI.LINE, 10)
+	v.add_child(fp)
+	var fv := UI.vbox(6)
+	fp.add_child(fv)
+	fv.add_child(UI.lbl("ÇEVRİMİÇİ ARKADAŞLAR", 17, UI.GREEN, "Rajdhani-Bold"))
+	_hub_friends = UI.vbox(4)
+	fv.add_child(_hub_friends)
+	var tm := Timer.new()
+	tm.wait_time = 6.0
+	tm.autostart = true
+	tm.timeout.connect(_hub_refresh)
+	p.add_child(tm)
+	_hub_refresh()
+
+func _hub_refresh() -> void:
+	if m.page != "rooms" or _hub_list == null or not is_instance_valid(_hub_list):
+		return
+	var n: int = await Online.count_online()
+	var rooms: Array = await Online.list_rooms()
+	if not is_instance_valid(_hub_list):
+		return
+	_hub_count.text = "%d oyuncu çevrimiçi   •   %d açık oda" % [maxi(n, 1), rooms.size()]
+	for c in _hub_list.get_children():
+		c.queue_free()
+	if rooms.is_empty():
+		var e := UI.vbox(6)
+		e.add_child(UI.lbl("Şu an açık oda yok.", 24, Color.WHITE, "Rajdhani-Bold"))
+		e.add_child(UI.lbl("ODA KUR'a bas, arkadaşlarını davet et ya da HIZLI KATIL ile ilk odayı aç.", 18, UI.DIM, "Rajdhani-SemiBold"))
+		_hub_list.add_child(e)
+	for r in rooms:
+		var row := PanelContainer.new()
+		row.add_theme_stylebox_override("panel", UI.sb(Color(0.07, 0.09, 0.12, 0.95), Color(0.2, 0.3, 0.24), 1, 4, 8))
+		_hub_list.add_child(row)
+		var rh := UI.hbox(0)
+		row.add_child(rh)
+		var host_n := str(r["profiles"]["username"]) if r.get("profiles") is Dictionary else "?"
+		var full := int(r["players"]) >= int(r["max_players"])
+		var cells := [[str(r["name"]), 330, Color.WHITE], [GS.MAPS.get(r["map"], {}).get("name", r["map"]), 170, UI.TEXT],
+			[GS.MODES.get(r["mode"], {}).get("name", r["mode"]), 200, UI.TEXT], ["%d / %d" % [int(r["players"]), int(r["max_players"])], 110, UI.RED if full else UI.GREEN], [host_n, 170, UI.DIM]]
+		for c in cells:
+			var l := UI.lbl(str(c[0]), 19, c[2], "Rajdhani-Bold")
+			l.custom_minimum_size = Vector2(c[1], 0)
+			l.clip_text = true
+			rh.add_child(l)
+		var lobby := str(r["state"]) == "lobby"
+		var code := str(r["code"])
+		rh.add_child(UI.btn("KATIL" if lobby and not full else ("DOLU" if full else "MAÇTA"), func(): join_room(code), 16, lobby and not full, 110, 36))
+	for c in _hub_friends.get_children():
+		c.queue_free()
+	var any := false
+	for f in Online.friends:
+		if not (f is Dictionary) or not bool(f.get("online", false)) or bool(f.get("pending", false)):
+			continue
+		any = true
+		var fh := UI.hbox(10)
+		fh.add_child(UI.lbl("●  " + str(f["username"]), 18, UI.GREEN, "Rajdhani-Bold"))
+		fh.add_child(UI.lbl("Sv. %d  •  %s" % [int(f.get("level", 1)), "odada" if str(f.get("room", "")) not in ["", "<null>"] else "lobide"], 16, UI.DIM, "Rajdhani-SemiBold"))
+		fh.add_child(UI.spacer())
+		var rm := str(f.get("room", ""))
+		if rm not in ["", "<null>"]:
+			fh.add_child(UI.btn("YANINA GİT", func(): join_room(rm), 14, false, 120, 30))
+		_hub_friends.add_child(fh)
+	if not any:
+		_hub_friends.add_child(UI.lbl("Şu an çevrimiçi arkadaşın yok. ARKADAŞLAR sekmesinden arkadaş ekleyebilirsin.", 16, UI.DIM, "Rajdhani-SemiBold"))
+
+func quick_join() -> void:
+	if not Online.is_logged_in():
+		m.show_page("mode"); return
+	m._toast("Uygun oda aranıyor…", UI.GREEN)
+	var rooms: Array = await Online.list_rooms()
+	for r in rooms:
+		if str(r["state"]) == "lobby" and int(r["players"]) < int(r["max_players"]):
+			join_room(str(r["code"]))
+			return
+	create_room()
+
+# ================================================================ LEADERBOARD (SIRALAMA)
+var _lb_sort := "level"
+var _lb_box: VBoxContainer
+var _lb_podium: HBoxContainer
+var _lb_info: Label
+var _lb_sig := ""
+
+func page_leaderboard() -> void:
+	m.soldier.visible = true
+	var p := UI.panel(UI.BG, UI.LINE, 18)
+	m._margin(p, 28, 18, 560, 24)
+	m.content.add_child(p)
+	var v := UI.vbox(12)
+	p.add_child(v)
+	var th := UI.hbox(10)
+	v.add_child(th)
+	th.add_child(UI.lbl("SIRALAMA", 34, Color.WHITE, "RussoOne-Regular"))
+	th.add_child(UI.spacer(false, 14))
+	var live := UI.lbl("● CANLI", 18, UI.GREEN, "Rajdhani-Bold")
+	th.add_child(live)
+	var tw := live.create_tween().set_loops()
+	tw.tween_property(live, "modulate:a", 0.35, 0.7)
+	tw.tween_property(live, "modulate:a", 1.0, 0.7)
+	th.add_child(UI.spacer())
+	for it in [["level", "SEVİYE"], ["wins", "GALİBİYET"], ["kills", "ÖLDÜRME"]]:
+		var key: String = it[0]
+		th.add_child(UI.btn(it[1], func(): _lb_sort = key; _lb_sig = ""; m.show_page("leader"), 18, _lb_sort == key, 140, 44))
+	if not Online.is_logged_in():
+		v.add_child(UI.lbl("Sıralamayı görmek ve listeye girmek için hesabınla giriş yapmalısın.", 20, UI.ACCENT2, "Rajdhani-Bold"))
+		v.add_child(UI.btn("GİRİŞ / KAYIT EKRANINA DÖN", func(): m.main.go_login(), 20, true, 380, 56))
+		return
+	_lb_podium = UI.hbox(14)
+	_lb_podium.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(_lb_podium)
+	var head := UI.hbox(0)
+	v.add_child(head)
+	for c in [["#", 70], ["Oyuncu", 330], ["Seviye", 120], ["Galibiyet", 140], ["Öldürme", 140], ["K/D", 110], ["Maç", 100]]:
+		var l := UI.lbl(c[0], 17, UI.DIM, "Rajdhani-Bold")
+		l.custom_minimum_size = Vector2(c[1], 26)
+		head.add_child(l)
+	var sc := ScrollContainer.new()
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(sc)
+	_lb_box = UI.vbox(4)
+	_lb_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(_lb_box)
+	_lb_info = UI.lbl("Yükleniyor…", 16, UI.DIM, "Rajdhani-SemiBold")
+	v.add_child(_lb_info)
+	var tm := Timer.new()
+	tm.wait_time = 5.0
+	tm.autostart = true
+	tm.timeout.connect(_lb_refresh)
+	p.add_child(tm)
+	_lb_sig = ""
+	Online.save_now()
+	_lb_refresh()
+
+func _lb_val(r: Dictionary, k: String) -> int:
+	var x = r.get(k)
+	return int(x) if x != null else 0
+
+func _lb_refresh() -> void:
+	if m.page != "leader" or _lb_box == null or not is_instance_valid(_lb_box):
+		return
+	var rows: Array = await Online.leaderboard(_lb_sort, 50)
+	if not is_instance_valid(_lb_box):
+		return
+	var t := Time.get_time_string_from_system()
+	_lb_info.text = "%d oyuncu  •  son güncelleme %s  •  her 5 saniyede yenilenir" % [rows.size(), t]
+	var sig := JSON.stringify(rows.map(func(r): return [r.get("username"), r.get("level"), r.get("wins"), r.get("kills"), r.get("last_seen", "").substr(0, 16)]))
+	if sig == _lb_sig:
+		return
+	_lb_sig = sig
+	for c in _lb_box.get_children():
+		c.queue_free()
+	for c in _lb_podium.get_children():
+		c.queue_free()
+	var now := Time.get_unix_time_from_system()
+	var medal := [Color("ffc23d"), Color("cfd8e3"), Color("d9894a")]
+	for i in rows.size():
+		var r: Dictionary = rows[i]
+		var me := str(r.get("id", "")) == Online.uid
+		var online := false
+		var ls := str(r.get("last_seen", ""))
+		if ls != "":
+			online = now - Time.get_unix_time_from_datetime_string(ls.substr(0, 19)) < 75
+		var k := _lb_val(r, "kills")
+		var d := _lb_val(r, "deaths")
+		if i < 3:
+			_lb_podium.add_child(_lb_card(i, r, medal[i], online))
+		var row := PanelContainer.new()
+		var bg := Color(0.16, 0.1, 0.03, 0.95) if me else Color(0.07, 0.085, 0.11, 0.92)
+		row.add_theme_stylebox_override("panel", UI.sb(bg, UI.ACCENT if me else (medal[i] if i < 3 else Color(0.16, 0.19, 0.25)), 1, 4, 6))
+		_lb_box.add_child(row)
+		var rh := UI.hbox(0)
+		row.add_child(rh)
+		var cells := [["%d" % (i + 1), 70, medal[i] if i < 3 else UI.DIM, "Teko", 26],
+			[("● " if online else "   ") + str(r.get("username", "?")) + ("  (sen)" if me else ""), 330, UI.GREEN if online else Color.WHITE, "Rajdhani-Bold", 20],
+			[str(_lb_val(r, "level")), 120, UI.ACCENT2, "Rajdhani-Bold", 20],
+			[str(_lb_val(r, "wins")), 140, Color.WHITE, "Rajdhani-Bold", 20],
+			[str(k), 140, Color.WHITE, "Rajdhani-Bold", 20],
+			["%.2f" % (float(k) / maxf(1.0, float(d))), 110, UI.DIM, "Rajdhani-SemiBold", 19],
+			[str(_lb_val(r, "matches")), 100, UI.DIM, "Rajdhani-SemiBold", 19]]
+		for c in cells:
+			var l := UI.lbl(c[0], c[4], c[2], c[3])
+			l.custom_minimum_size = Vector2(c[1], 0)
+			l.clip_text = true
+			rh.add_child(l)
+		row.modulate.a = 0.0
+		var tw := row.create_tween()
+		tw.tween_interval(0.02 * i)
+		tw.tween_property(row, "modulate:a", 1.0, 0.25)
+
+func _lb_card(i: int, r: Dictionary, c: Color, online: bool) -> Control:
+	var pc := PanelContainer.new()
+	pc.custom_minimum_size = Vector2(300, 150 if i == 0 else 130)
+	pc.size_flags_vertical = Control.SIZE_SHRINK_END
+	var sbx := UI.sb(Color(c.r * 0.18, c.g * 0.18, c.b * 0.18, 0.95), c, 2, 6, 14)
+	pc.add_theme_stylebox_override("panel", sbx)
+	var vv := UI.vbox(2)
+	pc.add_child(vv)
+	var h := UI.hbox(8)
+	vv.add_child(h)
+	h.add_child(UI.lbl(["1.", "2.", "3."][i], 40, c, "Teko"))
+	var nm := UI.lbl(str(r.get("username", "?")), 26, Color.WHITE, "RussoOne-Regular")
+	nm.clip_text = true
+	nm.custom_minimum_size = Vector2(200, 0)
+	h.add_child(nm)
+	var stat := ""
+	match _lb_sort:
+		"wins": stat = "%d galibiyet" % _lb_val(r, "wins")
+		"kills": stat = "%d öldürme" % _lb_val(r, "kills")
+		_: stat = "Seviye %d" % _lb_val(r, "level")
+	vv.add_child(UI.lbl(stat, 24, c.lightened(0.2), "Rajdhani-Bold"))
+	vv.add_child(UI.lbl("● çevrimiçi" if online else "çevrimdışı", 16, UI.GREEN if online else UI.DIM, "Rajdhani-SemiBold"))
+	pc.pivot_offset = pc.custom_minimum_size / 2
+	pc.scale = Vector2(0.9, 0.9)
+	pc.create_tween().tween_property(pc, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	return pc
+
 func _code() -> String:
 	var abc := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	var c := ""

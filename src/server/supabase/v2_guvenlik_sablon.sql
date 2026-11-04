@@ -1,0 +1,366 @@
+-- SOKAK: Operasyon — v2 GÜVENLİK (sunucu taraflı ekonomi)
+-- Supabase > SQL Editor > New query > bu dosyanın TAMAMINI yapıştır > RUN.  (schema.sql'den sonra, bir kez)
+--
+-- Ne yapar?
+--  * Oyuncu artık profilindeki altın / malzeme / silah / seviye / istatistik alanlarına DOĞRUDAN yazamaz.
+--  * Satın alma, kasa açma, silah yükseltme, görev ödülü ve maç ödülü yalnızca sunucudaki
+--    sokak_act() fonksiyonu üzerinden yapılır: fiyatlar, şanslar ve ödül sınırları sunucuda hesaplanır.
+--  * Yeni hesaplar sunucunun verdiği başlangıç profiliyle açılır (istemcinin gönderdiği profil kabul edilmez).
+
+-- ---------- katalog (fiyatlar, kasalar, görevler — oyundan otomatik üretildi) ----------
+create table if not exists public.sokak_catalog (id int primary key, data jsonb not null);
+insert into public.sokak_catalog (id, data) values (1, $CATALOG$__CATALOG__$CATALOG$::jsonb)
+  on conflict (id) do update set data = excluded.data;
+alter table public.sokak_catalog enable row level security;
+revoke all on public.sokak_catalog from anon, authenticated;
+
+-- ---------- profil yazma izinlerini kısıtla ----------
+revoke insert, update, delete on public.profiles from anon, authenticated;
+grant insert (id, username) on public.profiles to authenticated;
+grant update (status, room, last_seen) on public.profiles to authenticated;
+
+create or replace function public.sokak_profile_defaults() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  new.data := (select c.data->'default' from sokak_catalog c where c.id = 1) || jsonb_build_object('name', new.username);
+  new.level := 1;
+  return new;
+end $$;
+drop trigger if exists sokak_profile_defaults on public.profiles;
+create trigger sokak_profile_defaults before insert on public.profiles
+  for each row execute function public.sokak_profile_defaults();
+
+-- ---------- yardımcılar ----------
+create or replace function public._si(j jsonb, path text[]) returns bigint language sql immutable as $$
+  select coalesce(floor((j #>> path)::numeric)::bigint, 0)
+$$;
+
+create or replace function public._pick(arr jsonb) returns text language sql volatile as $$
+  select case when jsonb_typeof(arr) = 'array' and jsonb_array_length(arr) > 0
+    then arr ->> floor(random() * jsonb_array_length(arr))::int else null end
+$$;
+
+create or replace function public._add_xp(p jsonb, amount bigint, out np jsonb, out ups int)
+language plpgsql as $$
+declare lv int; xp bigint;
+begin
+  lv := _si(p, '{level}'); xp := _si(p, '{xp}') + amount; ups := 0;
+  while xp >= floor(1200 * power(lv, 1.35)) loop
+    xp := xp - floor(1200 * power(lv, 1.35))::bigint;
+    lv := lv + 1; ups := ups + 1;
+    p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + 500));
+    p := jsonb_set(p, '{crates}', to_jsonb(_si(p, '{crates}') + 1));
+  end loop;
+  p := jsonb_set(p, '{xp}', to_jsonb(xp));
+  np := jsonb_set(p, '{level}', to_jsonb(lv));
+end $$;
+
+create or replace function public._pay(p jsonb, n bigint) returns jsonb language plpgsql as $$
+begin
+  if n < 0 or _si(p, '{gold}') < n then raise exception 'Yetersiz altın!'; end if;
+  return jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') - n));
+end $$;
+
+create or replace function public._crate_add(p jsonb, t text, n int) returns jsonb language plpgsql as $$
+begin
+  if t = 'sokak' then
+    return jsonb_set(p, '{crates}', to_jsonb(greatest(0, _si(p, '{crates}') + n)));
+  end if;
+  if not (p ? 'crates2') or jsonb_typeof(p->'crates2') <> 'object' then p := jsonb_set(p, '{crates2}', '{}'); end if;
+  return jsonb_set(p, array['crates2', t], to_jsonb(greatest(0, _si(p, array['crates2', t]) + n)));
+end $$;
+
+-- ---------- ana işlem fonksiyonu ----------
+create or replace function public.sokak_act(a text, args jsonb default '{}'::jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  uid uuid := auth.uid();
+  p jsonb; cat jsonb; res jsonb := '{}'::jsonb;
+  id text; wid text; sk text; t text; price bigint; lvl int; ch int; ok boolean; nl int;
+  cost jsonb; m text; r float8; it jsonb; arr jsonb; tot float8; pick float8; w float8; rr int;
+  ms jsonb; k text; t0 float8; secs float8; kills int; head int; deaths int; won boolean; place int;
+  shots bigint; hits bigint; is_full boolean; xp bigint; gold bigint; mats jsonb; ups int; i int;
+  s jsonb; sets jsonb; cur jsonb; slot text; lst jsonb; slots jsonb; pid text; wp jsonb; nowt float8;
+begin
+  if uid is null then raise exception 'Giriş yapmalısın'; end if;
+  select pr.data into p from profiles pr where pr.id = uid for update;
+  if p is null then raise exception 'Profil bulunamadı'; end if;
+  select c.data into cat from sokak_catalog c where c.id = 1;
+  nowt := extract(epoch from clock_timestamp());
+  if not (p ? 'parts') or jsonb_typeof(p->'parts') <> 'object' then p := jsonb_set(p, '{parts}', '{}'); end if;
+  if not (p ? 'chars') or jsonb_typeof(p->'chars') <> 'array' then p := jsonb_set(p, '{chars}', '["takim","deri","asker1"]'); end if;
+
+  case a
+  when 'buy_weapon' then
+    id := args->>'id';
+    if cat->'weapons'->id is null or (cat->'weapons'->id->>'throwable')::boolean or _si(cat, array['weapons', id, 'price']) <= 0 then
+      raise exception 'Bu silah satılmıyor'; end if;
+    if p->'owned' ? id then raise exception 'Bu silaha zaten sahipsin'; end if;
+    price := _si(cat, array['weapons', id, 'price']);
+    select f into k from jsonb_array_elements_text(cat->'featured') with ordinality as x(f, o)
+      where not (p->'owned' ? f) order by o limit 1;
+    if k = id then price := floor(price * 0.8); end if;
+    p := _pay(p, price);
+    p := jsonb_set(p, array['owned', id], '{"lvl":0,"skins":["std"],"skin":"std"}');
+    res := jsonb_build_object('id', id, 'price', price);
+
+  when 'buy_skin' then
+    wid := args->>'wid'; sk := args->>'skin';
+    if not (p->'owned' ? wid) or cat->'skins'->sk is null or sk = 'std' then raise exception 'Geçersiz stil'; end if;
+    if (p->'owned'->wid->'skins') ? sk then raise exception 'Bu stile zaten sahipsin'; end if;
+    p := _pay(p, _si(cat, array['skins', sk, 'price']));
+    p := jsonb_set(p, array['owned', wid, 'skins'], coalesce(p->'owned'->wid->'skins', '["std"]') || to_jsonb(sk));
+    p := jsonb_set(p, array['owned', wid, 'skin'], to_jsonb(sk));
+
+  when 'buy_part' then
+    id := args->>'id';
+    if cat->'parts'->id is null then raise exception 'Geçersiz eklenti'; end if;
+    p := _pay(p, _si(cat, array['parts', id, 'price']));
+    p := jsonb_set(p, array['parts', id], to_jsonb(_si(p, array['parts', id]) + 1));
+
+  when 'buy_char' then
+    id := args->>'id';
+    if cat->'chars'->id is null then raise exception 'Geçersiz karakter'; end if;
+    if (p->'chars') ? id or _si(cat, array['chars', id, 'price']) = 0 then raise exception 'Bu karaktere zaten sahipsin'; end if;
+    p := _pay(p, _si(cat, array['chars', id, 'price']));
+    p := jsonb_set(p, '{chars}', (p->'chars') || to_jsonb(id));
+    p := jsonb_set(p, '{char}', to_jsonb(id));
+
+  when 'buy_crate' then
+    t := args->>'id';
+    if cat->'crates'->t is null then raise exception 'Geçersiz kasa'; end if;
+    p := _pay(p, _si(cat, array['crates', t, 'price']));
+    p := _crate_add(p, t, 1);
+
+  when 'buy_pack' then
+    i := coalesce((args->>'i')::int, -1);
+    if i < 0 or i >= jsonb_array_length(cat->'packs') then raise exception 'Geçersiz paket'; end if;
+    arr := cat->'packs'->i;
+    p := _pay(p, _si(arr, '{3}'));
+    if arr->>1 = 'crate' then p := _crate_add(p, 'sokak', _si(arr, '{2}')::int);
+    else p := jsonb_set(p, array['mats', arr->>1], to_jsonb(_si(p, array['mats', arr->>1]) + _si(arr, '{2}'))); end if;
+
+  when 'open_crate' then
+    t := args->>'id';
+    if cat->'crates'->t is null then raise exception 'Geçersiz kasa'; end if;
+    if (t = 'sokak' and _si(p, '{crates}') > 0) or (t <> 'sokak' and _si(p, array['crates2', t]) > 0) then
+      p := _crate_add(p, t, -1);
+    else
+      p := _pay(p, _si(cat, array['crates', t, 'price']));
+    end if;
+    r := random();
+    it := null;
+    if t <> 'efsane' and r < (case when t = 'sokak' then 0.3 else 0.18 end) then
+      m := (array['demir','demir','krom','titanyum','kobalt'])[1 + floor(random() * 5)::int];
+      it := jsonb_build_object('type', 'mat', 'id', m, 'n', (jsonb_build_object('demir',40,'krom',20,'titanyum',8,'kobalt',3)->>m)::int);
+    elsif t <> 'efsane' and r < (case when t = 'sokak' then 0.5 else 0.3 end) then
+      it := jsonb_build_object('type', 'gold', 'n', (array[500,800,1200,2500])[1 + floor(random() * 4)::int]);
+    end if;
+    if it is null and jsonb_array_length(coalesce(cat->'crates'->t->'parts', '[]')) > 0
+       and random() < (case when t = 'eklenti' then 0.85 else 0.12 end) then
+      it := jsonb_build_object('type', 'part', 'id', _pick(cat->'crates'->t->'parts'));
+    end if;
+    if it is null and jsonb_array_length(coalesce(cat->'crates'->t->'weapons', '[]')) > 0 and random() < 0.10 then
+      it := jsonb_build_object('type', 'weapon', 'id', _pick(cat->'crates'->t->'weapons'));
+    end if;
+    if it is null and jsonb_array_length(coalesce(cat->'crates'->t->'chars', '[]')) > 0 and random() < 0.06 then
+      it := jsonb_build_object('type', 'char', 'id', _pick(cat->'crates'->t->'chars'));
+    end if;
+    if it is null then
+      select o into wid from jsonb_object_keys(p->'owned') o
+        where cat->'weapons'->o is not null and not (cat->'weapons'->o->>'throwable')::boolean order by random() limit 1;
+      wid := coalesce(wid, 'ak47');
+      arr := cat->'crates'->t->'skins';
+      tot := 0;
+      for sk in select jsonb_array_elements_text(arr) loop
+        rr := _si(cat, array['skins', sk, 'rarity'])::int;
+        tot := tot + (case when t = 'efsane' then (array[0, 0, 4, 1.2])[rr + 1] else (array[10, 5, 2, 0.5])[rr + 1] end);
+      end loop;
+      pick := random() * greatest(tot, 0.001);
+      k := arr->>0;
+      for sk in select jsonb_array_elements_text(arr) loop
+        rr := _si(cat, array['skins', sk, 'rarity'])::int;
+        pick := pick - (case when t = 'efsane' then (array[0, 0, 4, 1.2])[rr + 1] else (array[10, 5, 2, 0.5])[rr + 1] end);
+        if pick <= 0 then k := sk; exit; end if;
+      end loop;
+      it := jsonb_build_object('type', 'skin', 'wid', wid, 'id', k);
+    end if;
+    -- grant
+    case it->>'type'
+    when 'part' then p := jsonb_set(p, array['parts', it->>'id'], to_jsonb(_si(p, array['parts', it->>'id']) + 1));
+    when 'mat' then p := jsonb_set(p, array['mats', it->>'id'], to_jsonb(_si(p, array['mats', it->>'id']) + _si(it, '{n}')));
+    when 'gold' then p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + _si(it, '{n}')));
+    when 'skin' then
+      if (p->'owned' ? (it->>'wid')) and not ((p->'owned'->(it->>'wid')->'skins') ? (it->>'id')) then
+        p := jsonb_set(p, array['owned', it->>'wid', 'skins'], (p->'owned'->(it->>'wid')->'skins') || to_jsonb(it->>'id'));
+      else
+        it := it || jsonb_build_object('dup', _si(cat, array['skins', it->>'id', 'price']) / 2);
+        p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + _si(it, '{dup}')));
+      end if;
+    when 'weapon' then
+      if p->'owned' ? (it->>'id') then
+        it := it || jsonb_build_object('dup', _si(cat, array['weapons', it->>'id', 'price']) / 2);
+        p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + _si(it, '{dup}')));
+      else
+        p := jsonb_set(p, array['owned', it->>'id'], '{"lvl":0,"skins":["std"],"skin":"std"}');
+      end if;
+    when 'char' then
+      if (p->'chars') ? (it->>'id') then
+        it := it || '{"dup":1500}'::jsonb;
+        p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + 1500));
+      else
+        p := jsonb_set(p, '{chars}', (p->'chars') || to_jsonb(it->>'id'));
+      end if;
+    end case;
+    res := it;
+
+  when 'upgrade' then
+    wid := args->>'wid';
+    if not (p->'owned' ? wid) or cat->'weapons'->wid is null or (cat->'weapons'->wid->>'throwable')::boolean then
+      raise exception 'Geçersiz silah'; end if;
+    lvl := _si(p, array['owned', wid, 'lvl'])::int;
+    if lvl >= jsonb_array_length(cat->'chances') then raise exception 'Silah en yüksek seviyede'; end if;
+    cost := jsonb_build_object('gold', 400 * (lvl + 1), 'demir', 18 * (lvl + 1),
+      'krom', case when lvl >= 1 then 10 * lvl else 0 end, 'titanyum', case when lvl >= 3 then 5 * (lvl - 2) else 0 end,
+      'kobalt', case when lvl >= 5 then 4 * (lvl - 4) else 0 end);
+    if _si(p, '{gold}') < _si(cost, '{gold}') then raise exception 'Yetersiz altın!'; end if;
+    foreach m in array array['demir','krom','titanyum','kobalt'] loop
+      if _si(p, array['mats', m]) < _si(cost, array[m]) then raise exception 'Yetersiz malzeme!'; end if;
+    end loop;
+    p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') - _si(cost, '{gold}')));
+    foreach m in array array['demir','krom','titanyum','kobalt'] loop
+      p := jsonb_set(p, array['mats', m], to_jsonb(_si(p, array['mats', m]) - _si(cost, array[m])));
+    end loop;
+    ch := (cat->'chances'->>lvl)::int;
+    ok := (1 + floor(random() * 100)::int) <= ch;
+    nl := case when ok then lvl + 1 when lvl >= 5 then lvl - 1 else lvl end;
+    p := jsonb_set(p, array['owned', wid, 'lvl'], to_jsonb(nl));
+    res := jsonb_build_object('success', ok, 'lvl', nl, 'prev', lvl);
+
+  when 'claim_mission' then
+    id := args->>'id';
+    select x into ms from jsonb_array_elements(cat->'missions') x where x->>'id' = id;
+    if ms is null then raise exception 'Görev bulunamadı'; end if;
+    if p->'missions'->'claimed' ? id then raise exception 'Ödül zaten alındı'; end if;
+    if _si(p, array['missions', ms->>'key']) < _si(ms, '{goal}') then raise exception 'Görev henüz tamamlanmadı'; end if;
+    for k in select jsonb_object_keys(ms->'reward') loop
+      if k = 'gold' then p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + _si(ms, array['reward', k])));
+      else p := jsonb_set(p, array['mats', k], to_jsonb(_si(p, array['mats', k]) + _si(ms, array['reward', k]))); end if;
+    end loop;
+    p := jsonb_set(p, array['missions', 'claimed', id], 'true');
+
+  when 'match_start' then
+    p := jsonb_set(p, '{_t0}', to_jsonb(nowt));
+
+  when 'match_end' then
+    t0 := coalesce((p->>'_t0')::float8, 0);
+    p := p - '_t0';
+    secs := case when t0 > 0 then least(greatest(nowt - t0, 0), 1800) else 0 end;
+    kills := least(greatest(coalesce((args->>'kills')::int, 0), 0), least(50, floor(secs / 6)::int));
+    head := least(greatest(coalesce((args->>'head')::int, 0), 0), kills);
+    deaths := least(greatest(coalesce((args->>'deaths')::int, 0), 0), 200);
+    won := coalesce((args->>'won')::boolean, false) and secs >= 60;
+    place := least(greatest(coalesce((args->>'place')::int, 10), 1), 20);
+    shots := least(greatest(coalesce((args->>'shots')::bigint, 0), 0), floor(secs * 15)::bigint);
+    hits := least(greatest(coalesce((args->>'hits')::bigint, 0), 0), shots);
+    is_full := secs >= 45;
+    if is_full then
+      xp := 200 + kills * 100 + head * 50 + (case when won then 600 else 0 end) + greatest(0, 4 - place) * 100;
+      gold := 150 + kills * 45 + (case when won then 400 else 0 end);
+      mats := jsonb_build_object('demir', 6 + floor(random() * 9)::int + kills,
+        'krom', case when random() < 0.75 then 2 + floor(random() * 5)::int else 0 end,
+        'titanyum', case when random() < 0.35 + (case when won then 0.2 else 0 end) then 1 + floor(random() * 3)::int else 0 end,
+        'kobalt', case when random() < 0.12 + (case when won then 0.1 else 0 end) then 1 else 0 end);
+    else
+      xp := kills * 50; gold := kills * 20;
+      mats := '{"demir":0,"krom":0,"titanyum":0,"kobalt":0}';
+    end if;
+    select np, x.ups into p, ups from _add_xp(p, xp) x;
+    p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + gold));
+    foreach m in array array['demir','krom','titanyum','kobalt'] loop
+      p := jsonb_set(p, array['mats', m], to_jsonb(_si(p, array['mats', m]) + _si(mats, array[m])));
+    end loop;
+    p := jsonb_set(p, '{stats,kills}', to_jsonb(_si(p, '{stats,kills}') + kills));
+    p := jsonb_set(p, '{stats,headshots}', to_jsonb(_si(p, '{stats,headshots}') + head));
+    p := jsonb_set(p, '{stats,deaths}', to_jsonb(_si(p, '{stats,deaths}') + deaths));
+    p := jsonb_set(p, '{stats,shots}', to_jsonb(_si(p, '{stats,shots}') + shots));
+    p := jsonb_set(p, '{stats,hits}', to_jsonb(_si(p, '{stats,hits}') + hits));
+    p := jsonb_set(p, '{missions,kills}', to_jsonb(_si(p, '{missions,kills}') + kills));
+    p := jsonb_set(p, '{missions,head}', to_jsonb(_si(p, '{missions,head}') + head));
+    if is_full then
+      p := jsonb_set(p, '{stats,matches}', to_jsonb(_si(p, '{stats,matches}') + 1));
+      p := jsonb_set(p, '{missions,matches}', to_jsonb(_si(p, '{missions,matches}') + 1));
+    end if;
+    if won then
+      p := jsonb_set(p, '{stats,wins}', to_jsonb(_si(p, '{stats,wins}') + 1));
+      p := jsonb_set(p, '{missions,wins}', to_jsonb(_si(p, '{missions,wins}') + 1));
+    end if;
+    res := jsonb_build_object('xp', xp, 'gold', gold, 'mats', mats, 'ups', ups, 'won', won);
+
+  when 'sync' then
+    s := args;
+    if jsonb_typeof(s->'sets') = 'array' then
+      sets := '[]';
+      for i in 0 .. (cat->>'sets')::int - 1 loop
+        cur := coalesce(p->'sets'->i, p->'sets'->0, '{}');
+        if jsonb_typeof(s->'sets'->i) = 'object' then
+          foreach slot in array array['ana','tabanca','bicak','bomba'] loop
+            wid := s->'sets'->i->>slot;
+            if wid is not null and (p->'owned' ? wid) and cat->'weapons'->wid->>'cat' = slot then
+              cur := jsonb_set(cur, array[slot], to_jsonb(wid));
+            end if;
+          end loop;
+        end if;
+        sets := sets || jsonb_build_array(cur);
+      end loop;
+      p := jsonb_set(p, '{sets}', sets);
+    end if;
+    if s ? 'active_set' then
+      p := jsonb_set(p, '{active_set}', to_jsonb(least(greatest(coalesce((s->>'active_set')::int, 0), 0), (cat->>'sets')::int - 1)));
+    end if;
+    if s ? 'char' then
+      id := s->>'char';
+      if id = '' or (cat->'chars'->id is not null and (_si(cat, array['chars', id, 'price']) = 0 or (p->'chars') ? id)) then
+        p := jsonb_set(p, '{char}', to_jsonb(coalesce(id, '')));
+      end if;
+    end if;
+    if jsonb_typeof(s->'skins') = 'object' then
+      for wid in select jsonb_object_keys(s->'skins') loop
+        sk := s->'skins'->>wid;
+        if p->'owned' ? wid and coalesce(p->'owned'->wid->'skins', '["std"]') ? sk then
+          p := jsonb_set(p, array['owned', wid, 'skin'], to_jsonb(sk));
+        end if;
+      end loop;
+    end if;
+    if jsonb_typeof(s->'wparts') = 'object' then
+      wp := '{}';
+      for wid in select jsonb_object_keys(s->'wparts') loop
+        if not (p->'owned' ? wid) or jsonb_typeof(s->'wparts'->wid) <> 'array' then continue; end if;
+        lst := '[]'; slots := '{}';
+        for pid in select jsonb_array_elements_text(s->'wparts'->wid) loop
+          if cat->'parts'->pid is null or _si(p, array['parts', pid]) <= 0
+             or not ((cat->'parts'->pid->'fits') ? wid) or slots ? (cat->'parts'->pid->>'slot') then continue; end if;
+          slots := slots || jsonb_build_object(cat->'parts'->pid->>'slot', true);
+          lst := lst || to_jsonb(pid);
+        end loop;
+        if jsonb_array_length(lst) > 0 then wp := wp || jsonb_build_object(wid, lst); end if;
+      end loop;
+      p := jsonb_set(p, '{wparts}', wp);
+    end if;
+
+  when 'reset' then
+    p := (cat->'default') || jsonb_build_object('name', p->>'name');
+
+  when 'get' then
+    null;
+
+  else
+    raise exception 'Bilinmeyen işlem';
+  end case;
+
+  update profiles set data = p, level = _si(p, '{level}')::int, last_seen = now() where profiles.id = uid;
+  return jsonb_build_object('profile', p, 'res', res);
+end $$;
+
+revoke all on function public.sokak_act(text, jsonb) from public, anon;
+grant execute on function public.sokak_act(text, jsonb) to authenticated;

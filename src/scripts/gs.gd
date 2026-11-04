@@ -161,37 +161,114 @@ func full_stats(id: String, parts = null) -> Dictionary:
 const LVL_GLOW_COLS := [Color(0, 0, 0), Color(0.3, 0.75, 1.0), Color(0.3, 0.75, 1.0), Color(0.65, 0.4, 1.0), Color(0.65, 0.4, 1.0), Color(1.0, 0.5, 0.15), Color(1.0, 0.5, 0.15), Color(1.0, 0.82, 0.3)]
 var _glow_shader: Shader
 
+func _is_optic_mesh(mi: MeshInstance3D) -> bool:
+	## glass / reticle surfaces must never get the upgrade overlay (it would cloud the sight picture)
+	if mi.mesh == null:
+		return false
+	for k in mi.mesh.get_surface_count():
+		var sm := mi.mesh.surface_get_material(k)
+		var n := sm.resource_name if sm else ""
+		if "glass" in n or "holo" in n or "ret" in n or "dot" in n or "lens" in n:
+			return true
+	return false
+
 func level_glow(gun: Node3D, id: String, strength: float = 1.0) -> void:
-	## upgraded weapons carry a coloured energy rim (+1/2 blue, +3/4 purple, +5/6 orange, +7 gold) with a moving sweep
+	## Upgrade tiers: +1/2 cyan, +3/4 violet, +5/6 ember, +7 gold.
+	## No surface tint (the skin stays fully visible): thin energy lines run along the weapon's hard edges,
+	## a faint silhouette rim, and a narrow light sweep every few seconds. In the menu/inspect (strength >= 1)
+	## tier 3+ also gets a soft particle aura.
 	var lvl := wlvl(id)
-	if lvl <= 0 or gun == null:
+	if gun == null:
+		return
+	for old in gun.find_children("LvlAura", "GPUParticles3D", true, false):
+		old.queue_free()
+	if lvl <= 0:
+		for mi in gun.find_children("*", "MeshInstance3D", true, false):
+			(mi as MeshInstance3D).material_overlay = null
 		return
 	if _glow_shader == null:
 		_glow_shader = Shader.new()
 		_glow_shader.code = """shader_type spatial;
-render_mode unshaded, blend_add, depth_draw_never, cull_back;
+render_mode unshaded, blend_add, depth_draw_never, cull_back, depth_test_default;
 uniform vec4 col : source_color = vec4(1.0, 0.6, 0.2, 1.0);
 uniform float power = 1.0;
+uniform float tier = 1.0;
 varying vec3 lp;
 void vertex() { lp = VERTEX; }
 void fragment() {
-	// thin rim only on silhouette edges (does not cover the skin pattern)
-	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 5.0);
-	// a narrow diagonal glint passes over the weapon about every 3.5 s, then it rests
-	float cyc = fract(TIME * 0.28);
-	float lane = lp.z * 1.6 + lp.y * 1.2;
-	float head = cyc * 3.4 - 1.7;
-	float glint = (1.0 - smoothstep(0.0, 0.022, abs(lane - head))) * step(cyc, 0.55);
-	float sparkle = pow(max(sin(lp.x * 140.0 + lp.z * 90.0 + TIME * 3.0), 0.0), 40.0) * 0.25;
-	ALBEDO = col.rgb * (rim * 0.5 + glint * 0.8 + sparkle * rim) * power;
+	// crease detection: the view-space normal changes sharply across hard edges
+	float edge = smoothstep(0.35, 0.9, length(fwidth(NORMAL)) * 4.0);
+	// energy flowing along the edges, faster and brighter on higher tiers
+	float flow = 0.55 + 0.45 * sin(lp.z * 38.0 - TIME * (2.0 + tier * 0.5) + lp.y * 20.0);
+	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 6.0) * 0.28;
+	// narrow sweep of light along the barrel every ~4 s
+	float cyc = fract(TIME * 0.25);
+	float head = cyc * 3.2 - 1.6;
+	float glint = (1.0 - smoothstep(0.0, 0.03, abs(lp.z * 1.4 + lp.y * 0.8 - head))) * step(cyc, 0.5);
+	// tiny sparkles only on the top tier
+	float spark = step(6.5, tier) * pow(max(sin(lp.x * 210.0 + TIME * 4.0) * sin(lp.z * 170.0 - TIME * 3.0), 0.0), 30.0);
+	ALBEDO = col.rgb * (edge * flow * 0.85 + rim + glint * 0.5 + spark * 1.5) * power;
 }"""
-
 	var m := ShaderMaterial.new()
 	m.shader = _glow_shader
 	m.set_shader_parameter("col", LVL_GLOW_COLS[clamp(lvl, 0, 7)])
-	m.set_shader_parameter("power", (0.5 + lvl * 0.08) * strength)
+	m.set_shader_parameter("power", (0.55 + lvl * 0.07) * strength)
+	m.set_shader_parameter("tier", float(lvl))
+	gun.set_meta("glow_mat", m)
+	gun.set_meta("glow_power", (0.55 + lvl * 0.07) * strength)
+	var aabb := AABB()
+	var first := true
 	for mi in gun.find_children("*", "MeshInstance3D", true, false):
-		(mi as MeshInstance3D).material_overlay = m
+		var mm := mi as MeshInstance3D
+		if _is_optic_mesh(mm):
+			mm.material_overlay = null
+			continue
+		mm.material_overlay = m
+		if mm.mesh:
+			var bb: AABB = gun.global_transform.affine_inverse() * mm.global_transform * mm.get_aabb()
+			aabb = bb if first else aabb.merge(bb)
+			first = false
+	if strength >= 1.0 and lvl >= 3 and not first:
+		var p := GPUParticles3D.new()
+		p.name = "LvlAura"
+		p.amount = 24 + lvl * 6
+		p.lifetime = 1.6
+		p.local_coords = true
+		var pm := ParticleProcessMaterial.new()
+		pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+		pm.emission_box_extents = aabb.size * 0.5
+		pm.direction = Vector3.UP
+		pm.spread = 25.0
+		pm.initial_velocity_min = 0.02
+		pm.initial_velocity_max = 0.08
+		pm.gravity = Vector3(0, 0.03, 0)
+		pm.scale_min = 0.6
+		pm.scale_max = 1.2
+		var cr := Curve.new()
+		cr.add_point(Vector2(0, 0)); cr.add_point(Vector2(0.25, 1)); cr.add_point(Vector2(1, 0))
+		var ct := CurveTexture.new(); ct.curve = cr
+		pm.scale_curve = ct
+		p.process_material = pm
+		var q := QuadMesh.new()
+		q.size = Vector2(0.012, 0.012)
+		var qm := StandardMaterial3D.new()
+		qm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		qm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		qm.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		qm.albedo_color = LVL_GLOW_COLS[clamp(lvl, 0, 7)] * 1.6
+		var gt := GradientTexture2D.new()
+		gt.fill = GradientTexture2D.FILL_RADIAL
+		gt.fill_from = Vector2(0.5, 0.5); gt.fill_to = Vector2(0.5, 0.0)
+		var gr := Gradient.new(); gr.set_color(0, Color.WHITE); gr.set_color(1, Color(1, 1, 1, 0))
+		gt.gradient = gr
+		qm.albedo_texture = gt
+		qm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		qm.vertex_color_use_as_albedo = true
+		q.material = qm
+		p.draw_pass_1 = q
+		p.position = aabb.get_center()
+		p.visibility_aabb = AABB(-aabb.size, aabb.size * 2.0)
+		gun.add_child(p)
 
 func _att(pid: String) -> Node3D:
 	var path := "res://assets/models/att_%s.glb" % pid
@@ -264,6 +341,7 @@ var MODES := {
 	"gungame": {"name": "Silah Oyunu", "desc": "Her öldürmede silahın değişir. Son silah bıçak!", "teams": false},
 	"knife": {"name": "Bıçak Arenası", "desc": "Sadece bıçak ve el bombası. Saf refleks.", "teams": false},
 	"sniper": {"name": "Nişancı Düellosu", "desc": "Sadece keskin nişancı tüfekleri. Takımlı.", "teams": true},
+	"sabotaj": {"name": "Sabotaj", "desc": "KARTAL bombayı A ya da B noktasına kurar, AKREP çözer. Turlu, ilk 6 turu alan kazanır.", "teams": true, "offline_only": true},
 }
 const TEAMS := {"a": "KARTAL", "b": "AKREP"}
 const TEAM_COLORS := {"a": Color("3d8bff"), "b": Color("ff4d3d")}
@@ -304,6 +382,7 @@ const MISSIONS := [
 var profile: Dictionary = {}
 var settings: Dictionary = {}
 var room: Dictionary = {}       # current room config for match
+var play_mode := ""             # "bot" or "online" (chosen after login, per session)
 var last_result: Dictionary = {}
 
 func _ready() -> void:
@@ -317,26 +396,10 @@ func _ready() -> void:
 
 # ---------------------------------------------------------------- profile
 func default_profile() -> Dictionary:
-	return {
-		"name": "Oyuncu%d" % randi_range(100, 999), "level": 1, "xp": 0, "gold": 7500,
-		"mats": {"demir": 150, "krom": 50, "titanyum": 15, "kobalt": 5},
-		"owned": {
-			"ak47": {"lvl": 0, "skins": ["std"], "skin": "std"},
-			"mp5": {"lvl": 0, "skins": ["std"], "skin": "std"},
-			"glock": {"lvl": 0, "skins": ["std"], "skin": "std"},
-			"knife": {"lvl": 0, "skins": ["std"], "skin": "std"},
-			"frag": {"lvl": 0, "skins": ["std"], "skin": "std"},
-		},
-		"sets": [
-			{"ana": "ak47", "tabanca": "glock", "bicak": "knife", "bomba": "frag"},
-			{"ana": "mp5", "tabanca": "glock", "bicak": "knife", "bomba": "frag"},
-			{"ana": "ak47", "tabanca": "glock", "bicak": "knife", "bomba": "frag"},
-		],
-		"active_set": 0,
-		"stats": {"kills": 0, "deaths": 0, "matches": 0, "wins": 0, "headshots": 0, "shots": 0, "hits": 0},
-		"missions": {"kills": 0, "head": 0, "matches": 0, "wins": 0, "claimed": {}},
-		"crates": 1,
-	}
+	var d := Econ.default_profile_base()
+	d["name"] = "Oyuncu%d" % randi_range(100, 999)
+	d["char"] = "takim"
+	return d
 
 func load_profile() -> void:
 	profile = default_profile()
@@ -357,6 +420,18 @@ func sanitize_profile() -> void:
 	# json numbers -> ints where needed
 	profile["level"] = int(profile["level"]); profile["xp"] = int(profile["xp"]); profile["gold"] = int(profile["gold"])
 	profile["active_set"] = int(profile["active_set"])
+	profile["crates"] = int(profile.get("crates", 0))
+	for grp in ["stats", "mats"]:
+		var gd: Dictionary = profile[grp]
+		for k in gd.keys():
+			gd[k] = int(gd[k])
+	for k in profile["missions"].keys():
+		if k != "claimed":
+			profile["missions"][k] = int(profile["missions"][k])
+	for k in profile["parts"].keys() if profile.get("parts") is Dictionary else []:
+		profile["parts"][k] = int(profile["parts"][k])
+	for k in profile["crates2"].keys() if profile.get("crates2") is Dictionary else []:
+		profile["crates2"][k] = int(profile["crates2"][k])
 	# items from eklentiler that are not loaded right now are parked, not lost
 	var dormant: Dictionary = profile.get("dormant", {})
 	for w in dormant.keys():
@@ -376,6 +451,14 @@ func sanitize_profile() -> void:
 		if not SKINS.has(str(profile["owned"][w].get("skin", "std"))):
 			profile["owned"][w]["skin"] = "std"
 	var defaults := {"ana": "ak47", "tabanca": "glock", "bicak": "knife", "bomba": "frag"}
+	if not (profile["sets"] is Array):
+		profile["sets"] = []
+	while (profile["sets"] as Array).size() < Econ.SET_COUNT:
+		profile["sets"].append(defaults.duplicate())
+	profile["active_set"] = clampi(int(profile["active_set"]), 0, Econ.SET_COUNT - 1)
+	for k2 in ["parts", "wparts", "crates2"]:
+		if not (profile.get(k2) is Dictionary):
+			profile[k2] = {}
 	for st in profile["sets"]:
 		for c in (st as Dictionary).keys():
 			if not owned(str(st[c])):
@@ -383,10 +466,66 @@ func sanitize_profile() -> void:
 	if not CHARACTERS.has(str(profile.get("char", "takim"))):
 		profile["char"] = "takim"
 
+const Econ = preload("res://scripts/econ.gd")
+var _cat_cache: Dictionary = {}
+
+func _online() -> bool:
+	return has_node("/root/Online") and get_node("/root/Online").is_logged_in()
+
+func catalog() -> Dictionary:
+	## economy catalog built from the loaded game data (the server keeps its own copy of the base catalog)
+	if not _cat_cache.is_empty():
+		return _cat_cache
+	var w := {}
+	for id in WEAPONS.keys():
+		var d: Dictionary = WEAPONS[id]
+		w[id] = {"price": int(d.get("price", 0)), "cat": str(d["cat"]), "throwable": bool(d.get("throwable", false)), "melee": bool(d.get("melee", false))}
+	var sk := {}
+	for id in SKINS.keys():
+		sk[id] = {"price": int(SKINS[id]["price"]), "rarity": int(SKINS[id]["rarity"])}
+	var parts := {}
+	for pid in PARTS.keys():
+		var fits := []
+		for wid in WEAPONS.keys():
+			if part_fits(pid, wid):
+				fits.append(wid)
+		parts[pid] = {"price": int(PARTS[pid]["price"]), "slot": str(PARTS[pid]["slot"]), "fits": fits}
+	var cr := {}
+	for id in CRATES.keys():
+		var c: Dictionary = CRATES[id]
+		cr[id] = {"price": int(c["price"]), "skins": c.get("skins", []), "weapons": c.get("weapons", []), "chars": c.get("chars", []), "parts": c.get("parts", [])}
+	var ch := {}
+	for id in CHARACTERS.keys():
+		ch[id] = {"price": int(CHARACTERS[id]["price"])}
+	_cat_cache = {"weapons": w, "skins": sk, "parts": parts, "crates": cr, "chars": ch, "missions": MISSIONS, "packs": Econ.PACKS, "featured": Econ.FEATURED}
+	return _cat_cache
+
+func act(a: String, args: Dictionary = {}) -> Dictionary:
+	## Every economy change goes through here. Online accounts: the server performs it and returns the
+	## authoritative profile. Offline: the same rules run locally (scripts/econ.gd).
+	if _online():
+		var r: Dictionary = await get_node("/root/Online").act(a, args)
+		if not r.get("fallback", false):
+			if r["ok"] and r.get("profile") is Dictionary:
+				var keep_name := str(profile.get("name", ""))
+				profile = r["profile"]
+				if keep_name != "" and not profile.has("name"):
+					profile["name"] = keep_name
+				sanitize_profile()
+				profile_changed.emit()
+			return {"ok": r["ok"], "err": r["err"], "res": r.get("res", {})}
+	var res: Dictionary = Econ.act(profile, catalog(), a, args, Time.get_unix_time_from_system())
+	if res["ok"]:
+		sanitize_profile()
+		save_profile(a == "match_start")
+	return res
+
 func save_profile(local_only: bool = false) -> void:
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f:
-		f.store_string(JSON.stringify(profile))
+	# online accounts live on the server; the local file is the offline profile only
+	if not _online():
+		var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+		if f:
+			f.store_string(JSON.stringify(profile))
 	if not local_only and has_node("/root/Online"):
 		get_node("/root/Online").queue_save()   # cloud save (debounced)
 	profile_changed.emit()
@@ -418,6 +557,9 @@ func add_xp(amount: int) -> int:
 	return ups
 
 func upgrade_cost(lvl: int) -> Dictionary:
+	return Econ.upgrade_cost(lvl)
+
+func _old_upgrade_cost(lvl: int) -> Dictionary:
 	var chances := [100, 95, 85, 75, 60, 45, 35]
 	return {
 		"gold": 300 * (lvl + 1), "demir": 15 * (lvl + 1), "krom": 8 * lvl if lvl >= 1 else 0,
@@ -607,6 +749,7 @@ func load_settings_raw() -> void:
 
 func load_mods() -> void:
 	mods.clear()
+	_cat_cache = {}
 	var disabled: Array = settings.get("mods_disabled", [])
 	for root in mod_dirs():
 		var da := DirAccess.open(root)
@@ -635,10 +778,24 @@ func _apply_mod(j: Dictionary, dir: String, info: Dictionary) -> void:
 		var base := str(wd.get("base", "ak47"))
 		if not WEAPONS.has(base):
 			continue
-		var w: Dictionary = (WEAPONS[base] as Dictionary).duplicate(true)
+		if WEAPONS.has(wid) and not mod_weapon_model.has(wid):
+			push_warning("Eklenti orijinal silahı değiştiremez: " + wid)
+			continue
+		var b0: Dictionary = WEAPONS[base]
+		var w: Dictionary = b0.duplicate(true)
 		for k in wd.keys():
 			if k != "base" and k != "model":
 				w[k] = wd[k]
+		# balance guard: a mod weapon can never be much stronger than the weapon it is based on
+		for lim in [["dmg", 1.1], ["rpm", 1.15], ["mag", 1.5], ["head", 1.0], ["range", 1.2], ["pellets", 1.0]]:
+			if b0.has(lim[0]) and w.has(lim[0]):
+				w[lim[0]] = min(float(w[lim[0]]), float(b0[lim[0]]) * lim[1])
+				if lim[0] in ["mag", "rpm", "pellets"]:
+					w[lim[0]] = int(w[lim[0]])
+		for lim2 in ["spread", "ads_spread", "recoil", "hrec", "reload"]:
+			if b0.has(lim2) and w.has(lim2):
+				w[lim2] = max(float(w[lim2]), float(b0[lim2]) * 0.85)
+		w["mod"] = true
 		WEAPONS[wid] = w
 		if wd.has("model"):
 			mod_weapon_model[wid] = {"glb": dir.path_join(str(wd["model"])), "base": base}
@@ -745,7 +902,7 @@ func write_example_mod() -> String:
 		"desc": "Yeni silah, stil, karakter ve kasa ekleyen örnek eklenti. Düzenleyip kendi eklentini yap!",
 		"weapons": {"ak_kizil": {"base": "ak47", "name": "AK-47 Kızıl Kurt", "dmg": 35, "rpm": 620, "price": 4000, "cls": "Makinalı"},
 			"mp5_hiz": {"base": "mp5", "name": "MP5 Şimşek", "rpm": 900, "dmg": 21, "price": 3000}},
-		"skins": {"pembe": {"name": "Pembe Panter", "price": 900, "rarity": 1, "color": "#ff5fb0"}},
+		"skins": {"pembe": {"name": "Pembe Şeker", "price": 900, "rarity": 1, "color": "#ff5fb0"}},
 		"characters": {"ajan2": {"base": "patron", "name": "Gizli Ajan", "team": "a", "price": 0, "desc": "Eklentiden gelen karakter"}},
 		"crates": {"ornek": {"name": "Eklenti Kasası", "price": 1200, "color": "#ff5fb0", "desc": "Örnek eklenti kasası", "skins": ["pembe", "kamuflaj", "kizil"], "weapons": ["ak_kizil", "mp5_hiz"], "chars": ["ajan2"]}}
 	}

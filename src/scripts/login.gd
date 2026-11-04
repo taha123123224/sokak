@@ -23,6 +23,8 @@ var bar: ProgressBar
 var ticker: Label
 var logo: TextureRect
 var busy := false
+var resume_box: PanelContainer
+var resume_lbl: Label
 const SERVERS := [["TR-İstanbul #1", 18], ["TR-Ankara #2", 24], ["EU-Frankfurt", 46]]
 
 func _ready() -> void:
@@ -164,6 +166,22 @@ func _build_ui() -> void:
 	var acc := ColorRect.new(); acc.color = UI.ACCENT; acc.custom_minimum_size = Vector2(6, 40)
 	hh.add_child(acc)
 	hh.add_child(UI.lbl("GİRİŞ", 38, Color.WHITE, "RussoOne-Regular"))
+	# saved account (filled by _try_resume): continue with it or sign out to use another account
+	resume_box = PanelContainer.new()
+	resume_box.add_theme_stylebox_override("panel", UI.sb(Color(0.05, 0.12, 0.07, 0.95), UI.GREEN.darkened(0.2), 1, 8, 12))
+	resume_box.visible = false
+	v.add_child(resume_box)
+	var rv := UI.vbox(8)
+	resume_box.add_child(rv)
+	resume_lbl = UI.lbl("", 20, Color.WHITE, "Rajdhani-Bold")
+	rv.add_child(resume_lbl)
+	var rh := UI.hbox(8)
+	rv.add_child(rh)
+	var rb1 := UI.btn("▶  DEVAM ET", func(): if not busy: _enter("Hoş geldin, %s!" % Online.username), 18, true, 0, 44)
+	rb1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var rb2 := UI.btn("ÇIKIŞ YAP / HESAP DEĞİŞTİR", _switch_account, 16, false, 0, 44)
+	rb2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rh.add_child(rb1); rh.add_child(rb2)
 	# --- tabs: GİRİŞ / KAYIT OL
 	var tabs := UI.hbox(8)
 	v.add_child(tabs)
@@ -185,7 +203,10 @@ func _build_ui() -> void:
 	pass2_edit = _field("", true)
 	v.add_child(pass2_edit)
 	name_edit.text_submitted.connect(func(_t): pass_edit.grab_focus())
-	pass_edit.text_submitted.connect(func(_t): _login())
+	# Enter and the button go through the same _login() checks (password repeat included)
+	pass_edit.text_submitted.connect(func(_t):
+		if register_mode: pass2_edit.grab_focus()
+		else: _login())
 	pass2_edit.text_submitted.connect(func(_t): _login())
 	v.add_child(UI.spacer())
 	status_lbl = UI.lbl("", 18, UI.ACCENT2, "Rajdhani-Bold")
@@ -201,7 +222,7 @@ func _build_ui() -> void:
 	v.add_child(row)
 	var b0 := UI.btn("ÇEVRİMDIŞI OYNA", _offline, 18, false, 0, 44)
 	b0.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var b1 := UI.btn("AYARLAR", func(): if main: main.go_menu("settings"), 18, false, 0, 44)
+	var b1 := UI.btn("AYARLAR", _open_settings, 18, false, 0, 44)
 	b1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var b2 := UI.btn("ÇIKIŞ", func(): get_tree().quit(), 18, false, 0, 44)
 	b2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -305,7 +326,10 @@ func _try_resume() -> void:
 	busy = false
 	bar.visible = false
 	if ok:
-		_enter("Hoş geldin, %s!" % Online.username)
+		# never enter automatically: show the saved account and let the player choose
+		resume_lbl.text = "Kayıtlı hesap:  %s   (Seviye %d)" % [Online.username, int(GS.profile.get("level", 1))]
+		resume_box.visible = true
+		_msg("", false)
 	else:
 		_msg("", false)
 
@@ -322,8 +346,8 @@ func _login() -> void:
 		_msg(bad, true); return
 	if pw.length() < 6:
 		_msg("Şifre en az 6 karakter olmalı", true); return
-	if register_mode and pw != pass2_edit.text:
-		_msg("Şifreler aynı değil", true); return
+	if register_mode and (pass2_edit.text == "" or pw != pass2_edit.text):
+		_msg("Şifreler aynı değil", true); pass2_edit.grab_focus(); return
 	busy = true
 	SFX.play("ui_click")
 	bar.visible = true; bar.value = 0.3
@@ -340,9 +364,37 @@ func _login() -> void:
 		return
 	_enter("Hoş geldin, %s!" % Online.username)
 
+func _switch_account() -> void:
+	if busy:
+		return
+	busy = true
+	await Online.logout()
+	busy = false
+	resume_box.visible = false
+	name_edit.text = ""
+	pass_edit.text = ""
+	name_edit.grab_focus()
+	_msg("Çıkış yapıldı. Başka bir hesapla giriş yapabilir ya da KAYIT OL ile yeni hesap açabilirsin.", false)
+
+func _open_settings() -> void:
+	## settings as an overlay on the login screen (no account is entered)
+	var bg := ColorRect.new()
+	bg.color = Color(0.02, 0.025, 0.035, 0.94)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ui.add_child(bg)
+	var su := preload("res://scripts/settings_ui.gd").new()
+	su.set_anchors_preset(Control.PRESET_FULL_RECT)
+	su.offset_left = 120; su.offset_top = 24; su.offset_right = -120; su.offset_bottom = -24
+	su.on_close = func(): bg.queue_free(); su.queue_free()
+	ui.add_child(su)
+
 func _offline() -> void:
 	if busy:
 		return
+	# offline play never uses an online account: sign out of the saved session and load the local profile
+	if Online.is_logged_in():
+		await Online.go_offline()
+		resume_box.visible = false
 	var n := name_edit.text.strip_edges()
 	if n.length() >= 3:
 		GS.profile["name"] = n
@@ -356,7 +408,7 @@ func _enter(t: String) -> void:
 	SFX.play("success", -6)
 	var tw := create_tween()
 	tw.tween_property(bar, "value", 1.0, 0.6)
-	tw.tween_callback(func(): if main: main.go_menu())
+	tw.tween_callback(func(): if main: main.go_menu("mode"))
 
 func _on_update(info: Dictionary) -> void:
 	upd_panel.visible = true

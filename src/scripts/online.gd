@@ -135,11 +135,19 @@ func register(n: String, pw: String) -> String:
 		return "Supabase'de e-posta onayı kapalı olmalı (Authentication > Providers > Email > Confirm email: KAPALI)"
 	_take_session(r["data"])
 	username = n
-	var p := await _req(HTTPClient.METHOD_POST, "/rest/v1/profiles", {"id": uid, "username": n, "data": GS.profile, "level": int(GS.profile.get("level", 1))}, PackedStringArray(["Prefer: return=minimal"]))
+	var p := await _req(HTTPClient.METHOD_POST, "/rest/v1/profiles", {"id": uid, "username": n}, PackedStringArray(["Prefer: return=minimal"]))
 	if not p["ok"]:
 		return p["err"]
+	# a brand-new account always starts from the default profile (never from a local/offline save)
+	GS.profile = GS.default_profile()
 	GS.profile["name"] = n
-	GS.save_profile()
+	await _load_profile()
+	if server_v2 != 1:
+		var chk: Dictionary = await act("get", {})
+		if chk.get("fallback", false):
+			await _req(HTTPClient.METHOD_PATCH, "/rest/v1/profiles?id=eq." + uid, {"data": GS.profile, "level": 1}, PackedStringArray(["Prefer: return=minimal"]))
+		elif chk["ok"] and chk["profile"] is Dictionary:
+			GS.profile = chk["profile"]; GS.sanitize_profile()
 	_after_login()
 	return ""
 
@@ -171,11 +179,22 @@ func try_resume() -> bool:
 	_after_login()
 	return true
 
+func go_offline() -> void:
+	## play offline this session without signing out (the saved session stays for next time)
+	if is_logged_in():
+		await set_status("offline")
+	token = ""; uid = ""; username = ""
+	server_v2 = -1
+	GS.load_profile()
+
 func logout() -> void:
 	if is_logged_in():
 		await set_status("offline")
 	token = ""; uid = ""; refresh = ""; username = ""
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SESSION))
+	server_v2 = -1
+	GS.load_profile()
+	GS.play_mode = ""
 	logged_out.emit()
 
 func _take_session(d: Dictionary) -> void:
@@ -197,6 +216,8 @@ func _load_profile() -> bool:
 	if d is Dictionary and d.size() > 3:
 		GS.profile = d          # continue exactly where the account left off
 		GS.sanitize_profile()
+	else:
+		GS.profile = GS.default_profile()
 	GS.profile["name"] = username
 	GS.save_profile(true)
 	return true
@@ -211,10 +232,38 @@ func queue_save() -> void:
 	if is_logged_in():
 		_save_t = 3.0
 
+var server_v2 := -1      # -1 unknown, 1 = sokak_act exists (server-side economy), 0 = old server
+
+func act(a: String, args: Dictionary) -> Dictionary:
+	## {"ok", "err", "profile", "res", "fallback"}; fallback=true means the server is still on v1 (no sokak_act)
+	if server_v2 == 0:
+		return {"ok": false, "err": "", "fallback": true}
+	var r := await _req(HTTPClient.METHOD_POST, "/rest/v1/rpc/sokak_act", {"a": a, "args": args})
+	if r["code"] == 404 or (r["data"] is Dictionary and str(r["data"].get("code", "")) == "PGRST202"):
+		server_v2 = 0
+		push_warning("Sunucuda sokak_act yok: v2_guvenlik.sql çalıştırılmalı (geçici olarak eski kayıt yöntemi)")
+		return {"ok": false, "err": "", "fallback": true}
+	if r["ok"] and r["data"] is Dictionary:
+		server_v2 = 1
+		return {"ok": true, "err": "", "profile": r["data"].get("profile"), "res": r["data"].get("res", {}) if r["data"].get("res") is Dictionary else {}}
+	return {"ok": false, "err": r["err"] if r["err"] != "" else "Sunucu hatası", "profile": null, "res": {}}
+
+func _cosmetic() -> Dictionary:
+	var skins := {}
+	for w in GS.profile.get("owned", {}).keys():
+		skins[w] = str(GS.profile["owned"][w].get("skin", "std"))
+	return {"sets": GS.profile.get("sets", []), "active_set": int(GS.profile.get("active_set", 0)), "char": str(GS.profile.get("char", "")),
+		"skins": skins, "wparts": GS.profile.get("wparts", {})}
+
 func save_now() -> void:
 	if not is_logged_in():
 		return
 	_save_t = -1.0
+	if server_v2 != 0:
+		var r: Dictionary = await act("sync", _cosmetic())
+		if not r.get("fallback", false):
+			return
+	# old (v1) server: whole profile upload
 	await _req(HTTPClient.METHOD_PATCH, "/rest/v1/profiles?id=eq." + uid, {"data": GS.profile, "level": int(GS.profile.get("level", 1))}, PackedStringArray(["Prefer: return=minimal"]))
 
 # ---------------------------------------------------------------- presence
@@ -316,6 +365,24 @@ func publish_room(code: String, cfg: Dictionary, players: int, state: String = "
 func close_room(code: String) -> void:
 	if is_logged_in():
 		await _req(HTTPClient.METHOD_DELETE, "/rest/v1/rooms?code=eq." + code, null, PackedStringArray(["Prefer: return=minimal"]))
+
+func count_online() -> int:
+	## players seen in the last 75 s (heartbeat every 30 s)
+	if not is_logged_in():
+		return 0
+	var since := Time.get_datetime_string_from_unix_time(int(Time.get_unix_time_from_system()) - 75) + "Z"
+	var r := await _req(HTTPClient.METHOD_GET, "/rest/v1/profiles?select=id&last_seen=gt.%s&limit=2000" % since)
+	return (r["data"] as Array).size() if r["ok"] and r["data"] is Array else 0
+
+func leaderboard(sort_key: String, limit: int = 50) -> Array:
+	## sort_key: level | wins | kills
+	var order := "level.desc,last_seen.desc"
+	if sort_key == "wins":
+		order = "data->stats->wins.desc.nullslast,level.desc"
+	elif sort_key == "kills":
+		order = "data->stats->kills.desc.nullslast,level.desc"
+	var r := await _req(HTTPClient.METHOD_GET, "/rest/v1/profiles?select=id,username,level,last_seen,wins:data->stats->wins,kills:data->stats->kills,deaths:data->stats->deaths,matches:data->stats->matches&order=%s&limit=%d" % [order, limit])
+	return r["data"] if r["ok"] and r["data"] is Array else []
 
 func list_rooms() -> Array:
 	var since := Time.get_datetime_string_from_unix_time(int(Time.get_unix_time_from_system()) - 120) + "Z"

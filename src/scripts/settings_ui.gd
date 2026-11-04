@@ -181,14 +181,40 @@ func _build() -> void:
 			_check("damage_numbers", "Hasar Göstergesi")
 			if not in_match:
 				_section("PROFİL")
-				var le := LineEdit.new()
-				le.text = str(GS.profile["name"])
-				le.max_length = 16
-				le.custom_minimum_size = Vector2(300, 42)
-				le.text_changed.connect(func(t): if t.strip_edges().length() >= 3: GS.profile["name"] = t.strip_edges())
-				_row("Oyuncu Adı", le)
-				var rb := UI.btn("PROFİLİ SIFIRLA", func(): GS.profile = GS.default_profile(); GS.save_profile(); _build(), 18, false, 260, 42)
-				_row("Tüm ilerleme", rb, "Dikkat: geri alınamaz!")
+				var on := Online.is_logged_in()
+				if on:
+					_row("Hesap", UI.lbl(Online.username + "  (çevrimiçi hesap)", 20, UI.GREEN, "Rajdhani-Bold"))
+				else:
+					var le := LineEdit.new()
+					le.text = str(GS.profile["name"])
+					le.max_length = 16
+					le.custom_minimum_size = Vector2(300, 42)
+					le.text_changed.connect(func(t): if t.strip_edges().length() >= 3: GS.profile["name"] = t.strip_edges())
+					_row("Oyuncu Adı (çevrimdışı)", le)
+				var rb := UI.btn("PROFİLİ SIFIRLA", _confirm_reset, 18, false, 260, 42)
+				_row("Tüm ilerleme", rb, "Hesabının bütün ilerlemesi sunucuda silinir. Geri alınamaz!" if on else "Çevrimdışı profilin silinir. Geri alınamaz!")
+
+var _reset_armed := false
+
+func _confirm_reset() -> void:
+	## two-step: first press arms, second press within 4 s resets (on the server for online accounts)
+	if not _reset_armed:
+		_reset_armed = true
+		var tip := UI.lbl("Emin misin? Sıfırlamak için 4 saniye içinde tekrar bas.", 20, UI.RED, "Rajdhani-Bold")
+		tip.name = "ResetTip"
+		add_child(tip)
+		tip.position = Vector2(40, size.y - 60)
+		get_tree().create_timer(4.0).timeout.connect(func():
+			_reset_armed = false
+			if is_instance_valid(tip): tip.queue_free())
+		return
+	_reset_armed = false
+	var r: Dictionary = await GS.act("reset")
+	if r["ok"]:
+		SFX.play("success", -6)
+	else:
+		SFX.play("fail", -6)
+	_build()
 
 func _input(e: InputEvent) -> void:
 	if rebinding != "" and e is InputEventKey and e.pressed:

@@ -149,6 +149,12 @@ func setup_loadout(set: Dictionary, mode: String) -> void:
 		for c in GS.SLOT_ORDER:
 			if set.has(c):
 				slots[c] = set[c]
+	# online matches: only original weapons (eklenti/mod weapons fall back to their base weapon)
+	if match_node and match_node.net:
+		for c in slots.keys():
+			var wid0: String = slots[c]
+			if GS.WEAPONS.get(wid0, {}).get("mod", false):
+				slots[c] = str(GS.mod_weapon_model.get(wid0, {}).get("base", "ak47"))
 	ammo.clear()
 	for c in slots.keys():
 		var id: String = slots[c]
@@ -312,10 +318,12 @@ func _process(delta: float) -> void:
 		pitch += step.x
 		yaw += step.y
 		recoil_vel -= step
-	if not Input.is_action_pressed("fire") or fire_cd > 0.12:
-		var rec: float = min(recoil_pitch, delta * 0.6)
+	# only a small part of the kick settles back by itself (no "pull" back onto the target):
+	# the player has to control the spray
+	if not Input.is_action_pressed("fire") or fire_cd > 0.2:
+		var rec: float = min(recoil_pitch, delta * 0.35)
 		recoil_pitch -= rec
-		pitch -= rec * 0.9
+		pitch -= rec * 0.35
 	if not Input.is_action_pressed("fire"):
 		shots_in_burst = 0
 		trigger_released = true
@@ -348,7 +356,7 @@ func _process(delta: float) -> void:
 		if throw_t <= 0:
 			_finish_throw()
 	# ADS
-	var want_ads: bool = Input.is_action_pressed("aim") and not frozen and reload_t <= 0 and equip_t <= 0 and bolt_t <= 0 and not wdata.get("melee", false) and not wdata.get("throwable", false)
+	var want_ads: bool = (Input.is_action_pressed("aim") or test_ads) and not frozen and reload_t <= 0 and equip_t <= 0 and bolt_t <= 0 and not wdata.get("melee", false) and not wdata.get("throwable", false)
 	if want_ads != ads:
 		ads = want_ads
 		if ads:
@@ -356,6 +364,8 @@ func _process(delta: float) -> void:
 			if wdata.get("scope", false):
 				SFX.play("scope_in", -6)
 	ads_k = move_toward(ads_k, 1.0 if ads else 0.0, delta * (7.0 if not wdata.get("scope", false) else 9.0))
+	if vm_weapon and is_instance_valid(vm_weapon) and vm_weapon.has_meta("glow_mat"):
+		(vm_weapon.get_meta("glow_mat") as ShaderMaterial).set_shader_parameter("power", float(vm_weapon.get_meta("glow_power")) * (1.0 - ads_k * 0.85))
 	var zoom: float = wdata.get("zoom", 1.2)
 	var target_fov: float = float(GS.settings["fov"]) / lerp(1.0, zoom, ads_k)
 	cam.fov = lerp(cam.fov, target_fov, min(delta * 20.0, 1.0))
@@ -367,6 +377,10 @@ func _process(delta: float) -> void:
 	_update_viewmodel(delta)
 
 # ---------------------------------------------------------------- weapons
+var test_ads := false
+var shots_fired := 0
+var shots_hit := 0
+
 func switch_to(id: String, instant: bool = false) -> void:
 	if not instant:
 		if id == cur and holster_t <= 0:
@@ -452,7 +466,7 @@ func _try_fire() -> void:
 	fire_cd = 60.0 / float(wdata["rpm"])
 	inspect_t = 0
 	shots_in_burst += 1
-	GS.profile["stats"]["shots"] = int(GS.profile["stats"]["shots"]) + 1
+	shots_fired += 1
 	if match_node.net:
 		match_node.net.send_fire(cur)
 	if wdata.get("silenced", false):
@@ -481,16 +495,21 @@ func _try_fire() -> void:
 		if i < 3:
 			match_node.fx.tracer(muzzle, res.get("pos", origin + dir * 80.0))
 	if hit_any:
-		GS.profile["stats"]["hits"] = int(GS.profile["stats"]["hits"]) + 1
+		shots_hit += 1
 	if not wdata.get("silenced", false):
 		match_node.fx.muzzle_light(muzzle, 2.5)
 		match_node.on_shot_fired(self, global_position)
-	bloom = min(bloom + float(wdata["recoil"]) * 0.22, 0.04)
-	# recoil (camera)
-	var rk: float = float(wdata["recoil"]) * 0.55 * (1.0 + min(shots_in_burst, 10) * 0.03) * (0.75 if crouching else 1.0) * lerp(1.0, 0.8, ads_k)
-	var hr: float = float(wdata.get("hrec", 0.006)) * 0.5 * randf_range(-1.0, 1.0) * (1.0 + min(shots_in_burst, 10) * 0.03)
-	if shots_in_burst > 8:
-		hr += float(wdata.get("hrec", 0.006)) * 0.5 * sin(shots_in_burst * 0.7) * 0.8
+	bloom = min(bloom + float(wdata["recoil"]) * 0.32, 0.055)
+	# recoil (camera): learnable spray pattern — climbs for ~10 shots, then sways left/right
+	var n: int = shots_in_burst
+	var climb: float = 1.0 + min(n, 10) * 0.07
+	if n > 10:
+		climb = 0.55
+	var rk: float = float(wdata["recoil"]) * 0.95 * climb * (0.8 if crouching else 1.0) * lerp(1.0, 0.85, ads_k)
+	var hrec: float = float(wdata.get("hrec", 0.006))
+	var hr: float = hrec * 0.35 * randf_range(-1.0, 1.0)
+	if n > 4:
+		hr += hrec * 1.25 * sin(float(n - 4) * 0.42 + float(hash(cur) % 7)) * min(float(n - 4) / 4.0, 1.0)
 	recoil_vel += Vector2(rk, hr)
 	recoil_pitch += rk
 	punch += Vector3(rk * 0.6, 0, randf_range(-0.004, 0.004))
@@ -1055,7 +1074,7 @@ func _update_viewmodel(delta: float) -> void:
 	if vm_parts.has("sight") and kind != "knife" and kind != "frag":
 		var sight_rest: Transform3D = (vm_parts["sight"] as Node3D).get_meta("rest")
 		var sp: Vector3 = sight_rest.origin
-		var ads_pos := Vector3(-sp.x, -sp.y, -sp.z - (0.14 if kind != "pistol" else 0.3))
+		var ads_pos := Vector3(-sp.x, -sp.y, -sp.z - (0.14 if kind != "pistol" else 0.3) - (0.07 if GS.wparts(cur).has("optik") else 0.0))
 		if wdata.get("scope", false):
 			ads_pos.z = -sp.z - 0.06
 		pos = hip.lerp(ads_pos, ads_k)

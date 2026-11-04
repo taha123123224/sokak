@@ -17,6 +17,17 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		var kv := a.trim_prefix("--").split("=")
 		args[kv[0]] = kv[1] if kv.size() > 1 else "1"
+	if args.has("econtest"):
+		for a in [["match_start", {}], ["buy_weapon", {"id": "m4a1"}], ["buy_skin", {"wid": "ak47", "skin": "kar"}], ["open_crate", {"id": "sokak"}], ["upgrade", {"wid": "ak47"}], ["sync", {"active_set": 3}]]:
+			var r: Dictionary = await GS.act(a[0], a[1])
+			print("ECON ", a[0], " ", r)
+		print("ECON gold=", GS.profile["gold"], " sets=", GS.profile["sets"].size(), " active=", GS.profile["active_set"], " file=", FileAccess.file_exists(GS.SAVE_PATH))
+		get_tree().quit()
+		return
+	if args.has("dumpcatalog"):
+		load("res://tools/dump_catalog.gd").run()
+		get_tree().quit()
+		return
 	if args.has("shot"):
 		_test(args)
 		return
@@ -59,11 +70,53 @@ func _test(args: Dictionary) -> void:
 			start_match(d)
 	elif args.has("match"):
 		var parts: PackedStringArray = args["match"].split(":")
-		start_match({"map": parts[0], "mode": parts[1] if parts.size() > 1 else "ffa", "bots": int(args.get("bots", "6")), "diff": 1, "time": 8, "target": 40, "team": "a", "no": 1, "name": "test"})
+		start_match({"map": parts[0], "mode": parts[1] if parts.size() > 1 else "ffa", "bots": int(args.get("bots", "6")), "diff": 1, "time": float(args.get("time", "8")), "target": 40, "team": "a", "no": 1, "name": "test"})
 	elif args.get("page", "") == "login":
 		go_login()
 	else:
 		go_menu(args.get("page", "lobby"))
+	if args.has("simstat"):
+		# headless bot-combat check: --simstat=SECONDS (game time, runs at time_scale 4)
+		Engine.time_scale = 4.0
+		Engine.physics_ticks_per_second = 30
+		var secs := float(args["simstat"])
+		if OS.has_environment("SIMMID"):
+			await get_tree().create_timer(6.0).timeout
+			if current and "player" in current and current.player:
+				var bb = null
+				for c in current.combatants:
+					if not c["is_player"]: bb = c["node"]; break
+				if bb: current.player.global_position = bb.global_position + Vector3(2, 0.3, 0)
+		var waited := 0.0
+		while waited < secs:
+			await get_tree().create_timer(5.0).timeout
+			waited += 5.0
+			if current and "combatants" in current:
+				var tk := 0
+				for c in current.combatants:
+					tk += int(c["kills"])
+				print("SIM t=%d kills=%d" % [int(waited), tk] + ((" | SAB tur=%d faz=%s skor=%s kurulu=%s tasiyan=%s" % [current.sab.round_no, current.sab.phase, str(current.team_score), current.sab.planted, (str(current.sab.carrier.global_position.distance_to(current.sab.sites[current.sab.target_site]["pos"])) + " tv=" + str(current.sab.carrier.target_visible if "target_visible" in current.sab.carrier else "-") + " obj=" + str(current.sab.carrier.obj_goal if "obj_goal" in current.sab.carrier else "-") + " pos=" + str(current.sab.carrier.global_position) if current.sab.carrier else "yok")]) if "sab" in current and current.sab else ""))
+				if OS.has_environment("SIMDBG"):
+					for c in current.combatants:
+						var nn = c["node"]
+						var extra := ""
+						if "nav" in nn and nn.nav:
+							var mp: RID = nn.get_world_3d().navigation_map
+							var cp := NavigationServer3D.map_get_closest_point(mp, nn.global_position)
+							extra = " navpath=%d tgtpos=%s closest=%s roam=%s" % [nn.nav.get_current_navigation_path().size(), str(nn.nav.target_position.snapped(Vector3.ONE)), str(cp.snapped(Vector3.ONE * 0.1)), str(nn.roam_target.snapped(Vector3.ONE)) + " has_roam=%s pp=%s vel=%s ls=%.1f now=%.1f" % [nn.has_roam, nn.is_physics_processing(), str(nn.velocity.snapped(Vector3.ONE*0.1)), nn.last_seen_t, Time.get_ticks_msec()/1000.0]]
+						print("  %s team=%s pos=%s alive=%s tgt=%s vis=%s%s" % [c["name"], c["team"], str(nn.global_position.snapped(Vector3.ONE)), nn.alive, ("target" in nn and nn.target != null), ("target_visible" in nn and nn.target_visible), extra])
+				if OS.has_environment("SIMDBG"):
+					for c in current.combatants:
+						var nd = c["node"]
+						var extra := (" shots=%d hits=%d hp=%s" % [nd.dbg_shots, nd.dbg_hits, str(nd.hp) if "hp" in nd else "?"]) if "dbg_shots" in nd else ""
+						print("   %s team=%s alive=%s pos=%s tv=%s%s" % [c["name"], c["team"], nd.alive, (nd.global_position as Vector3).snapped(Vector3.ONE), nd.target_visible if "target_visible" in nd else "-", extra])
+		if current and "combatants" in current:
+			var parts := []
+			for c in current.combatants:
+				parts.append("%s:%s k%d d%d" % [c["name"], c["node"].wid if "wid" in c["node"] else "?", int(c["kills"]), int(c["deaths"])])
+			print("SIMEND mode=%s %s" % [current.mode, ", ".join(parts)])
+		get_tree().quit()
+		return
 	var shots: PackedStringArray = args["shot"].split(",")
 	var after := float(args.get("after", "4"))
 	for i in shots.size():
