@@ -1535,7 +1535,8 @@ func _update_viewmodel(delta: float) -> void:
 			if not vm_weapon.has_meta("insp_rest"):
 				vm_weapon.set_meta("insp_rest", vm_weapon.transform)
 			var it2 := 1.0 - inspect_t / 3.2
-			var spin := smoothstep(0.4, 0.56, it2) * PI + smoothstep(0.8, 0.95, it2) * PI
+			# quarter turn: flat of the blade to the camera, half turn: the other flat, then home
+			var spin := (smoothstep(0.08, 0.22, it2) * 0.5 + smoothstep(0.44, 0.6, it2) + smoothstep(0.82, 0.96, it2) * 0.5) * PI
 			vm_weapon.transform = (vm_weapon.get_meta("insp_rest") as Transform3D) * Transform3D(Basis(Vector3(0, 0, 1), spin), Vector3.ZERO)
 	elif inspect_t > 0:
 		var it := 1.0 - inspect_t / 3.2

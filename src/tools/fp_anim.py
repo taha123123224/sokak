@@ -163,12 +163,11 @@ def choreograph(wid, rig, meta):
         pull = rot_state(R0, Quaternion(X, math.radians(-10)), Vector((0.02, -0.07, 0.015)))
         thrust = rot_state(R0, Quaternion(X, math.radians(6)), Vector((-0.03, 0.22, 0.035)))
         acts['stab'] = make_action(rig, 'stab', 0.8, {'Right': ([(0.0, *R0), (0.3, *pull), (0.48, *thrust), (0.62, *thrust), (1.0, *R0)], rpole)})
-        # inspect (F): the wrist turns the blade's flat toward the camera and holds it there; the in-game
-        # code spins the knife in the fingers meanwhile (the arm itself never twists)
-        show = rot_state(R0, yaw(38) @ roll(-14), Vector((-0.05, 0.0, 0.05)))
-        show2 = rot_state(R0, yaw(42) @ roll(-18), Vector((-0.055, 0.01, 0.055)))
-        tip = rot_state(R0, yaw(30) @ roll(-8) @ Quaternion(X, math.radians(-14)), Vector((-0.045, 0.01, 0.07)))
-        acts['inspect'] = make_action(rig, 'inspect', 3.0, {'Right': ([(0.0, *R0), (0.14, *show), (0.4, *show2), (0.62, *tip), (0.84, *show), (1.0, *R0)], rpole)})
+        # inspect (F): the hand stays where it is (no arm swing across the screen) and only the wrist tilts a
+        # little; the in-game code turns the knife in the fingers to show both sides of the blade
+        show = rot_state(R0, yaw(10) @ roll(-6), Vector((-0.012, 0.0, 0.025)))
+        tilt = rot_state(R0, yaw(6) @ roll(8), Vector((-0.01, 0.005, 0.03)))
+        acts['inspect'] = make_action(rig, 'inspect', 3.0, {'Right': ([(0.0, *R0), (0.18, *show), (0.42, *show), (0.6, *tilt), (0.84, *tilt), (1.0, *R0)], rpole)})
         meta['slash'] = {'len': acts['slash'], 'hit': 0.38}
         meta['stab'] = {'len': acts['stab'], 'hit': 0.5}
     if kind == 'frag':

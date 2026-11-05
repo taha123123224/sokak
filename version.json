@@ -1,37 +1,37 @@
 {
-	"version": "2.9.5",
-	"build": 34,
+	"version": "2.9.6",
+	"build": 35,
 	"parts": [
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v34.pck.part00",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v35.pck.part00",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v34.pck.part01",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v35.pck.part01",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v34.pck.part02",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v35.pck.part02",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v34.pck.part03",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v35.pck.part03",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v34.pck.part04",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v35.pck.part04",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v34.pck.part05",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v35.pck.part05",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v34.pck.part06",
-			"size": 41018120
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v35.pck.part06",
+			"size": 51570844
 		}
 	],
-	"pck_size": 607249160,
+	"pck_size": 617801884,
 	"installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
-	"notes": "v2.9.5: M4A1 ve AWM için gerçek animasyonlu birinci şahıs kollar (çekme, ateş, şarjör, mekanizma, inceleme); bıçak yumruk kavrayışı, daha sıkı kesme/saplama ve F ile parmakta dönen bıçak incelemesi; yeni modern ölüm kartı (seni vuranın kalan canı, silahı ve +seviyesi, verilen/alınan hasar, mesafe); Ayarlar > Lisanslar sekmesi."
+	"notes": "v2.9.6: Bıçak incelemesi (F) düzeltildi — kol artık ekrana savrulmuyor, el yumruk halinde yerinde kalıyor, bıçak parmaklarda dönerek iki yüzünü gösteriyor. M4A1 ve AWM için gerçek animasyonlu birinci şahıs kollar (çekme, ateş, şarjör, mekanizma, inceleme); bıçak yumruk kavrayışı, daha sıkı kesme/saplama ve F ile parmakta dönen bıçak incelemesi; yeni modern ölüm kartı (seni vuranın kalan canı, silahı ve +seviyesi, verilen/alınan hasar, mesafe); Ayarlar > Lisanslar sekmesi."
 }
