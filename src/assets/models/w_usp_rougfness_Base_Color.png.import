@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://gfiy7hbjoltm"
-path="res://.godot/imported/w_usp_rougfness_Base_Color.png-9cb3f8497d281a750f31381025e3476f.ctex"
+path.s3tc="res://.godot/imported/w_usp_rougfness_Base_Color.png-9cb3f8497d281a750f31381025e3476f.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "11f284790c1d0a16a06d08034847721a"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/w_usp_rougfness_Base_Color.png"
-dest_files=["res://.godot/imported/w_usp_rougfness_Base_Color.png-9cb3f8497d281a750f31381025e3476f.ctex"]
+dest_files=["res://.godot/imported/w_usp_rougfness_Base_Color.png-9cb3f8497d281a750f31381025e3476f.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

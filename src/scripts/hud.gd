@@ -231,6 +231,8 @@ func setup(p) -> void:
 	feed.offset_left = -560; feed.offset_right = -24; feed.offset_top = 24
 	feed.alignment = BoxContainer.ALIGNMENT_BEGIN
 	root.add_child(feed)
+	for i in 6:
+		_kf_rows.append(_kf_new_row())     # built during loading, recycled on every kill
 	# center messages
 	center = UI.lbl("", 40, UI.ACCENT, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
 	center.set_anchors_preset(Control.PRESET_CENTER)
@@ -553,53 +555,99 @@ func kill_feed(killer: String, victim: String, wid: String, head: bool, kt: Stri
 func lvl_badge(lvl: int, fs: int = 15) -> Control:
 	return UI.lvl_badge(lvl, fs)
 
+## kill feed rows are built once and recycled (creating panels/labels per kill cost 6-11 ms = a hitch on every kill)
+var _kf_rows: Array = []
+var _kf_sb := {}
+func _kf_style(kind: String) -> StyleBoxFlat:
+	if not _kf_sb.has(kind):
+		match kind:
+			"me": _kf_sb[kind] = UI.sb(Color(0.35, 0.2, 0.05, 0.75), UI.ACCENT, 2, 8, 8)
+			"died": _kf_sb[kind] = UI.sb(Color(0.02, 0.03, 0.05, 0.65), UI.RED, 2, 8, 8)
+			_: _kf_sb[kind] = UI.sb(Color(0.02, 0.03, 0.05, 0.65), Color(1, 1, 1, 0.08), 2, 8, 8)
+	return _kf_sb[kind]
+
+func _kf_new_row() -> Dictionary:
+	var p := PanelContainer.new()
+	p.size_flags_horizontal = Control.SIZE_SHRINK_END
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var h := UI.hbox(10)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(h)
+	var kl := UI.lbl("", 20, Color.WHITE, "Rajdhani-Bold")
+	var tr := TextureRect.new()
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var wl := UI.lbl("", 17, UI.DIM, "Rajdhani-SemiBold")
+	var bh := HBoxContainer.new()
+	bh.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var hr := TextureRect.new()
+	hr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	hr.custom_minimum_size = Vector2(24, 24)
+	hr.modulate = Color(1, 0.84, 0.35)
+	var vl := UI.lbl("", 20, Color.WHITE, "Rajdhani-Bold")
+	for c in [kl, tr, wl, bh, hr, vl]:
+		h.add_child(c)
+	p.visible = false
+	feed.add_child(p)
+	return {"p": p, "kl": kl, "tr": tr, "wl": wl, "bh": bh, "hr": hr, "vl": vl, "badge": null, "blvl": -1, "tw": null}
+
 func _sp_kill_feed(killer: String, victim: String, wid: String, head: bool, kt: String, vt: String, by_player: bool, player_died: bool, lvl: int = 0) -> void:
 	if not GS.settings.get("kill_feed", true):
 		return
-	var p := UI.panel(Color(0.02, 0.03, 0.05, 0.65) if not by_player else Color(0.35, 0.2, 0.05, 0.75), Color(1, 1, 1, 0.08) if not (by_player or player_died) else (UI.ACCENT if by_player else UI.RED), 8, 2)
-	p.size_flags_horizontal = Control.SIZE_SHRINK_END
-	var h := UI.hbox(10)
-	p.add_child(h)
+	if _kf_rows.is_empty():
+		for i in 6:
+			_kf_rows.append(_kf_new_row())
+	# reuse the oldest row and move it to the bottom
+	var r: Dictionary = _kf_rows.pop_front()
+	_kf_rows.append(r)
+	var p: PanelContainer = r["p"]
+	feed.move_child(p, feed.get_child_count() - 1)
+	if r["tw"] and (r["tw"] as Tween).is_valid():
+		(r["tw"] as Tween).kill()
+	p.add_theme_stylebox_override("panel", _kf_style("me" if by_player else ("died" if player_died else "n")))
 	var kc: Color = GS.TEAM_COLORS.get(kt, Color("ffcf5a")) if kt != "" else Color("ffcf5a")
 	var vc: Color = GS.TEAM_COLORS.get(vt, Color("ff6a5a")) if vt != "" else Color("ff6a5a")
-	h.alignment = BoxContainer.ALIGNMENT_CENTER
-	h.add_child(UI.lbl(killer, 20, kc, "Rajdhani-Bold"))
+	(r["kl"] as Label).text = killer
+	(r["kl"] as Label).add_theme_color_override("font_color", kc)
+	(r["vl"] as Label).text = victim
+	(r["vl"] as Label).add_theme_color_override("font_color", vc)
 	var icon := _kf_icon(wid)
+	var tr: TextureRect = r["tr"]
+	var wl: Label = r["wl"]
 	if icon:
-		var tr := TextureRect.new()
 		tr.texture = icon
-		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		var ih := 26.0
 		tr.custom_minimum_size = Vector2(min(ih * icon.get_width() / max(icon.get_height(), 1), 104.0), ih)
 		tr.modulate = Color(1, 1, 1, 0.95) if lvl <= 0 else Color(1, 1, 1).lerp(GS.lvl_color(lvl), 0.35)
-		h.add_child(tr)
-		if lvl > 0:
-			h.add_child(lvl_badge(lvl, 15))
+		tr.visible = true
+		wl.visible = false
 	else:
-		var wname: String = GS.WEAPONS[wid]["name"] if GS.WEAPONS.has(wid) else "☠"
-		h.add_child(UI.lbl("[" + wname + "]", 17, UI.DIM, "Rajdhani-SemiBold"))
+		tr.visible = false
+		wl.visible = true
+		wl.text = "[" + (str(GS.WEAPONS[wid]["name"]) if GS.WEAPONS.has(wid) else "☠") + "]"
+	# upgrade badge: only rebuilt when the level shown in this row changes
+	var bh: HBoxContainer = r["bh"]
+	if lvl != int(r["blvl"]):
+		if r["badge"] and is_instance_valid(r["badge"]):
+			(r["badge"] as Node).queue_free()
+		r["badge"] = lvl_badge(lvl, 15) if lvl > 0 else null
+		if r["badge"]:
+			bh.add_child(r["badge"])
+		r["blvl"] = lvl
+	bh.visible = lvl > 0
+	var hr: TextureRect = r["hr"]
 	if head:
-		var hs := _kf_icon("_head")
-		if hs:
-			var hr := TextureRect.new()
-			hr.texture = hs
-			hr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			hr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			hr.custom_minimum_size = Vector2(24, 24)
-			hr.modulate = Color(1, 0.84, 0.35)
-			h.add_child(hr)
-		else:
-			h.add_child(UI.lbl("✖", 18, UI.GOLD, "Rajdhani-Bold"))
-	h.add_child(UI.lbl(victim, 20, vc, "Rajdhani-Bold"))
-	feed.add_child(p)
-	_ignore_mouse(p)
-	if feed.get_child_count() > 6:
-		feed.get_child(0).queue_free()
+		hr.texture = _kf_icon("_head")
+	hr.visible = head and hr.texture != null
+	p.modulate.a = 1.0
+	p.visible = true
 	var tw := p.create_tween()
 	tw.tween_interval(6.0)
 	tw.tween_property(p, "modulate:a", 0.0, 0.6)
-	tw.tween_callback(p.queue_free)
+	tw.tween_callback(func(): p.visible = false)
+	r["tw"] = tw
 
 var insp_card: PanelContainer
 ## F-inspect card: weapon, skin, level (slides in bottom-right)

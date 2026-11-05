@@ -1,33 +1,33 @@
 {
-	"version": "2.9.3",
-	"build": 32,
+	"version": "2.9.4",
+	"build": 33,
 	"parts": [
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v32.pck.part00",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v33.pck.part00",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v32.pck.part01",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v33.pck.part01",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v32.pck.part02",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v33.pck.part02",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v32.pck.part03",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v33.pck.part03",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v32.pck.part04",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v33.pck.part04",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v32.pck.part05",
-			"size": 67842972
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v33.pck.part05",
+			"size": 86100716
 		}
 	],
-	"pck_size": 539702172,
+	"pck_size": 557959916,
 	"installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
-	"notes": "Yeni silahlar: AKM, M4 Karabina, USP .45, Kartal .44 Toplu, Osmanlı Hançeri, Kasap Bıçağı, Taktik Balta + yeni M4A1 modeli. Yeni maç yükleme ekranı, yenilenen giriş/kayıt ekranı, öldürmelerde +seviye rozeti, yeni silah yükseltme animasyonu ve parıltı dalgası."
+	"notes": "Performans güncellemesi: AMD/DirectX 12 maç girişinde çökme düzeltildi, doğarken ve öldürünce olan takılmalar giderildi, önceden derlenmiş shaderlar, çökme sonrası güvenli mod, Rekabetçi grafik ayarı, detaylı FPS göstergesi, HD yükleme ekranı ve oyuncu listesi."
 }

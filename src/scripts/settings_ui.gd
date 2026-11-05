@@ -105,6 +105,12 @@ func _build() -> void:
 					_gfx_restart_dialog(), 16, gm == md, 0, 44))
 			body.add_child(UI.lbl("Şu an: %s  •  Ekran kartı: %s" % [Gfx.driver().to_upper(), RenderingServer.get_video_adapter_name()], 16, UI.ACCENT2, "Rajdhani-Bold"))
 			body.add_child(UI.lbl("Haritalar/silahlar görünmüyor, ekranda çizgiler varsa: önce DirectX 12, olmazsa Uyumluluk modunu seç. Oyun yeniden başlar.", 15, UI.DIM, "Rajdhani-SemiBold"))
+			_section("TEK TIKLA PERFORMANS")
+			var ph := UI.hbox(8)
+			body.add_child(ph)
+			ph.add_child(UI.btn("⚡ REKABETÇİ (en yüksek FPS)", func(): _competitive(); _build(), 17, false, 0, 46))
+			ph.add_child(UI.btn("ÖNERİLEN AYAR (%s)" % str(GS.detect_tier()).to_upper(), func(): GS.apply_preset(GS.detect_tier()); _build(), 17, false, 0, 46))
+			body.add_child(UI.lbl("Rekabetçi: Valorant'taki gibi her şey düşük ama net; gölgeler kısa mesafe, çim ve parlama kapalı, FSR 2 ile %85 çözünürlük.", 15, UI.DIM, "Rajdhani-SemiBold"))
 			_section("PERFORMANS")
 			_check("dyn_res", "Dinamik çözünürlük (FPS düşünce 3D görüntüyü otomatik ölçekler)", "Zayıf bilgisayarlarda akıcılık sağlar")
 			_options("dyn_target", "Hedef FPS", [[60, "60"], [75, "75"], [90, "90"], [120, "120"], [144, "144"]])
@@ -131,7 +137,11 @@ func _build() -> void:
 			_check("sdfgi", "Global Aydınlatma (SDFGI)", "Çok ağır - sadece güçlü sistemler")
 			_check("glow", "Parlama (Bloom)")
 			_check("volumetric", "Hacimsel Sis / Işık Huzmeleri")
+			_options("shadow_dist", "Gölge Mesafesi", [[0.6, "Kısa (hızlı)"], [1.0, "Normal"], [1.4, "Uzak"]], "Gölgenin çizildiği mesafe: kısa = daha yüksek FPS")
+			_check("grass", "Çim ve bitki örtüsü", "Çanakkale'de rüzgarla sallanan çimler")
+			_section("PERFORMANS GÖSTERGESİ")
 			_check("show_fps", "FPS Göstergesi")
+			_options("perf_overlay", "Gösterge türü", [[1, "Sadece FPS"], [2, "Detaylı (FPS, kare süresi, en kötü %1)"]])
 		"nisangah":
 			_section("NİŞANGAH ÖNİZLEME")
 			var pv := PreviewBox.new()
@@ -263,6 +273,18 @@ func _build() -> void:
 				_row("Tüm ilerleme", rb, "Hesabının bütün ilerlemesi sunucuda silinir. Geri alınamaz!" if on else "Çevrimdışı profilin silinir. Geri alınamaz!")
 
 var _reset_armed := false
+
+func _competitive() -> void:
+	GS.apply_preset("low")
+	GS.settings["resolution_scale"] = 0.85
+	GS.settings["upscaler"] = "fsr2"
+	GS.settings["sharpen"] = 0.45
+	GS.settings["shadows"] = 1
+	GS.settings["shadow_dist"] = 0.6
+	GS.settings["grass"] = false
+	GS.settings["glow"] = false
+	GS.settings["dyn_res"] = true
+	GS.settings["draw_distance"] = 0.8
 
 func _confirm_reset() -> void:
 	## two-step: first press arms, second press within 4 s resets (on the server for online accounts)

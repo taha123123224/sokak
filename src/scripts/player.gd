@@ -177,15 +177,23 @@ func _fp_scene(path: String) -> PackedScene:
 		_fp_cache[path] = load(path)
 	return _fp_cache[path]
 
+var _vm_warmed := {}
 func _warm_vm() -> void:
 	if vm_off == null:
 		return
+	var todo := []
+	for c in slots.keys():
+		if not _vm_warmed.has(slots[c] + ":" + GS.wskin(slots[c])):
+			todo.append(slots[c])
+	if todo.is_empty():
+		return          # this loadout was already drawn once: nothing to load or compile again
+	for id in todo:
+		_vm_warmed[id + ":" + GS.wskin(id)] = true
 	var tmp := Node3D.new()
 	vm_off.add_child(tmp)
 	tmp.position = Vector3(0, 0, -0.6)
 	tmp.scale = Vector3.ONE * 0.02
-	for c in slots.keys():
-		var id: String = slots[c]
+	for id in todo:
 		var ps: PackedScene = GS.weapon_scene(id)
 		if ps:
 			var w := ps.instantiate()
@@ -1105,7 +1113,22 @@ func _vm_kind(id: String) -> String:
 	if w.get("scope", false): return "sniper"
 	return "rifle"
 
+var _vm_loaded_id := ""
 func _load_vm_weapon(id: String) -> void:
+	# respawning with the same weapon: keep the built viewmodel, just put every moving part back at rest
+	# (rebuilding weapon + arms on every respawn cost ~40 ms = a visible hitch)
+	if id == _vm_loaded_id and vm_weapon and is_instance_valid(vm_weapon) and fp_root and is_instance_valid(fp_root) and not wdata.get("melee", false) and not wdata.get("throwable", false):
+		for k in vm_parts.keys():
+			var f = vm_parts[k]
+			if f is Node3D and is_instance_valid(f) and (f as Node3D).has_meta("rest"):
+				(f as Node3D).transform = (f as Node3D).get_meta("rest")
+				(f as Node3D).visible = not (cur == "spas" and k == "mag")
+		mag_att = null
+		if fp_ap:
+			_fp_play("idle", 0.0)
+			fp_ap.advance(0.0)
+		return
+	_vm_loaded_id = id
 	if vm_weapon:
 		vm_weapon.queue_free()
 	vm_parts.clear()

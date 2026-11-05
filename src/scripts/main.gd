@@ -39,6 +39,7 @@ func _ready() -> void:
 	if args.has("shot"):
 		_test(args)
 		return
+	_check_last_crash()
 	go_login()
 
 func _test(args: Dictionary) -> void:
@@ -177,9 +178,64 @@ func _process(_d: float) -> void:
 				_perf_max * 1000.0, Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
 				Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)])
 			_perf_max = 0.0
-	fps_label.visible = bool(GS.settings.get("show_fps", true))
+	fps_label.visible = bool(GS.settings.get("show_fps", true)) and not OS.has_environment("NOHUD")
 	if fps_label.visible:
-		fps_label.text = "%d FPS" % Engine.get_frames_per_second()
+		_ft.append(_d)
+		if _ft.size() > 240:
+			_ft.pop_front()
+		_ov_t += _d
+		if _ov_t >= 0.25:
+			_ov_t = 0.0
+			if int(GS.settings.get("perf_overlay", 1)) >= 2 and _ft.size() > 20:
+				var srt := _ft.duplicate()
+				srt.sort()
+				var n1 := maxi(int(srt.size() * 0.01), 1)
+				var worst := 0.0
+				for i in n1:
+					worst += srt[srt.size() - 1 - i]
+				worst /= n1
+				var avg := 0.0
+				for v in _ft:
+					avg += v
+				avg /= _ft.size()
+				fps_label.text = "%d FPS   %.1f ms   %%1 düşük: %d   VRAM %d MB" % [Engine.get_frames_per_second(), avg * 1000.0, int(1.0 / maxf(worst, 0.0001)),
+					int(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0)]
+			else:
+				fps_label.text = "%d FPS" % Engine.get_frames_per_second()
+
+var _ft: Array = []
+var _ov_t := 0.0
+
+## crash guard: a flag file exists while a match is loading/running. If the game died with it in place,
+## the next start lowers the graphics one step and tells the player (Valorant-style "safe" recovery).
+const CRASH_FLAG := "user://match_running.flag"
+func set_match_flag(on: bool) -> void:
+	if on:
+		var f := FileAccess.open(CRASH_FLAG, FileAccess.WRITE)
+		if f:
+			f.store_string(str(Time.get_unix_time_from_system()))
+	elif FileAccess.file_exists(CRASH_FLAG):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(CRASH_FLAG))
+
+func _check_last_crash() -> void:
+	if not FileAccess.file_exists(CRASH_FLAG):
+		return
+	set_match_flag(false)
+	var order := ["low", "medium", "high", "ultra", "uhd"]
+	var qi: int = order.find(str(GS.settings.get("quality", "high")))
+	var crashes := int(GS.settings.get("crash_count", 0)) + 1
+	GS.settings["crash_count"] = crashes
+	if qi > 0:
+		GS.apply_preset(order[qi - 1])
+	GS.settings["dyn_res"] = true
+	GS.settings["grass"] = false if crashes >= 2 else GS.settings.get("grass", true)
+	GS.settings["shadow_dist"] = 0.6 if crashes >= 2 else GS.settings.get("shadow_dist", 1.0)
+	GS.save_settings()
+	GS.set_meta("crash_notice", "Oyun son maçta beklenmedik şekilde kapandı. Grafik ayarları otomatik olarak bir kademe düşürüldü (%s). Ayarlar > Grafik'ten değiştirebilirsin." % str(GS.settings["quality"]).to_upper())
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		set_match_flag(false)     # closing the window on purpose is not a crash
 
 func _swap(n: Node) -> void:
 	if current:
@@ -197,6 +253,7 @@ func go_login() -> void:
 
 func go_menu(page: String = "lobby") -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	set_match_flag(false)
 	var m := preload("res://scripts/menu.gd").new()
 	m.start_page = page
 	m.main = self
@@ -204,6 +261,8 @@ func go_menu(page: String = "lobby") -> void:
 
 func start_match(cfg: Dictionary) -> void:
 	GS.room = cfg
+	if not OS.get_cmdline_user_args().has("--shot") and not str(OS.get_cmdline_user_args()).contains("--shot"):
+		set_match_flag(true)
 	var mt := preload("res://scripts/match.gd").new()
 	mt.main = self
 	_swap(mt)

@@ -120,7 +120,9 @@ func _show_loading() -> void:
 	var minfo: Dictionary = GS.MAPS.get(map_id, {})
 	var minf: Dictionary = GS.MODES.get(mode, {})
 	# map artwork, slowly zooming (Ken Burns)
-	var ip := "res://assets/ui/map_%s.jpg" % map_id
+	var ip := "res://assets/ui/load_%s.jpg" % map_id
+	if not ResourceLoader.exists(ip):
+		ip = "res://assets/ui/map_%s.jpg" % map_id
 	if ResourceLoader.exists(ip):
 		var bg := TextureRect.new()
 		bg.texture = load(ip)
@@ -271,11 +273,56 @@ func _show_loading() -> void:
 	var fin := loading.create_tween()
 	fin.tween_property(loading, "modulate:a", 1.0, 0.25)
 
+func _loading_roster() -> void:
+	## loading screen: who is in the match (two team columns, or one list in free-for-all)
+	if loading == null or not is_instance_valid(loading) or combatants.is_empty():
+		return
+	var box := UI.panel(Color(0.02, 0.025, 0.035, 0.82), Color(1, 1, 1, 0.1), 12, 1)
+	box.anchor_left = 1.0; box.anchor_right = 1.0
+	box.offset_left = -520; box.offset_right = -70; box.offset_top = 120
+	loading.add_child(box)
+	var v := UI.vbox(6)
+	box.add_child(v)
+	v.add_child(UI.lbl("OYUNCULAR  •  %d" % combatants.size(), 14, UI.ACCENT2, "Rajdhani-Bold"))
+	var cols := UI.hbox(18)
+	v.add_child(cols)
+	var groups := [["a", "KARTAL"], ["b", "AKREP"]] if teams else [["", ""]]
+	for g in groups:
+		var cv := UI.vbox(2)
+		cv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		cols.add_child(cv)
+		var gc: Color = GS.TEAM_COLORS.get(g[0], Color.WHITE)
+		if g[1] != "":
+			cv.add_child(UI.lbl(g[1], 16, gc, "RussoOne-Regular"))
+		var n := 0
+		for c in combatants:
+			if teams and c["team"] != g[0]:
+				continue
+			n += 1
+			if n > 8:
+				continue
+			var row := UI.hbox(6)
+			cv.add_child(row)
+			var dot := ColorRect.new()
+			dot.color = gc if teams else UI.ACCENT
+			dot.custom_minimum_size = Vector2(3, 18)
+			row.add_child(dot)
+			row.add_child(UI.lbl(str(c["name"]), 16, Color.WHITE if not c["is_player"] else UI.GOLD, "Rajdhani-Bold"))
+			row.add_child(UI.spacer())
+			row.add_child(UI.lbl("Sv %d" % int(c.get("lvl", 1)), 13, UI.DIM, "Rajdhani-SemiBold"))
+	box.modulate.a = 0.0
+	var tw := box.create_tween()
+	tw.tween_property(box, "modulate:a", 1.0, 0.3)
+
 func _process_loading_pct() -> void:
 	if _load_pct and is_instance_valid(_load_pct) and _load_fx and is_instance_valid(_load_fx):
 		_load_pct.text = "%d%%" % int(round(_load_fx.shown))
 
 func _progress(p: float, t: String) -> void:
+	if OS.has_environment("MEMLOG"):
+		print("MEM %d%% static=%dMB vram=%dMB tex=%dMB buf=%dMB  %s" % [int(p), int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0),
+			int(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0), int(Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0),
+			int(Performance.get_monitor(Performance.RENDER_BUFFER_MEM_USED) / 1048576.0), t])
 	if _load_fx and is_instance_valid(_load_fx):
 		_load_fx.prog = p
 	var st := loading.find_child("st", true, false) as Label
@@ -402,8 +449,9 @@ func _build() -> void:
 	for c in combatants:
 		_spawn(c, true)
 	_fill_gun_pool()
+	_loading_roster()
 	await _progress(92, "Efektler ve gölgelendiriciler hazırlanıyor...")
-	if GRASS_MAPS.has(map_id) and str(GS.settings.get("quality", "high")) != "low":
+	if GRASS_MAPS.has(map_id) and str(GS.settings.get("quality", "high")) != "low" and bool(GS.settings.get("grass", true)):
 		await _scatter_grass(GRASS_MAPS[map_id])
 	await _prewarm()
 	await _progress(100, "Hazır!")
@@ -424,6 +472,12 @@ func _build() -> void:
 		sab.setup(self)
 	GS.act("match_start")   # the server measures real match time (bounds the rewards)
 
+func _frame_drawn() -> void:
+	if DisplayServer.get_name() == "headless":
+		await get_tree().process_frame   # no renderer: frame_post_draw never fires
+	else:
+		await RenderingServer.frame_post_draw
+
 func _prewarm() -> void:
 	## draw every effect once behind the loading screen so shaders/pipelines are compiled now,
 	## not in the middle of a fight (prevents first-shot / first-kill stutters)
@@ -439,21 +493,32 @@ func _prewarm() -> void:
 	fx.tracer(p - Vector3(1, 0, 0), p + Vector3(1, 0, 0))
 	fx.muzzle_light(p, 1.0)
 	fx.explosion(p + n * -8.0)
-	# every weapon model + skin material once
+	# weapon models that can actually appear in this match (bot pool + player loadout), drawn a few per frame:
+	# drawing all 33 weapons in one frame overflowed the D3D12 sampler-descriptor heap on AMD (device lost -> crash)
+	var ids: Array = gun_pool.keys().duplicate()
+	for c in player.slots.keys():
+		if not player.slots[c] in ids:
+			ids.append(player.slots[c])
 	var tmp := Node3D.new()
 	add_child(tmp)
 	tmp.global_position = p
-	for wid in GS.WEAPONS.keys():
+	var batch := 0
+	for wid in ids:
 		var ps := GS.weapon_scene(wid)
-		if ps:
-			var w := ps.instantiate()
-			MatLib.apply(w, GS.wskin(wid))
-			tmp.add_child(w)
-	for i in 3:
-		if DisplayServer.get_name() == "headless":
-			await get_tree().process_frame   # no renderer: frame_post_draw never fires
-		else:
-			await RenderingServer.frame_post_draw
+		if ps == null:
+			continue
+		var w := ps.instantiate()
+		MatLib.apply(w, GS.wskin(wid))
+		tmp.add_child(w)
+		batch += 1
+		if batch >= 4:
+			batch = 0
+			for i in 2:
+				await _frame_drawn()
+			for ch in tmp.get_children():
+				ch.queue_free()
+	for i in 2:
+		await _frame_drawn()
 	tmp.queue_free()
 	SFX.silent = false
 	# pre-load all sound streams into memory
@@ -570,7 +635,7 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	sun.shadow_enabled = int(s["shadows"]) > 0
 	# every shadow split re-renders the map from the sun: 4 splits only on ULTRA+, shorter range on lower tiers
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if int(s["shadows"]) >= 3 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-	sun.directional_shadow_max_distance = [40.0, 55.0, 80.0, 120.0, 180.0][clamp(int(s["shadows"]), 0, 4)]
+	sun.directional_shadow_max_distance = [40.0, 55.0, 80.0, 120.0, 180.0][clamp(int(s["shadows"]), 0, 4)] * clampf(float(s.get("shadow_dist", 1.0)), 0.5, 1.5)
 	sun.directional_shadow_fade_start = 0.85
 	sun.directional_shadow_blend_splits = true
 	sun.shadow_bias = 0.03

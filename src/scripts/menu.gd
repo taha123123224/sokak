@@ -134,6 +134,17 @@ func _ready() -> void:
 	adminp = preload("res://scripts/menu_admin.gd").new(self)
 	Online.announced.connect(_on_announce)
 	Online.gifts_arrived.connect(_on_gifts)
+	if GS.has_meta("crash_notice"):
+		var cn := str(GS.get_meta("crash_notice"))
+		GS.remove_meta("crash_notice")
+		get_tree().create_timer(1.0).timeout.connect(func():
+			if not is_inside_tree(): return
+			var v := _modal(640, 260)
+			v.add_child(UI.header("GÜVENLİ MOD", 26))
+			var l := UI.lbl(cn, 19, UI.TEXT, "Rajdhani-SemiBold")
+			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			v.add_child(l)
+			v.add_child(UI.btn("TAMAM", _close_modal, 20, true, 0, 50)))
 	_build_world()
 	var cl := CanvasLayer.new()
 	add_child(cl)

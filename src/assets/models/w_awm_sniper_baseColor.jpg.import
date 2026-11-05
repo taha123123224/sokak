@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bs3hbrjo3m1xb"
-path="res://.godot/imported/w_awm_sniper_baseColor.jpg-5bfa351b5a28d25863d856b70f12c90b.ctex"
+path.s3tc="res://.godot/imported/w_awm_sniper_baseColor.jpg-5bfa351b5a28d25863d856b70f12c90b.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "97005b70e479d491e6b6fd07d37ec014"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/w_awm_sniper_baseColor.jpg"
-dest_files=["res://.godot/imported/w_awm_sniper_baseColor.jpg-5bfa351b5a28d25863d856b70f12c90b.ctex"]
+dest_files=["res://.godot/imported/w_awm_sniper_baseColor.jpg-5bfa351b5a28d25863d856b70f12c90b.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0
