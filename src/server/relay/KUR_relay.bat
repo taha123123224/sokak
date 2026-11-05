@@ -15,8 +15,13 @@ if errorlevel 1 (
   exit /b 1
 )
 echo Node.js bulundu.
-set /p CLOUDFLARE_API_TOKEN=Cloudflare API token:
+REM Token gerekmez: Cloudflare girisi tarayicida yapilir (bir kez), wrangler oturumu hatirlar.
+call npx --yes wrangler@4 whoami >nul 2>nul
+if errorlevel 1 (
+  echo Tarayicida Cloudflare girisi acilacak, "Allow" ile onayla...
+  call npx --yes wrangler@4 login
+)
 call npx --yes wrangler@4 deploy
 echo.
-echo Yukarida "https://....workers.dev" ile biten adresi Claude'a gonder (token'i GONDERME).
+echo Kurulum bitti. Yukarida "https://....workers.dev" ile biten adres gorunuyorsa her sey tamam.
 pause
