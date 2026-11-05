@@ -799,6 +799,7 @@ var net_pitch := 0.0
 var net_t := 0.0
 var _net_force := false
 
+var net_wlvl := 0      # online: the remote player's upgrade level of the held weapon (kill feed badge)
 var net_use := false     # online: the remote player is holding E (sabotage plant / defuse)
 
 func net_state(d: Dictionary) -> void:
@@ -814,6 +815,7 @@ func net_state(d: Dictionary) -> void:
 	net_pitch = float(d.get("pt", 0.0))
 	crouching = bool(d.get("c", false))
 	net_use = bool(d.get("u", false))
+	net_wlvl = clampi(int(d.get("wl", 0)), 0, 7)
 	net_t = Time.get_ticks_msec() / 1000.0
 	var w := str(d.get("w", wid))
 	if w != wid and GS.WEAPONS.has(w):

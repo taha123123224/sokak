@@ -34,8 +34,15 @@ var WEAPONS := {
 	"awm":    {"name": "AWM", "cat": "ana", "cls": "Nişancı", "dmg": 135, "rpm": 38, "mag": 5, "reserve": 20, "reload": 3.6, "spread": 0.09, "ads_spread": 0.0002, "move": 0.13, "recoil": 0.09, "hrec": 0.01, "auto": false, "range": 450.0, "scope": true, "zoom": 5.5, "speed": 0.84, "price": 6500, "snd": "shot_sniper", "head": 3.2, "bolt": true},
 	"uzi":    {"name": "Micro UZI", "cat": "ana", "cls": "Hafif Makinalı", "dmg": 18, "rpm": 1200, "mag": 32, "reserve": 160, "reload": 1.8, "spread": 0.032, "ads_spread": 0.011, "move": 0.012, "recoil": 0.009, "hrec": 0.011, "auto": true, "range": 55.0, "speed": 1.1, "price": 2100, "snd": "shot_smg", "zoom": 1.15, "head": 2.0},
 	"kuzgun": {"name": "BR-7 Kuzgun", "cat": "ana", "cls": "Savaş Tüfeği", "dmg": 36, "rpm": 900, "mag": 36, "reserve": 144, "reload": 2.5, "spread": 0.02, "ads_spread": 0.002, "move": 0.045, "recoil": 0.016, "hrec": 0.006, "auto": false, "burst": 3, "burst_delay": 0.32, "range": 220.0, "speed": 0.95, "price": 5200, "snd": "shot_m4", "zoom": 2.0, "head": 2.5},
+	"m4k":    {"name": "M4 Karabina", "cat": "ana", "cls": "Makinalı", "dmg": 30, "rpm": 780, "mag": 30, "reserve": 120, "reload": 2.1, "spread": 0.023, "ads_spread": 0.0028, "move": 0.04, "recoil": 0.015, "hrec": 0.007, "auto": true, "range": 165.0, "speed": 0.98, "price": 3400, "snd": "shot_m4", "zoom": 1.35, "head": 2.5},
+	"usp":    {"name": "USP .45 Taktik", "cat": "tabanca", "cls": "Tabanca", "dmg": 29, "rpm": 400, "mag": 12, "reserve": 60, "reload": 1.6, "spread": 0.017, "ads_spread": 0.0035, "move": 0.013, "recoil": 0.022, "hrec": 0.006, "auto": false, "range": 85.0, "speed": 1.08, "price": 1600, "snd": "shot_pistol", "zoom": 1.2, "head": 2.6},
+	"kartal": {"name": "Kartal .44 Toplu", "cat": "tabanca", "cls": "Tabanca", "dmg": 68, "rpm": 130, "mag": 6, "reserve": 30, "reload": 2.4, "spread": 0.019, "ads_spread": 0.0028, "move": 0.04, "recoil": 0.065, "hrec": 0.013, "auto": false, "range": 125.0, "speed": 1.05, "price": 3000, "snd": "shot_revolver", "zoom": 1.25, "head": 2.7},
+	"akm":    {"name": "AKM", "cat": "ana", "cls": "Makinalı", "dmg": 34, "rpm": 600, "mag": 30, "reserve": 120, "reload": 2.5, "spread": 0.029, "ads_spread": 0.0042, "move": 0.05, "recoil": 0.022, "hrec": 0.009, "auto": true, "range": 160.0, "speed": 0.95, "price": 3000, "snd": "shot_ak", "zoom": 1.25, "head": 2.6},
 	"knife":  {"name": "Savaş Bıçağı", "cat": "bicak", "cls": "Bıçak", "dmg": 55, "rpm": 110, "melee": true, "speed": 1.15, "price": 0, "head": 1.0},
 	"karambit": {"name": "Karambit", "cat": "bicak", "cls": "Bıçak", "dmg": 60, "rpm": 130, "melee": true, "speed": 1.17, "price": 2000, "head": 1.0},
+	"hancer": {"name": "Osmanlı Hançeri", "cat": "bicak", "cls": "Bıçak", "dmg": 58, "rpm": 125, "melee": true, "speed": 1.17, "price": 2600, "head": 1.0},
+	"kasap":  {"name": "Kasap Bıçağı", "cat": "bicak", "cls": "Bıçak", "dmg": 50, "rpm": 150, "melee": true, "speed": 1.18, "price": 1200, "head": 1.0},
+	"balta":  {"name": "Taktik Balta", "cat": "bicak", "cls": "Bıçak", "dmg": 75, "rpm": 80, "melee": true, "speed": 1.08, "price": 2800, "head": 1.0},
 	"frag":   {"name": "El Bombası MK3", "cat": "bomba", "cls": "Bomba", "dmg": 130, "count": 2, "throwable": true, "speed": 1.1, "price": 0, "head": 1.0},
 }
 const CATS := {"ana": "Ana Silah", "tabanca": "Tabanca", "bicak": "Bıçak", "bomba": "Bomba"}
@@ -71,15 +78,15 @@ var SKINS := {
 }
 var CRATES := {
 	"sokak": {"name": "Sokak Kasası", "price": 1000, "color": Color("ff8a1f"), "desc": "Her şeyden biraz: malzeme, altın, stiller.",
-		"skins": ["kamuflaj", "kar", "dijital", "gece", "neon", "kizil", "galaksi", "altin", "col", "kan", "okyanus", "siber"], "weapons": ["mp5", "ump45", "p90", "fn502", "deagle", "spas", "kar98"], "wchance": 0.2, "chars": []},
+		"skins": ["kamuflaj", "kar", "dijital", "gece", "neon", "kizil", "galaksi", "altin", "col", "kan", "okyanus", "siber"], "weapons": ["mp5", "ump45", "p90", "fn502", "usp", "deagle", "spas", "kar98", "kasap"], "wchance": 0.2, "chars": []},
 	"silah": {"name": "Silah Kasası", "price": 1800, "color": Color("ff4d5e"), "desc": "Her açılışta yüksek silah şansı! Süreli (3/7/30 gün) veya nadiren SÜRESİZ silahlar.",
-		"skins": ["kamuflaj", "dijital", "karbon", "kizil"], "weapons": ["m4a1", "scar", "aug", "vector", "ump45", "p90", "vityaz", "rpk16", "m249", "awp", "awm", "kar98", "r870", "spas", "deagle", "revolver", "m1911", "fn502", "uzi", "kuzgun"], "wchance": 0.62, "chars": []},
+		"skins": ["kamuflaj", "dijital", "karbon", "kizil"], "weapons": ["m4a1", "scar", "aug", "vector", "ump45", "p90", "vityaz", "rpk16", "m249", "awp", "awm", "kar98", "r870", "spas", "deagle", "revolver", "m1911", "fn502", "uzi", "kuzgun", "m4k", "usp", "kartal", "akm", "balta"], "wchance": 0.62, "chars": []},
 	"operasyon": {"name": "Operasyon Kasası", "price": 2000, "color": Color("4fb3ff"), "desc": "Taktik stiller ve %38 silah şansı (AUG, Vector, Vityaz, UZI...). Kasa silahları süreli gelir.",
-		"skins": ["dijital", "karbon", "kar", "kamuflaj", "gece", "buz", "col", "kan", "siber", "okyanus"], "weapons": ["aug", "vector", "scar", "ump45", "m4a1", "p90", "r870", "fn502", "vityaz", "m1911", "uzi"], "wchance": 0.38, "chars": ["asker2", "asker3"]},
+		"skins": ["dijital", "karbon", "kar", "kamuflaj", "gece", "buz", "col", "kan", "siber", "okyanus"], "weapons": ["aug", "vector", "scar", "ump45", "m4a1", "p90", "r870", "fn502", "vityaz", "m1911", "uzi", "m4k", "usp", "akm", "kasap"], "wchance": 0.38, "chars": ["asker2", "asker3"]},
 	"eklenti": {"name": "Eklenti Paketi", "price": 1500, "color": Color("7dff6a"), "desc": "Silah eklentileri: susturucu, nişangah, şarjör, tutamak, lazer.",
 		"skins": ["karbon", "dijital"], "weapons": [], "chars": [], "parts": ["sus", "kompen", "optik", "durbun", "sarjor", "tutamak", "lazer"]},
 	"osmanli": {"name": "Osmanlı Kasası", "price": 2500, "color": Color("2fb6a8"), "desc": "Çini ve turkuaz desenler, Magnum ve Patron karakteri şansı.",
-		"skins": ["cini", "turkuaz", "altin", "kizil", "neon", "lale", "nazar", "mermer", "ayyildiz", "kehribar"], "weapons": ["revolver", "deagle", "karambit", "m1911"], "wchance": 0.32, "chars": ["patron", "kapson"]},
+		"skins": ["cini", "turkuaz", "altin", "kizil", "neon", "lale", "nazar", "mermer", "ayyildiz", "kehribar"], "weapons": ["revolver", "kartal", "deagle", "karambit", "hancer", "m1911"], "wchance": 0.32, "chars": ["patron", "kapson"]},
 	"efsane": {"name": "Efsane Kasası", "price": 5000, "color": Color("ffb02e"), "desc": "En az Epik garantili! Lav, Buz, Galaksi, Altın.",
 		"skins": ["lav", "buz", "galaksi", "altin", "cini", "turkuaz", "zumrut", "mermer", "aurora", "ayyildiz", "ejder", "kehribar"], "weapons": ["awp", "awm", "scar", "m249", "rpk16", "kuzgun"], "wchance": 0.4, "chars": ["kot", "patron", "asker2"], "parts": ["sus", "optik", "durbun", "sarjor"]},
 }
@@ -111,6 +118,10 @@ const BALLISTICS := {
 	"kar98":  {"ap": 0.85, "pen": 0.5, "f0": 400.0, "f1": 500.0, "fmin": 1.0, "limb": 0.8, "ability": "Hızlı sürgü, kafadan kesin ölüm"},
 	"glock":  {"ap": 0.1, "pen": 0.0, "f0": 12.0, "f1": 35.0, "fmin": 0.65, "limb": 0.8, "ability": "Işık hızında çekiş ve geniş şarjör"},
 	"deagle": {"ap": 0.6, "pen": 0.2, "f0": 20.0, "f1": 60.0, "fmin": 0.7, "limb": 0.8, "ability": "Kafadan tek atış"},
+	"m4k":    {"ap": 0.42, "pen": 0.2, "f0": 30.0, "f1": 90.0, "fmin": 0.74, "limb": 0.75, "ability": "Kısa namlu karabina: hızlı nişan, dengeli geri tepme"},
+	"usp":    {"ap": 0.3, "pen": 0.05, "f0": 15.0, "f1": 45.0, "fmin": 0.66, "limb": 0.8, "ability": ".45 ACP: 2 kafa atışıyla öldürür, isabetli ilk mermi"},
+	"kartal": {"ap": 0.6, "pen": 0.2, "f0": 24.0, "f1": 70.0, "fmin": 0.74, "limb": 0.85, "ability": ".44 Magnum toplu: kafadan tek atış, çok sert geri tepme"},
+	"akm":    {"ap": 0.5, "pen": 0.32, "f0": 25.0, "f1": 75.0, "fmin": 0.72, "limb": 0.8, "ability": "Modern AK: ahşap kundak, 7.62 mermi ince duvarları deler"},
 	"revolver": {"ap": 0.55, "pen": 0.18, "f0": 22.0, "f1": 65.0, "fmin": 0.72, "limb": 0.85, "ability": "En güçlü tabanca, sert geri tepme"},
 }
 
@@ -136,7 +147,7 @@ func part_fits(pid: String, wid: String) -> bool:
 	var w: Dictionary = WEAPONS.get(wid, {})
 	if w.get("melee", false) or w.get("throwable", false):
 		return false
-	if pid in ["optik", "durbun"] and (w.get("scope", false) or wid in ["m4a1", "scar", "ump45", "vector", "m249", "aug"]):
+	if pid in ["optik", "durbun"] and (w.get("scope", false) or wid in ["scar", "ump45", "vector", "m249", "aug"]):
 		return false   # these already have an optic
 	if w.get("pellets", 0) > 0 and pid in ["sus", "optik", "durbun"]:
 		return false
@@ -192,6 +203,10 @@ func full_stats(id: String, parts = null) -> Dictionary:
 	return w
 
 const LVL_GLOW_COLS := [Color(0, 0, 0), Color(0.3, 0.75, 1.0), Color(0.3, 0.75, 1.0), Color(0.65, 0.4, 1.0), Color(0.65, 0.4, 1.0), Color(1.0, 0.5, 0.15), Color(1.0, 0.5, 0.15), Color(1.0, 0.82, 0.3)]
+const LVL_GLOW_COLS2 := [Color(0, 0, 0), Color(0.75, 0.95, 1.0), Color(0.75, 0.95, 1.0), Color(1.0, 0.55, 0.95), Color(1.0, 0.55, 0.95), Color(1.0, 0.85, 0.35), Color(1.0, 0.85, 0.35), Color(1.0, 1.0, 0.85)]
+## shown next to a weapon name: "+4" badge colour for an upgrade level
+func lvl_color(lvl: int) -> Color:
+	return LVL_GLOW_COLS[clamp(lvl, 0, 7)] if lvl > 0 else Color(0.7, 0.75, 0.8)
 var _glow_shader: Shader
 
 func _is_optic_mesh(mi: MeshInstance3D) -> bool:
@@ -224,27 +239,47 @@ func level_glow(gun: Node3D, id: String, strength: float = 1.0) -> void:
 		_glow_shader.code = """shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_back, depth_test_default;
 uniform vec4 col : source_color = vec4(1.0, 0.6, 0.2, 1.0);
+uniform vec4 col2 : source_color = vec4(1.0, 0.9, 0.6, 1.0);
 uniform float power = 1.0;
 uniform float tier = 1.0;
 varying vec3 lp;
 void vertex() { lp = VERTEX; }
+// distance to the nearest hexagon edge (0 on the edge)
+float hexd(vec2 p) {
+	p.x *= 1.1547;
+	p.y += mod(floor(p.x), 2.0) * 0.5;
+	p = abs(fract(p) - 0.5);
+	return abs(max(p.x * 1.5 + p.y, p.y * 2.0) - 1.0);
+}
 void fragment() {
-	// crease detection: the view-space normal changes sharply across hard edges
+	// additive overlay only: the skin underneath is never tinted, glass/reticle meshes are skipped on the CPU side
 	float edge = smoothstep(0.35, 0.9, length(fwidth(NORMAL)) * 4.0);
-	// energy flowing along the edges, faster and brighter on higher tiers
-	float flow = 0.55 + 0.45 * sin(lp.z * 38.0 - TIME * (2.0 + tier * 0.5) + lp.y * 20.0);
-	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 6.0) * 0.28;
-	// narrow sweep of light along the barrel every ~4 s
-	float cyc = fract(TIME * 0.25);
-	float head = cyc * 3.2 - 1.6;
-	float glint = (1.0 - smoothstep(0.0, 0.03, abs(lp.z * 1.4 + lp.y * 0.8 - head))) * step(cyc, 0.5);
-	// tiny sparkles only on the top tier
+	float flow = 0.6 + 0.4 * sin(lp.z * 34.0 - TIME * (2.4 + tier * 0.45) + lp.y * 18.0);
+	float pulse = 0.8 + 0.2 * sin(TIME * (2.0 + tier * 0.3));
+	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 5.0) * (0.07 + tier * 0.012);
+	// the energy wave: a bright front that travels muzzle -> stock, leaving a hexagon trail that dissolves
+	float period = 3.0 - tier * 0.14;
+	float cyc = fract(TIME / period);
+	float front = mix(-0.75, 0.42, cyc);
+	float d = lp.z - front;                       // < 0 : already passed (towards the muzzle)
+	float wave = exp(-d * d * 1600.0);
+	float trail = d < 0.0 ? exp(d * 7.0) * (1.0 - cyc * 0.35) : 0.0;
+	float hx = 1.0 - smoothstep(0.0, 0.09, hexd(vec2(lp.z, lp.y + lp.x * 0.5) * 95.0));
+	float scan = 0.5 + 0.5 * sin(lp.y * 520.0 - TIME * 9.0);
+	vec3 c = mix(col.rgb, col2.rgb, clamp(wave + hx * trail * 0.6, 0.0, 1.0));
+	// second, fainter counter wave from tier 5
+	float d2 = lp.z - mix(0.42, -0.75, fract(TIME / period + 0.5));
+	float wave2 = step(4.5, tier) * exp(-d2 * d2 * 2600.0) * 0.55;
 	float spark = step(6.5, tier) * pow(max(sin(lp.x * 210.0 + TIME * 4.0) * sin(lp.z * 170.0 - TIME * 3.0), 0.0), 30.0);
-	ALBEDO = col.rgb * (edge * flow * 0.85 + rim + glint * 0.5 + spark * 1.5) * power;
+	float e = edge * flow * pulse * 0.6 + rim + wave * (0.9 + edge * 1.2) + wave2 * (0.6 + edge)
+		+ trail * (hx * 0.75 + scan * 0.08) * (0.55 + tier * 0.06) + spark * 1.6;
+	ALBEDO = c * e * power;
 }"""
+
 	var m := ShaderMaterial.new()
 	m.shader = _glow_shader
 	m.set_shader_parameter("col", LVL_GLOW_COLS[clamp(lvl, 0, 7)])
+	m.set_shader_parameter("col2", LVL_GLOW_COLS2[clamp(lvl, 0, 7)])
 	m.set_shader_parameter("power", (0.55 + lvl * 0.07) * strength)
 	m.set_shader_parameter("tier", float(lvl))
 	gun.set_meta("glow_mat", m)

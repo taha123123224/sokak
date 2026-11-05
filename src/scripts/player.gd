@@ -1114,7 +1114,7 @@ func _load_vm_weapon(id: String) -> void:
 	MatLib.apply(vm_weapon, GS.wskin(id))
 	vm_off.add_child(vm_weapon)
 	GS.parts_visual(vm_weapon, id)
-	GS.level_glow(vm_weapon, id, 0.45)
+	GS.level_glow(vm_weapon, id, 0.62)
 	for n in ["body", "mag", "bolt", "slide", "muzzle", "sight", "lhand", "rhand", "eject", "pin"]:
 		var f := vm_weapon.find_child(n, true, false)
 		if f:
@@ -1231,7 +1231,7 @@ func _spawn_flash() -> void:
 	var fv := randi() % 3
 	((flash_mi.mesh as QuadMesh).material as StandardMaterial3D).albedo_texture = flash_tex[fv]
 	((flash_side.mesh as QuadMesh).material as StandardMaterial3D).albedo_texture = flash_side_tex[fv]
-	var s := randf_range(0.8, 1.3) * (1.6 if cur in ["spas", "awp", "awm", "kar98", "deagle", "kuzgun"] else 1.0)
+	var s := randf_range(0.8, 1.3) * (1.6 if cur in ["spas", "awp", "awm", "kar98", "deagle", "kuzgun", "kartal"] else 1.0)
 	flash_mi.scale = Vector3(s, s, s)
 	flash_mi.visible = ads_k < 0.9 or not wdata.get("scope", false)
 	flash_side.global_position = p + Vector3(0, 0, -0.09) * s

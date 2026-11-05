@@ -544,13 +544,16 @@ func on_damaged(from_pos: Vector3, amount: float) -> void:
 func ping_minimap(n) -> void:
 	pings[n] = 2.0
 
-func kill_feed(killer: String, victim: String, wid: String, head: bool, kt: String, vt: String, by_player: bool, player_died: bool) -> void:
+func kill_feed(killer: String, victim: String, wid: String, head: bool, kt: String, vt: String, by_player: bool, player_died: bool, lvl: int = 0) -> void:
 	var __t := Time.get_ticks_usec()
-	_sp_kill_feed(killer, victim, wid, head, kt, vt, by_player, player_died)
+	_sp_kill_feed(killer, victim, wid, head, kt, vt, by_player, player_died, lvl)
 	var __d := Time.get_ticks_usec() - __t
 	if __d > 3000: print("SPIKE hud.gd.kill_feed ", __d / 1000.0, "ms")
 
-func _sp_kill_feed(killer: String, victim: String, wid: String, head: bool, kt: String, vt: String, by_player: bool, player_died: bool) -> void:
+func lvl_badge(lvl: int, fs: int = 15) -> Control:
+	return UI.lvl_badge(lvl, fs)
+
+func _sp_kill_feed(killer: String, victim: String, wid: String, head: bool, kt: String, vt: String, by_player: bool, player_died: bool, lvl: int = 0) -> void:
 	if not GS.settings.get("kill_feed", true):
 		return
 	var p := UI.panel(Color(0.02, 0.03, 0.05, 0.65) if not by_player else Color(0.35, 0.2, 0.05, 0.75), Color(1, 1, 1, 0.08) if not (by_player or player_died) else (UI.ACCENT if by_player else UI.RED), 8, 2)
@@ -569,8 +572,10 @@ func _sp_kill_feed(killer: String, victim: String, wid: String, head: bool, kt: 
 		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		var ih := 26.0
 		tr.custom_minimum_size = Vector2(min(ih * icon.get_width() / max(icon.get_height(), 1), 104.0), ih)
-		tr.modulate = Color(1, 1, 1, 0.95)
+		tr.modulate = Color(1, 1, 1, 0.95) if lvl <= 0 else Color(1, 1, 1).lerp(GS.lvl_color(lvl), 0.35)
 		h.add_child(tr)
+		if lvl > 0:
+			h.add_child(lvl_badge(lvl, 15))
 	else:
 		var wname: String = GS.WEAPONS[wid]["name"] if GS.WEAPONS.has(wid) else "☠"
 		h.add_child(UI.lbl("[" + wname + "]", 17, UI.DIM, "Rajdhani-SemiBold"))
@@ -791,7 +796,13 @@ func _kill_banner(head: bool, wid: String, streak: int) -> void:
 	var tv := UI.vbox(-4)
 	h.add_child(tv)
 	tv.add_child(UI.lbl("KAFADAN VURUŞ" if head else "DÜŞMAN ETKİSİZ", 26, col, "RussoOne-Regular"))
-	tv.add_child(UI.lbl(("+150" if head else "+100") + "   •   " + str(GS.WEAPONS.get(wid, {}).get("name", "")).to_upper(), 17, Color(1, 1, 1, 0.8), "Rajdhani-Bold"))
+	var wl := UI.hbox(8)
+	tv.add_child(wl)
+	wl.add_child(UI.lbl(("+150" if head else "+100") + "   •", 17, Color(1, 1, 1, 0.8), "Rajdhani-Bold"))
+	var blv := GS.wlvl(wid)
+	if blv > 0:
+		wl.add_child(lvl_badge(blv, 15))
+	wl.add_child(UI.lbl(str(GS.WEAPONS.get(wid, {}).get("name", "")).to_upper(), 17, Color(1, 1, 1, 0.8) if blv <= 0 else Color(1, 1, 1).lerp(GS.lvl_color(blv), 0.4), "Rajdhani-Bold"))
 	var pips := UI.hbox(3)
 	pips.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(pips)
@@ -1747,8 +1758,8 @@ class MedalRing extends Control:
 
 
 # ---------------------------------------------------------------- weapon menu (B)
-const BUY_GROUPS := [["TÜFEKLER", ["ak47", "m4a1", "scar", "aug", "m249", "rpk16", "kuzgun"]], ["HAFİF MAKİNALI", ["mp5", "p90", "ump45", "vector", "vityaz", "uzi"]], ["POMPALI", ["spas"]],
-	["KESKİN NİŞANCI", ["awp", "awm", "kar98"]], ["TABANCALAR", ["glock", "deagle", "revolver", "fn502", "m1911"]], ["BIÇAKLAR", ["knife", "karambit"]]]
+const BUY_GROUPS := [["TÜFEKLER", ["ak47", "akm", "m4a1", "m4k", "scar", "aug", "m249", "rpk16", "kuzgun"]], ["HAFİF MAKİNALI", ["mp5", "p90", "ump45", "vector", "vityaz", "uzi"]], ["POMPALI", ["spas"]],
+	["KESKİN NİŞANCI", ["awp", "awm", "kar98"]], ["TABANCALAR", ["glock", "usp", "deagle", "revolver", "kartal", "fn502", "m1911"]], ["BIÇAKLAR", ["knife", "karambit", "hancer", "kasap", "balta"]]]
 
 func toggle_buy(open: bool) -> void:
 	if buy_panel:

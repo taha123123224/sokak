@@ -79,6 +79,41 @@ SPECS.update({
                    tex_all=(BR + 'bc.png', BR + 'normal.png', BR + 'roughness.png', BR + 'metallic.png')),
 })
 
+SPECS.update({
+    'm4k': dict(file=NEW + '/m4carbine.fbx', axis='Y', flip=True, real=0.84,
+                rhand=(-1.2, -0.55), muzzle=(6.53, 0.42), sight=(-1.0, 1.18), lhand=(2.3, 0.25), eject=(0.11, 0.45),
+                flat={'Base_low': ((0.055, 0.057, 0.062), 0.75, 0.42), 'front_low': ((0.06, 0.062, 0.066), 0.6, 0.5),
+                      'Stock_low': ((0.045, 0.045, 0.048), 0.0, 0.72), 'grip_low': ((0.04, 0.04, 0.042), 0.0, 0.78),
+                      'magazine_low': ((0.07, 0.07, 0.075), 0.7, 0.45), 'Iron sight_low': ((0.04, 0.04, 0.045), 0.8, 0.4),
+                      'small parts_low': ((0.08, 0.08, 0.085), 0.9, 0.35), 'trigger_low': ((0.08, 0.08, 0.085), 0.9, 0.35)},
+                skin=['Base_low', 'front_low', 'Stock_low'],
+                parts={'mag': ['magazine_low']}),
+    'usp': dict(file=NEW + '/usp.fbx', axis='X', real=0.20,
+                rhand=(-1.3, 0.45), muzzle=(2.12, 1.0), sight=(-1.55, 1.36), lhand=(-1.2, -0.6), eject=(-0.05, 1.1),
+                keep_mats=True, mat_fix={'silver metal': ((0.075, 0.08, 0.088), 0.85)},
+                parts={'slide': ['Cube.001', 'Cube.006'], 'mag': ['Cube.002', 'Cube.005']}),
+    # revolver: restyled (own colours, steel frame + walnut grip)
+    'kartal': dict(file=NEW + '/revolver.fbx', axis='X', flip=True, real=0.30,
+                   rhand=(-1.45, -0.5), muzzle=(1.40, 0.04), sight=(-1.25, 0.24), lhand=(-1.4, -0.9), eject=(-0.65, -0.05),
+                   flat_mat={'Material': ((0.11, 0.115, 0.125), 0.9, 0.3)}, skin_mats=['Material'],
+                   wood_box=((-2.4, -0.95), (-1.6, -0.42), ((0.30, 0.16, 0.075), 0.0, 0.55))),
+})
+
+SPECS.update({
+    'm4a1': dict(file=NEW + '/m4a1n.fbx', axis='X', real=0.84,
+                 rhand=(-0.135, 0.0), muzzle=(0.469, 0.052), sight=(-0.13, 0.115), lhand=(0.168, 0.049), eject=(0.0, 0.059),
+                 flat_mat={'UltimateLowPolyGuns': ((0.06, 0.062, 0.067), 0.7, 0.45)}, skin_mats=['UltimateLowPolyGuns'],
+                 split_mag=((-0.06, 0.04), (-0.15, 0.0))),
+    'akm': dict(file=NEW + '/akm.fbx', axis='Y', flip=True, real=0.88,
+                rhand=(-0.124, -0.021), muzzle=(0.455, 0.020), sight=(0.056, 0.066), lhand=(0.271, 0.02), eject=(-0.027, 0.027),
+                flat={'WPN_AKM_magazine': ((0.07, 0.07, 0.075), 0.7, 0.45), 'WPN_AKM': ((0.07, 0.072, 0.078), 0.8, 0.38)},
+                skin=['WPN_AKM'],
+                wood_boxes=([((-0.47, -0.185), (-0.17, 0.06)), ((-0.19, -0.105), (-0.15, -0.025)), ((0.105, 0.235), (-0.012, 0.075))],
+                            ((0.29, 0.13, 0.065), 0.0, 0.5)),
+                wood_objs=['WPN_AKM'],
+                parts={'mag': ['WPN_AKM_magazine']}),
+})
+
 
 def load(spec):
     for o in list(bpy.data.objects):
@@ -92,8 +127,14 @@ def load(spec):
         for o in list(bpy.data.objects):
             if o.type != 'MESH':
                 bpy.data.objects.remove(o)
+    elif f.endswith('.stl'):
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        bpy.ops.wm.stl_import(filepath=f)
     else:
+        bpy.ops.wm.read_factory_settings(use_empty=True)
         bpy.ops.import_scene.fbx(filepath=f)
+    for o in bpy.data.objects:
+        o.animation_data_clear()
     meshes = [o for o in bpy.data.objects if o.type == 'MESH']
     # bake every transform into the meshes, drop parents
     for o in meshes:
@@ -113,6 +154,14 @@ def load(spec):
         cz = sum((v.co.z for v in o.data.vertices)) / max(len(o.data.vertices), 1)
         if any(o.name.startswith(d) for d in spec.get('drop', [])) or ('drop_above' in spec and cz > spec['drop_above']):
             meshes.remove(o); bpy.data.objects.remove(o)
+    if f.endswith('.stl'):
+        pass
+    if 'perm' in spec:
+        a, b, c = spec['perm']
+        for o in meshes:
+            for v in o.data.vertices:
+                q = v.co.copy(); v.co.x = q[a]; v.co.y = q[b]; v.co.z = q[c]
+            o.data.flip_normals() if spec.get('perm_flip') else None
     if spec.get('flip'):
         # muzzle points to -long: turn the model 180 deg about the up axis
         for o in meshes:
@@ -204,8 +253,8 @@ def build(wid):
     if 'flat_mat' in spec:
         for o in meshes:
             for slot in o.material_slots:
-                if slot.material and slot.material.name in spec['flat_mat']:
-                    key = slot.material.name
+                if slot.material and slot.material.name.split('.')[0] in spec['flat_mat']:
+                    key = slot.material.name.split('.')[0]
                     nm = ('gun_paint_ext_%s_%s' if key in spec.get('skin_mats', []) else 'ext_%s_%s') % (wid, key)
                     if nm not in bpy.data.materials:
                         make_mat(nm, flat=spec['flat_mat'][key])
@@ -233,8 +282,45 @@ def build(wid):
                         b = m2.node_tree.nodes.get('Principled BSDF') or next((n for n in m2.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None)
                         if b:
                             b.inputs['Roughness'].default_value = pbr[0]; b.inputs['Metallic'].default_value = pbr[1]
+                    fx = spec.get('mat_fix', {}).get(key)
+                    if fx and m2.node_tree:
+                        b = next((n for n in m2.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+                        if b:
+                            for sock in ('Base Color', 'Metallic'):
+                                for l in list(b.inputs[sock].links):
+                                    m2.node_tree.links.remove(l)
+                            b.inputs['Base Color'].default_value = (*fx[0], 1); b.inputs['Metallic'].default_value = fx[1]
                 slot.material = bpy.data.materials[nm]
                 slot.material['src'] = key
+    for zi, ((l0, l1), (u0, u1), zflat) in enumerate(spec.get('zones', [])):
+        zm = bpy.data.materials.get('ext_%s_z%d' % (wid, zi)) or make_mat('ext_%s_z%d' % (wid, zi), flat=zflat)
+        a, b = raw(l0, u0), raw(l1, u1)
+        for o in meshes:
+            if zm.name not in [mm.name for mm in o.data.materials if mm]:
+                o.data.materials.append(zm)
+            wi = [mm.name if mm else '' for mm in o.data.materials].index(zm.name)
+            for pl in o.data.polygons:
+                c = pl.center
+                if min(a.y, b.y) < c.y < max(a.y, b.y) and min(a.z, b.z) < c.z < max(a.z, b.z):
+                    pl.material_index = wi
+    if 'wood_box' in spec or 'wood_boxes' in spec:
+        if 'wood_box' in spec:
+            (l0, l1), (u0, u1), flat = spec['wood_box']; boxes = [((l0, l1), (u0, u1))]
+        else:
+            boxes, flat = spec['wood_boxes']
+        wm = make_mat('ext_%s_wood' % wid, flat=flat)
+        bb = []
+        for (l0, l1), (u0, u1) in boxes:
+            a, b = raw(l0, u0), raw(l1, u1); bb.append((min(a.y, b.y), max(a.y, b.y), min(a.z, b.z), max(a.z, b.z)))
+        only = spec.get('wood_objs')
+        for o in meshes:
+            if only and not any(o.name.startswith(k) for k in only):
+                continue
+            o.data.materials.append(wm); wi = len(o.data.materials) - 1
+            for pl in o.data.polygons:
+                c = pl.center
+                if any(y0 < c.y < y1 and z0 < c.z < z1 for y0, y1, z0, z1 in bb):
+                    pl.material_index = wi
     # ---- moving parts
     groups = {}
     if 'parts_mat' in spec:

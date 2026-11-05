@@ -1412,50 +1412,196 @@ func _parts_dialog(id: String) -> void:
 			cv.add_child(b)
 	v.add_child(UI.lbl("Eklentileri Eklenti Paketi kasasından kazanabilir ya da buradan satın alabilirsin. Bir eklentiye sahip olunca tüm uyumlu silahlarına takabilirsin.", 15, UI.DIM, "Rajdhani-SemiBold"))
 
+class UpgStage extends Control:
+	## upgrade stage behind the weapon: tier glow, 7 level segments on a turning ring,
+	## a charge arc while upgrading and a shockwave + flash on the result
+	var col := Color(0.3, 0.75, 1.0)
+	var lvl := 0
+	var charge := 0.0
+	var burst := -1.0
+	var flash := 0.0
+	var spin := 0.25
+	var t := 0.0
+	func _process(d: float) -> void:
+		t += d
+		if burst >= 0.0:
+			burst += d
+			if burst > 1.4: burst = -1.0
+		flash = maxf(flash - d * 2.2, 0.0)
+		queue_redraw()
+	func _draw() -> void:
+		var c := size * 0.5
+		var r := minf(size.y * 0.46, 170.0)
+		var p := 0.6 + charge * 0.9 + flash
+		for k in 12:
+			draw_circle(c, r * 2.2 - k * r * 0.16, Color(col.r, col.g, col.b, 0.012 * p * (k + 1) * 0.5))
+		for i in 18:
+			var a0 := t * 0.1 + i * TAU / 18.0
+			draw_colored_polygon(PackedVector2Array([c, c + Vector2.from_angle(a0) * r * 2.6, c + Vector2.from_angle(a0 + 0.045) * r * 2.6]), Color(col.r, col.g, col.b, 0.02 * p))
+		var rot := t * (spin + charge * 4.0)
+		draw_arc(c, r * 1.12, 0, TAU, 96, Color(1, 1, 1, 0.05), 1.5, true)
+		for i in 7:
+			var a := rot + i * TAU / 7.0
+			var on := i < lvl
+			var cc := col if on else Color(1, 1, 1, 0.12)
+			draw_arc(c, r, a, a + TAU / 7.0 - 0.14, 18, cc, 6.0 if on else 4.0, true)
+			if on:
+				draw_arc(c, r, a, a + TAU / 7.0 - 0.14, 18, Color(cc.r, cc.g, cc.b, 0.25), 14.0, true)
+		for i in 36:
+			var a := -rot * 0.6 + i * TAU / 36.0
+			var l := 8.0 if i % 3 == 0 else 4.0
+			draw_line(c + Vector2.from_angle(a) * (r * 0.86), c + Vector2.from_angle(a) * (r * 0.86 - l), Color(col.r, col.g, col.b, 0.35), 1.5, true)
+		if charge > 0.0:
+			draw_arc(c, r * 1.12, -PI / 2, -PI / 2 + TAU * charge, 96, col.lightened(0.3), 4.0, true)
+			draw_arc(c, r * 1.12, -PI / 2, -PI / 2 + TAU * charge, 96, Color(col.r, col.g, col.b, 0.3), 12.0, true)
+			var hp := c + Vector2.from_angle(-PI / 2 + TAU * charge) * r * 1.12
+			draw_circle(hp, 6.0, Color(1, 1, 1, 0.9))
+		if burst >= 0.0:
+			var k := burst / 1.4
+			draw_arc(c, r * (0.4 + k * 2.6), 0, TAU, 96, Color(col.r, col.g, col.b, (1.0 - k) * 0.9), 10.0 * (1.0 - k) + 2.0, true)
+			draw_arc(c, r * (0.2 + k * 1.8), 0, TAU, 96, Color(1, 1, 1, (1.0 - k) * 0.5), 4.0, true)
+		if flash > 0.0:
+			draw_rect(Rect2(Vector2.ZERO, size), Color(col.r, col.g, col.b, flash * 0.35))
+
+class UpgTrack extends Control:
+	## +1 .. +7 level path; reached nodes lit in their tier colour, the next one pulses
+	var lvl := 0
+	var t := 0.0
+	var pop := -1
+	var pop_t := 0.0
+	func _process(d: float) -> void:
+		t += d
+		pop_t += d
+		queue_redraw()
+	func _draw() -> void:
+		var n := 7
+		var x0 := 30.0
+		var x1 := size.x - 30.0
+		var y := size.y * 0.42
+		var f := get_theme_default_font()
+		draw_line(Vector2(x0, y), Vector2(x1, y), Color(1, 1, 1, 0.1), 4.0, true)
+		if lvl > 0:
+			draw_line(Vector2(x0, y), Vector2(lerpf(x0, x1, float(lvl - 1) / (n - 1)), y), GS.lvl_color(lvl), 4.0, true)
+		for i in n:
+			var lv := i + 1
+			var x := lerpf(x0, x1, float(i) / (n - 1))
+			var c: Color = GS.lvl_color(lv)
+			var reached := lv <= lvl
+			var rr := 13.0
+			if lv == pop and pop_t < 0.6:
+				rr += sin(pop_t / 0.6 * PI) * 10.0
+			if lv == lvl + 1:
+				var pu := 0.5 + 0.5 * sin(t * 4.0)
+				draw_circle(Vector2(x, y), rr + 6.0 + pu * 4.0, Color(c.r, c.g, c.b, 0.18 * pu))
+				draw_arc(Vector2(x, y), rr, 0, TAU, 32, c, 2.5, true)
+				draw_circle(Vector2(x, y), rr - 3.0, Color(0.05, 0.06, 0.08))
+			elif reached:
+				draw_circle(Vector2(x, y), rr + 5.0, Color(c.r, c.g, c.b, 0.25))
+				draw_circle(Vector2(x, y), rr, c)
+			else:
+				draw_circle(Vector2(x, y), rr, Color(0.12, 0.13, 0.16))
+				draw_arc(Vector2(x, y), rr, 0, TAU, 32, Color(1, 1, 1, 0.12), 1.5, true)
+			var txt := "+%d" % lv
+			var fs := 15
+			var tw := f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			draw_string(f, Vector2(x - tw / 2, y + 5), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.05, 0.05, 0.06) if reached else (Color.WHITE if lv == lvl + 1 else Color(1, 1, 1, 0.35)))
+			var tn: String = ["", "SİBER", "SİBER", "MOR", "MOR", "KOR", "KOR", "ALTIN"][lv]
+			if lv % 2 == 1 or lv == 7:
+				var w2 := f.get_string_size(tn, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+				draw_string(f, Vector2(x - w2 / 2, y + 34), tn, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(c.r, c.g, c.b, 0.85 if reached else 0.4))
+
+func _upg_stat(title: String, a: String, b: String, better: bool) -> Control:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UI.sb(Color(1, 1, 1, 0.035), Color(1, 1, 1, 0.08), 1, 10, 10))
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var v := UI.vbox(0)
+	p.add_child(v)
+	v.add_child(UI.lbl(title, 13, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+	var h := UI.hbox(8)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(h)
+	h.add_child(UI.lbl(a, 22, Color(1, 1, 1, 0.75), "Teko"))
+	h.add_child(UI.lbl("➜", 18, UI.ACCENT, "Rajdhani-Bold"))
+	h.add_child(UI.lbl(b, 24, UI.GREEN if better else Color.WHITE, "Teko"))
+	return p
+
 func _upgrade_dialog(id: String) -> void:
 	var lvl := GS.wlvl(id)
 	var cost := GS.upgrade_cost(lvl)
-	var v := _modal(760, 560)
+	var v := _modal(900, 640)
 	var top := UI.hbox(10)
 	v.add_child(top)
-	top.add_child(UI.header("SİLAH YÜKSELTME", 28))
+	var tv0 := UI.vbox(-4)
+	top.add_child(tv0)
+	tv0.add_child(UI.lbl("SİLAH YÜKSELTME", 14, UI.ACCENT2, "Rajdhani-Bold"))
+	var nh := UI.hbox(10)
+	tv0.add_child(nh)
+	nh.add_child(UI.lbl(str(GS.WEAPONS[id]["name"]).to_upper(), 32, Color.WHITE, "RussoOne-Regular"))
+	if lvl > 0:
+		nh.add_child(UI.lvl_badge(lvl, 18))
 	top.add_child(UI.spacer())
 	top.add_child(UI.btn("✕", _close_modal, 20, false, 44, 40))
-	var tr := thumb_rect(id, GS.wskin(id), Vector2(0, 170))
-	tr.pivot_offset = Vector2(356, 85)
+	# ---- stage: tier ring + weapon
+	var nc: Color = GS.lvl_color(lvl + 1)
+	var stage := UpgStage.new()
+	stage.custom_minimum_size = Vector2(0, 270)
+	stage.col = GS.lvl_color(maxi(lvl, 1))
+	stage.lvl = lvl
+	stage.clip_contents = true
+	v.add_child(stage)
+	var tr := thumb_rect(id, GS.wskin(id), Vector2(620, 220))
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stage.add_child(tr)
 	var gm := ShaderMaterial.new()
 	gm.shader = UPGRADE_GLOW
 	gm.set_shader_parameter("sweep", -1.0)
+	gm.set_shader_parameter("glow_col", stage.col)
 	tr.material = gm
-	v.add_child(tr)
+	var big := UI.lbl("", 64, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
+	big.add_theme_constant_override("outline_size", 10)
+	big.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	big.modulate.a = 0.0
+	stage.add_child(big)
+	var place := func():
+		tr.size = Vector2(620, 220)
+		tr.position = (stage.size - tr.size) / 2
+		tr.pivot_offset = tr.size / 2
+		big.size = Vector2(stage.size.x, 90)
+		big.position = Vector2(0, stage.size.y / 2 - 45)
+		big.pivot_offset = big.size / 2
+	stage.resized.connect(place)
 	var sparks := CPUParticles2D.new()
 	sparks.emitting = false
 	sparks.one_shot = true
-	sparks.amount = 90
-	sparks.lifetime = 1.1
-	sparks.explosiveness = 0.9
-	sparks.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	sparks.emission_rect_extents = Vector2(240, 50)
+	sparks.amount = 140
+	sparks.lifetime = 1.3
+	sparks.explosiveness = 0.95
+	sparks.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	sparks.emission_sphere_radius = 30.0
 	sparks.direction = Vector2(0, -1)
-	sparks.spread = 70
-	sparks.initial_velocity_min = 80; sparks.initial_velocity_max = 320
-	sparks.gravity = Vector2(0, 260)
-	sparks.scale_amount_min = 2.0; sparks.scale_amount_max = 4.5
-	var sg := Gradient.new()
-	sg.set_color(0, Color(1, 0.95, 0.7, 1)); sg.set_color(1, Color(1, 0.55, 0.1, 0))
-	sparks.color_ramp = sg
-	tr.add_child(sparks)
-	tr.resized.connect(func(): sparks.position = tr.size / 2)
-	var lh := UI.hbox(20)
-	lh.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_child(lh)
-	lh.add_child(UI.lbl(GS.WEAPONS[id]["name"] + " [+%d]" % lvl, 30, Color.WHITE, "RussoOne-Regular"))
-	lh.add_child(UI.lbl("➜", 30, UI.ACCENT, "Rajdhani-Bold"))
-	lh.add_child(UI.lbl("[+%d]" % (lvl + 1), 34, UI.ACCENT2, "RussoOne-Regular"))
+	sparks.spread = 180
+	sparks.initial_velocity_min = 120; sparks.initial_velocity_max = 520
+	sparks.gravity = Vector2(0, 340)
+	sparks.damping_min = 40; sparks.damping_max = 90
+	sparks.scale_amount_min = 2.0; sparks.scale_amount_max = 5.0
+	stage.add_child(sparks)
+	stage.resized.connect(func(): sparks.position = stage.size / 2)
+	# ---- level path
+	var track := UpgTrack.new()
+	track.lvl = lvl
+	track.custom_minimum_size = Vector2(0, 66)
+	v.add_child(track)
+	# ---- stat changes
 	var s0 := GS.stats_for(id, lvl)
-	var s1 := GS.stats_for(id, lvl + 1)
-	v.add_child(UI.lbl("Hasar %d ➜ %d    •    Geri Tepme -%d%%    •    Şarjör %d ➜ %d" % [s0["dmg"], s1["dmg"], 3, s0["mag"], s1["mag"]], 19, UI.GREEN, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
-	var ch := UI.hbox(16)
+	var s1 := GS.stats_for(id, mini(lvl + 1, GS.MAX_LVL))
+	var sh := UI.hbox(10)
+	v.add_child(sh)
+	sh.add_child(_upg_stat("HASAR", str(s0["dmg"]), str(s1["dmg"]), int(s1["dmg"]) > int(s0["dmg"])))
+	sh.add_child(_upg_stat("ŞARJÖR", str(s0.get("mag", 0)), str(s1.get("mag", 0)), int(s1.get("mag", 0)) > int(s0.get("mag", 0))))
+	sh.add_child(_upg_stat("GERİ TEPME", "%d%%" % int(100 - lvl * 3), "%d%%" % int(100 - (lvl + 1) * 3), true))
+	sh.add_child(_upg_stat("PARILTI", ["YOK", "SİBER", "SİBER", "MOR", "MOR", "KOR", "KOR", "ALTIN"][lvl], ["YOK", "SİBER", "SİBER", "MOR", "MOR", "KOR", "KOR", "ALTIN"][mini(lvl + 1, 7)], lvl + 1 in [1, 3, 5, 7]))
+	# ---- cost
+	var ch := UI.hbox(10)
 	ch.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(ch)
 	var reqs := [["gold", "Altın", UI.GOLD]]
@@ -1466,22 +1612,37 @@ func _upgrade_dialog(id: String) -> void:
 		if need <= 0:
 			continue
 		var have := int(GS.profile["gold"]) if r[0] == "gold" else int(GS.profile["mats"].get(r[0], 0))
-		var p := UI.panel(Color(1, 1, 1, 0.04), r[2].darkened(0.4), 10)
-		var pv := UI.vbox(0)
+		var p := UI.panel(Color(1, 1, 1, 0.04), (r[2] as Color).darkened(0.4) if have >= need else UI.RED.darkened(0.3), 10)
+		var pv := UI.vbox(-2)
 		p.add_child(pv)
-		pv.add_child(UI.lbl(UI.money(need), 26, Color.WHITE if have >= need else UI.RED, "Teko", HORIZONTAL_ALIGNMENT_CENTER))
-		pv.add_child(UI.lbl("%s (%s)" % [r[1], UI.money(have)], 14, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
-		p.custom_minimum_size = Vector2(120, 0)
+		pv.add_child(UI.lbl(UI.money(need), 24, Color.WHITE if have >= need else UI.RED, "Teko", HORIZONTAL_ALIGNMENT_CENTER))
+		pv.add_child(UI.lbl("%s · %s" % [r[1], UI.money(have)], 13, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+		p.custom_minimum_size = Vector2(118, 0)
 		ch.add_child(p)
-	var risk := "başarısız olursa malzemeler harcanır ve silah 1 seviye DÜŞER" if lvl >= GS.Econ.FAIL_DROP_FROM else "başarısız olursa malzemeler harcanır, seviye düşmez"
-	v.add_child(UI.lbl("Başarı şansı: %%%d   (%s)" % [cost["chance"], risk], 18, UI.RED if lvl >= GS.Econ.FAIL_DROP_FROM else UI.ACCENT2, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
-	var pb := UI.bar(0, 1, UI.ACCENT, 14)
-	v.add_child(pb)
-	var res := UI.lbl("", 40, UI.GOLD, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
-	v.add_child(res)
-	var go := UI.btn("YÜKSELT", Callable(), 26, true, 0, 60)
-	go.disabled = not GS.can_afford(cost)
-	v.add_child(go)
+	# ---- chance + action
+	var bh := UI.hbox(14)
+	v.add_child(bh)
+	var cv := UI.vbox(4)
+	cv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bh.add_child(cv)
+	var chance := int(cost["chance"])
+	var risky: bool = lvl >= GS.Econ.FAIL_DROP_FROM
+	var cc := UI.GREEN if chance >= 75 else (UI.GOLD if chance >= 50 else UI.RED)
+	var chh := UI.hbox(8)
+	cv.add_child(chh)
+	chh.add_child(UI.lbl("BAŞARI ŞANSI", 15, UI.DIM, "Rajdhani-Bold"))
+	chh.add_child(UI.lbl("%%%d" % chance, 22, cc, "Teko"))
+	chh.add_child(UI.spacer())
+	chh.add_child(UI.lbl("⚠ Başarısızlıkta seviye 1 DÜŞER" if risky else "Başarısızlıkta seviye düşmez", 14, UI.RED if risky else UI.DIM, "Rajdhani-Bold"))
+	var pb := UI.bar(0, 1, nc, 12)
+	pb.add_theme_stylebox_override("background", UI.sb(Color(1, 1, 1, 0.06), Color(0, 0, 0, 0), 0, 6, 0))
+	pb.add_theme_stylebox_override("fill", UI.sb(nc, Color(0, 0, 0, 0), 0, 6, 0))
+	cv.add_child(pb)
+	var res := UI.lbl("", 22, UI.GOLD, "RussoOne-Regular")
+	cv.add_child(res)
+	var go := UI.btn("YÜKSELT  ➜  +%d" % (lvl + 1), Callable(), 24, true, 280, 64)
+	go.disabled = not GS.can_afford(cost) or lvl >= GS.MAX_LVL
+	bh.add_child(go)
 	go.pressed.connect(func():
 		go.disabled = true
 		var ur: Dictionary = await _act("upgrade", {"wid": id})
@@ -1491,53 +1652,82 @@ func _upgrade_dialog(id: String) -> void:
 		var up: Dictionary = ur["res"]
 		SFX.play("upgrade_charge", -2)
 		spin_speed = 9.0
-		# charging: repeated light sweeps over the weapon, getting faster and brighter
-		gm.set_shader_parameter("glow_col", Color(1.0, 0.62, 0.18))
+		stage.col = nc
+		gm.set_shader_parameter("glow_col", nc)
+		res.text = "YÜKSELTİLİYOR..."
+		res.add_theme_color_override("font_color", nc)
+		# charging: arc fills, ring spins up, light sweeps over the weapon faster and faster, the weapon trembles
 		var gtw := create_tween()
-		for k in 4:
-			var d := 0.62 - k * 0.1
-			gtw.tween_method(func(x): gm.set_shader_parameter("sweep", x), -0.4, 1.6, d)
-		gtw.parallel().tween_method(func(x): gm.set_shader_parameter("glow", x), 0.0, 0.9, 2.2)
-		gtw.parallel().tween_method(func(x): gm.set_shader_parameter("outline", x), 0.0, 1.0, 2.2)
+		for k in 5:
+			gtw.tween_method(func(x): gm.set_shader_parameter("sweep", x), -0.4, 1.6, 0.6 - k * 0.09)
 		var tw := create_tween()
-		tw.tween_property(pb, "value", 1.0, 2.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		tw.parallel().tween_property(rim, "light_energy", 80.0, 2.2)
+		tw.tween_method(func(x):
+			stage.charge = x
+			pb.value = x
+			gm.set_shader_parameter("glow", x * 0.9)
+			gm.set_shader_parameter("outline", x)
+			tr.position = (stage.size - tr.size) / 2 + Vector2(randf_range(-1, 1), randf_range(-1, 1)) * x * 3.0
+			rim.light_energy = 9.0 + x * 70.0, 0.0, 1.0, 2.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		tw.tween_callback(func():
 			spin_speed = 0.5
 			rim.light_energy = 9
+			stage.charge = 0.0
+			tr.position = (stage.size - tr.size) / 2
 			var ok := bool(up.get("success", false))
+			var nl := int(up.get("lvl", lvl + 1 if ok else lvl))
 			if ok:
 				SFX.play("success")
-				res.text = "BAŞARILI!  +%d" % (lvl + 1)
-				res.add_theme_color_override("font_color", UI.GOLD)
-				res.scale = Vector2(1.6, 1.6)
-				res.pivot_offset = res.size / 2
-				var t2 := res.create_tween()
-				t2.tween_property(res, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-				# success: gold flash washes over the weapon, then slowly fades
-				gm.set_shader_parameter("glow_col", Color(1.0, 0.82, 0.32))
-				gm.set_shader_parameter("glow", 2.2)
-				gm.set_shader_parameter("outline", 1.6)
-				sparks.position = tr.size / 2
+				stage.lvl = nl; stage.burst = 0.0; stage.flash = 1.0
+				track.lvl = nl; track.pop = nl; track.pop_t = 0.0
+				big.text = "+%d" % nl
+				big.add_theme_color_override("font_color", nc.lightened(0.35))
+				big.add_theme_color_override("font_outline_color", Color(nc.r * 0.25, nc.g * 0.25, nc.b * 0.25, 0.9))
+				big.scale = Vector2(2.4, 2.4)
+				var t2 := big.create_tween()
+				t2.tween_property(big, "modulate:a", 1.0, 0.12)
+				t2.parallel().tween_property(big, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+				t2.tween_interval(0.9)
+				t2.tween_property(big, "modulate:a", 0.0, 0.5)
+				t2.parallel().tween_property(big, "position:y", big.position.y - 40, 0.5)
+				res.text = "BAŞARILI!  %s  +%d" % [str(GS.WEAPONS[id]["name"]).to_upper(), nl]
+				res.add_theme_color_override("font_color", nc.lightened(0.2))
+				var sg := Gradient.new()
+				sg.set_color(0, Color(1, 1, 1, 1)); sg.add_point(0.25, nc.lightened(0.3)); sg.set_color(sg.get_point_count() - 1, Color(nc.r, nc.g, nc.b, 0))
+				sparks.color_ramp = sg
 				sparks.restart()
+				gm.set_shader_parameter("glow_col", nc)
+				gm.set_shader_parameter("glow", 2.4)
+				gm.set_shader_parameter("outline", 1.8)
 				var t3 := tr.create_tween()
-				t3.tween_method(func(x): gm.set_shader_parameter("sweep", x), -0.4, 1.6, 0.55)
-				t3.parallel().tween_method(func(x): gm.set_shader_parameter("glow", x), 2.2, 0.0, 1.6).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
-				t3.parallel().tween_method(func(x): gm.set_shader_parameter("outline", x), 1.6, 0.0, 1.8).set_ease(Tween.EASE_OUT)
+				t3.tween_property(tr, "scale", Vector2(1.08, 1.08), 0.12)
+				t3.tween_property(tr, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+				t3.parallel().tween_method(func(x): gm.set_shader_parameter("sweep", x), -0.4, 1.6, 0.6)
+				t3.parallel().tween_method(func(x): gm.set_shader_parameter("glow", x), 2.4, 0.25, 1.8).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+				t3.parallel().tween_method(func(x): gm.set_shader_parameter("outline", x), 1.8, 0.35, 2.0).set_ease(Tween.EASE_OUT)
 			else:
 				SFX.play("fail")
+				stage.col = UI.RED; stage.flash = 0.8; stage.lvl = nl
+				track.lvl = nl
 				gm.set_shader_parameter("glow_col", Color(1.0, 0.15, 0.1))
 				var t5 := tr.create_tween()
 				t5.tween_method(func(x): gm.set_shader_parameter("glow", x), 1.4, 0.0, 0.9)
 				t5.parallel().tween_method(func(x): gm.set_shader_parameter("outline", x), 1.2, 0.0, 0.9)
-				res.text = "BAŞARISIZ!" if int(up.get("lvl", lvl)) >= lvl else "BAŞARISIZ!  SEVİYE DÜŞTÜ: +%d" % int(up.get("lvl", lvl))
+				big.text = "✖"
+				big.add_theme_color_override("font_color", UI.RED)
+				big.scale = Vector2(1.8, 1.8)
+				var t6 := big.create_tween()
+				t6.tween_property(big, "modulate:a", 1.0, 0.1)
+				t6.parallel().tween_property(big, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+				t6.tween_interval(0.7)
+				t6.tween_property(big, "modulate:a", 0.0, 0.4)
+				res.text = "BAŞARISIZ!" if nl >= lvl else "BAŞARISIZ!  SEVİYE DÜŞTÜ: +%d" % nl
 				res.add_theme_color_override("font_color", UI.RED)
 				var t4 := v.create_tween()
-				for k in 6:
-					t4.tween_property(v, "position:x", 10.0 * (1 if k % 2 == 0 else -1), 0.04)
+				for k in 8:
+					t4.tween_property(v, "position:x", 12.0 * (1 if k % 2 == 0 else -1) * (1.0 - k / 8.0), 0.035)
 				t4.tween_property(v, "position:x", 0.0, 0.04)
 			_refresh_currency()
-			get_tree().create_timer(1.6).timeout.connect(func(): if page == "bag": show_page("bag"))))
+			get_tree().create_timer(2.2).timeout.connect(func(): if page == "bag": show_page("bag"))))
 
 # ================================================================ MARKET
 func _page_market() -> void:
@@ -3362,6 +3552,18 @@ func _page_mods() -> void:
 # ---------------------------------------------------------------- screenshot test hooks
 func test_hook(i: int) -> void:
 	match i:
+		38, 39:
+			if not GS.owned("m4a1"):
+				GS.profile["owned"]["m4a1"] = {"lvl": 0, "skins": ["std"], "skin": "std"}
+			GS.profile["owned"]["m4a1"]["lvl"] = 3
+			GS.profile["gold"] = 999999
+			for m in GS.MATS.keys():
+				GS.profile["mats"][m] = 999
+			_upgrade_dialog("m4a1")
+			if i == 39:
+				for b in modal.find_children("*", "Button", true, false):
+					if str((b as Button).text).begins_with("YÜKSELT  "):
+						(b as Button).pressed.emit()
 		35:
 			_room_dialog({"name": "Kapışma Odası", "map": "canakkale", "mode": "sabotaj", "bots": 9, "diff": 1, "time": 8, "target": 6, "team": "a", "no": 110})
 		36, 37:

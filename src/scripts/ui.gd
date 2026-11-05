@@ -191,3 +191,40 @@ static func slider(minv: float, maxv: float, step: float, value: float, cb: Call
 	s.focus_mode = Control.FOCUS_NONE
 	s.value_changed.connect(cb)
 	return s
+
+## "+4" upgrade badge: slanted tier-coloured chip with a chevron and a light sweep that runs over it
+static func lvl_badge(lvl: int, fs: int = 15) -> Control:
+	var c: Color = GS.lvl_color(lvl)
+	var p := PanelContainer.new()
+	var sbx := StyleBoxFlat.new()
+	sbx.bg_color = Color(c.r * 0.28, c.g * 0.28, c.b * 0.28, 0.92)
+	sbx.border_color = c
+	sbx.set_border_width_all(0); sbx.border_width_left = 3; sbx.border_width_bottom = 2
+	sbx.skew = Vector2(-0.28, 0)
+	sbx.set_corner_radius_all(3)
+	sbx.content_margin_left = 8; sbx.content_margin_right = 9; sbx.content_margin_top = 0; sbx.content_margin_bottom = 0
+	sbx.shadow_color = Color(c.r, c.g, c.b, 0.45); sbx.shadow_size = 6
+	p.add_theme_stylebox_override("panel", sbx)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var h := hbox(3)
+	p.add_child(h)
+	var chev := lbl("▲".repeat(1 + int(lvl >= 3) + int(lvl >= 5)), int(fs * 0.6), c.lightened(0.3), "Rajdhani-Bold")
+	chev.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(chev)
+	var t := lbl("+%d" % lvl, fs, Color.WHITE, "RussoOne-Regular")
+	t.add_theme_constant_override("outline_size", 4)
+	t.add_theme_color_override("font_outline_color", Color(c.r * 0.3, c.g * 0.3, c.b * 0.3))
+	h.add_child(t)
+	p.clip_contents = true
+	var sh := ColorRect.new()
+	sh.color = Color(1, 1, 1, 0.55)
+	sh.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sh.size = Vector2(6, 60); sh.position = Vector2(-20, -10); sh.rotation = 0.35
+	p.add_child(sh)
+	sh.tree_entered.connect(func():
+		var tw := sh.create_tween().set_loops()
+		tw.tween_property(sh, "position:x", 90.0, 0.55).from(-20.0).set_trans(Tween.TRANS_SINE)
+		tw.tween_interval(1.6), CONNECT_ONE_SHOT)
+	return p
+

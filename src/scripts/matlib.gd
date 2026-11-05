@@ -627,7 +627,9 @@ func apply(node: Node, skin: String = "") -> void:
 		apply(c, skin)
 
 ## imported models whose archive came without textures: give them real wood / steel detail
-const EXT_FALLBACK := {"gun_paint_ext_r870_2": "wood", "gun_paint_ext_r870_1": "metal"}
+const EXT_FALLBACK := {"gun_paint_ext_r870_2": "wood", "gun_paint_ext_r870_1": "metal", "gun_paint_ext_m4a1_UltimateLowPolyGuns": "metal",
+	"gun_paint_ext_akm_wpn_akm": "metal", "ext_akm_wood": "wood", "gun_paint_ext_kartal_Material": "metal", "ext_kartal_wood": "wood",
+	"gun_paint_ext_m4k_base_low": "metal", "gun_paint_ext_m4k_front_low": "metal", "ext_balta_1": "wood", "ext_balta_0": "metal"}
 func _ext_fallback(n: String, orig: Material) -> Material:
 	var key := "extfb:" + n
 	if cache.has(key):

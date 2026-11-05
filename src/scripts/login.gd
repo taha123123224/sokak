@@ -25,6 +25,64 @@ var logo: TextureRect
 var busy := false
 var resume_box: PanelContainer
 var resume_lbl: Label
+var resume_sub: Label
+var card: PanelContainer
+var form: VBoxContainer
+var title_lbl: Label
+var sub_lbl: Label
+var avatar
+var name_hint: Label
+var strength: ProgressBar
+var pass2_box: Control
+var status_pill: PanelContainer
+
+class Glyph extends Control:
+	## tiny vector icons (the UI fonts have no emoji): user / lock / eye
+	var kind := "user"
+	var col := Color(0.55, 0.6, 0.68)
+	var slash := false
+	func _draw() -> void:
+		var c := size / 2
+		var k := minf(size.x, size.y) / 20.0
+		match kind:
+			"user":
+				draw_circle(c + Vector2(0, -4) * k, 4.2 * k, col)
+				draw_arc(c + Vector2(0, 9) * k, 7.5 * k, PI, TAU, 20, col, 3.0 * k, true)
+			"lock":
+				draw_arc(c + Vector2(0, -2) * k, 4.5 * k, PI, TAU, 16, col, 2.4 * k, true)
+				draw_line(c + Vector2(-4.5, -2) * k, c + Vector2(-4.5, 1) * k, col, 2.4 * k)
+				draw_line(c + Vector2(4.5, -2) * k, c + Vector2(4.5, 1) * k, col, 2.4 * k)
+				draw_rect(Rect2(c + Vector2(-7, 0) * k, Vector2(14, 10) * k), col)
+				draw_circle(c + Vector2(0, 4.5) * k, 1.6 * k, Color(0.07, 0.085, 0.12))
+			"eye":
+				var pts := PackedVector2Array()
+				for i in 25:
+					var a := i / 24.0 * TAU
+					pts.append(c + Vector2(cos(a) * 8.5, sin(a) * 4.8) * k)
+				draw_polyline(pts, col, 2.0 * k, true)
+				draw_circle(c, 2.6 * k, col)
+				if slash:
+					draw_line(c + Vector2(-8, 6) * k, c + Vector2(8, -6) * k, col, 2.0 * k, true)
+
+class Avatar extends Control:
+	## round avatar: animated accent ring + the account's initial
+	var letter := "?"
+	var col := Color("ff8a1f")
+	var t := 0.0
+	func _process(d: float) -> void:
+		t += d
+		queue_redraw()
+	func _draw() -> void:
+		var c := size / 2
+		var r := minf(size.x, size.y) / 2 - 3
+		draw_circle(c, r + 3, Color(col.r, col.g, col.b, 0.18))
+		draw_circle(c, r, Color(0.08, 0.09, 0.12))
+		draw_arc(c, r, t * 1.2, t * 1.2 + TAU * 0.7, 48, col, 3.0, true)
+		draw_arc(c, r, t * 1.2 + TAU * 0.75, t * 1.2 + TAU * 0.95, 16, Color(1, 1, 1, 0.5), 3.0, true)
+		var f := UI.font("RussoOne-Regular")
+		var fs := int(r * 1.05)
+		var w := f.get_string_size(letter, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		draw_string(f, Vector2(c.x - w / 2, c.y + fs * 0.36), letter, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
 const SERVERS := [["TR-İstanbul #1", 18], ["TR-Ankara #2", 24], ["EU-Frankfurt", 46]]
 
 func _ready() -> void:
@@ -149,87 +207,148 @@ func _build_ui() -> void:
 	em.offset_left = 400; em.offset_right = 580; em.offset_top = -480; em.offset_bottom = -300
 	em.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(em)
-	var tag := UI.lbl("Türkiye'nin sokaklarında taktik çatışma.  Eski Mahalle • Safranbolu • Gemi • Liman", 22, Color(1, 1, 1, 0.85), "Rajdhani-SemiBold")
+	var tag := UI.lbl("Türkiye'nin sokaklarında taktik çatışma.  Mahalle • Safranbolu • Gemi • Liman • İnşaat • Çanakkale", 22, Color(1, 1, 1, 0.85), "Rajdhani-SemiBold")
 	tag.anchor_top = 0.5; tag.anchor_bottom = 0.5
 	tag.offset_left = 120; tag.offset_top = -40; tag.offset_right = 1000
+	tag.add_theme_constant_override("outline_size", 6)
+	tag.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	ui.add_child(tag)
-	# login panel (right)
-	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UI.sb(Color(0.03, 0.04, 0.06, 0.82), Color(1, 0.55, 0.12, 0.55), 1, 10, 28))
-	p.anchor_left = 1; p.anchor_right = 1; p.anchor_top = 0.5; p.anchor_bottom = 0.5
-	p.offset_left = -560; p.offset_right = -90; p.offset_top = -300; p.offset_bottom = 300
-	ui.add_child(p)
-	var v := UI.vbox(14)
-	p.add_child(v)
-	var hh := UI.hbox(10)
-	v.add_child(hh)
-	var acc := ColorRect.new(); acc.color = UI.ACCENT; acc.custom_minimum_size = Vector2(6, 40)
-	hh.add_child(acc)
-	hh.add_child(UI.lbl("GİRİŞ", 38, Color.WHITE, "RussoOne-Regular"))
-	# saved account (filled by _try_resume): continue with it or sign out to use another account
+	# ---------------- account card (right): glass panel, segmented tabs, icon fields, saved-account profile card
+	card = PanelContainer.new()
+	var csb := UI.sb(Color(0.025, 0.03, 0.045, 0.86), Color(1, 1, 1, 0.09), 1, 16, 34)
+	csb.shadow_color = Color(0, 0, 0, 0.55); csb.shadow_size = 30
+	card.add_theme_stylebox_override("panel", csb)
+	card.anchor_left = 1; card.anchor_right = 1; card.anchor_top = 0.5; card.anchor_bottom = 0.5
+	card.offset_left = -580; card.offset_right = -90; card.offset_top = 0; card.offset_bottom = 0
+	card.grow_vertical = Control.GROW_DIRECTION_BOTH
+	ui.add_child(card)
+	var strip := ColorRect.new()
+	strip.color = UI.ACCENT
+	strip.custom_minimum_size = Vector2(0, 3)
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var v := UI.vbox(12)
+	card.add_child(v)
+	var hv := UI.vbox(-2)
+	v.add_child(hv)
+	var sh := UI.hbox(8)
+	hv.add_child(sh)
+	var dot := UI.lbl("●", 13, UI.GREEN if Online.configured() else UI.DIM, "Rajdhani-Bold")
+	sh.add_child(dot)
+	var dt := create_tween().set_loops()
+	dt.tween_property(dot, "modulate:a", 0.35, 0.9)
+	dt.tween_property(dot, "modulate:a", 1.0, 0.9)
+	sh.add_child(UI.lbl(("SUNUCULAR ÇEVRİMİÇİ  •  %s  %d ms" % [SERVERS[0][0], SERVERS[0][1]]) if Online.configured() else "ÇEVRİMDIŞI MOD", 14, UI.DIM, "Rajdhani-Bold"))
+	title_lbl = UI.lbl("HESABINA GİRİŞ YAP", 34, Color.WHITE, "RussoOne-Regular")
+	hv.add_child(title_lbl)
+	sub_lbl = UI.lbl("Kaldığın yerden devam et: envanterin ve rütben hesabında.", 16, Color(1, 1, 1, 0.55), "Rajdhani-SemiBold")
+	sub_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hv.add_child(sub_lbl)
+	v.add_child(strip)
+	# saved account ("önceki hesap") profile card
 	resume_box = PanelContainer.new()
-	resume_box.add_theme_stylebox_override("panel", UI.sb(Color(0.05, 0.12, 0.07, 0.95), UI.GREEN.darkened(0.2), 1, 8, 12))
+	var rsb := UI.sb(Color(1, 1, 1, 0.04), Color(1, 0.55, 0.12, 0.45), 1, 12, 16)
+	resume_box.add_theme_stylebox_override("panel", rsb)
 	resume_box.visible = false
 	v.add_child(resume_box)
-	var rv := UI.vbox(8)
+	var rv := UI.vbox(12)
 	resume_box.add_child(rv)
-	resume_lbl = UI.lbl("", 20, Color.WHITE, "Rajdhani-Bold")
-	rv.add_child(resume_lbl)
+	var rtop := UI.hbox(14)
+	rv.add_child(rtop)
+	avatar = Avatar.new()
+	avatar.custom_minimum_size = Vector2(72, 72)
+	rtop.add_child(avatar)
+	var rinfo := UI.vbox(0)
+	rinfo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rtop.add_child(rinfo)
+	rinfo.add_child(UI.lbl("KAYITLI HESAP", 13, UI.ACCENT2, "Rajdhani-Bold"))
+	resume_lbl = UI.lbl("", 30, Color.WHITE, "RussoOne-Regular")
+	rinfo.add_child(resume_lbl)
+	resume_sub = UI.lbl("", 16, Color(1, 1, 1, 0.6), "Rajdhani-Bold")
+	rinfo.add_child(resume_sub)
+	var rb1 := UI.btn("▶   DEVAM ET", func(): if not busy: _enter("Hoş geldin, %s!" % Online.username), 24, true, 0, 62)
+	rb1.add_theme_font_override("font", UI.font("RussoOne-Regular"))
+	rv.add_child(rb1)
 	var rh := UI.hbox(8)
 	rv.add_child(rh)
-	var rb1 := UI.btn("▶  DEVAM ET", func(): if not busy: _enter("Hoş geldin, %s!" % Online.username), 18, true, 0, 44)
-	rb1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var rb2 := UI.btn("ÇIKIŞ YAP / HESAP DEĞİŞTİR", _switch_account, 16, false, 0, 44)
-	rb2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	rh.add_child(rb1); rh.add_child(rb2)
-	# --- tabs: GİRİŞ / KAYIT OL
-	var tabs := UI.hbox(8)
-	v.add_child(tabs)
-	var tb_login := UI.btn("GİRİŞ YAP", func(): _set_mode(false), 18, true, 0, 42)
-	var tb_reg := UI.btn("KAYIT OL", func(): _set_mode(true), 18, false, 0, 42)
+	var rb3 := _ghost_btn("BAŞKA HESAPLA GİR", func(): _show_form(true))
+	var rb2 := _ghost_btn("✕  ÇIKIŞ YAP", _switch_account)
+	rh.add_child(rb3); rh.add_child(rb2)
+	# form
+	form = UI.vbox(10)
+	v.add_child(form)
+	var seg := PanelContainer.new()
+	seg.add_theme_stylebox_override("panel", UI.sb(Color(1, 1, 1, 0.045), Color(1, 1, 1, 0.06), 1, 10, 4))
+	form.add_child(seg)
+	var tabs := UI.hbox(4)
+	seg.add_child(tabs)
+	var tb_login := UI.btn("GİRİŞ YAP", func(): _set_mode(false), 18, false, 0, 44)
+	var tb_reg := UI.btn("KAYIT OL", func(): _set_mode(true), 18, false, 0, 44)
 	tb_login.size_flags_horizontal = Control.SIZE_EXPAND_FILL; tb_reg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tabs.add_child(tb_login); tabs.add_child(tb_reg)
 	tab_btns = [tb_login, tb_reg]
-	v.add_child(UI.lbl("KULLANICI ADI", 16, UI.DIM, "Rajdhani-Bold"))
-	name_edit = _field(str(GS.profile.get("name", "")) if not str(GS.profile.get("name", "")).begins_with("Oyuncu") else "", false)
+	var nf := _icon_field("user", "KULLANICI ADI", str(GS.profile.get("name", "")) if not str(GS.profile.get("name", "")).begins_with("Oyuncu") else "", false)
+	form.add_child(nf[0]); name_edit = nf[1]
 	name_edit.placeholder_text = "3-16 karakter: harf, rakam, _"
-	v.add_child(name_edit)
-	v.add_child(UI.lbl("ŞİFRE", 16, UI.DIM, "Rajdhani-Bold"))
-	pass_edit = _field("", true)
+	name_hint = UI.lbl("", 13, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_RIGHT)
+	form.add_child(name_hint)
+	name_edit.text_changed.connect(func(_tx): _validate())
+	var pf := _icon_field("lock", "ŞİFRE", "", true)
+	form.add_child(pf[0]); pass_edit = pf[1]
 	pass_edit.placeholder_text = "en az 6 karakter"
-	v.add_child(pass_edit)
-	pass2_lbl = UI.lbl("ŞİFRE (TEKRAR)", 16, UI.DIM, "Rajdhani-Bold")
-	v.add_child(pass2_lbl)
-	pass2_edit = _field("", true)
-	v.add_child(pass2_edit)
+	pass_edit.text_changed.connect(func(_tx): _validate())
+	strength = UI.bar(0, 4, UI.RED, 4)
+	strength.add_theme_stylebox_override("background", UI.sb(Color(1, 1, 1, 0.06), Color(0, 0, 0, 0), 0, 2, 0))
+	form.add_child(strength)
+	var p2 := _icon_field("lock", "ŞİFRE (TEKRAR)", "", true)
+	pass2_box = p2[0]; pass2_edit = p2[1]
+	pass2_lbl = UI.lbl("", 1, UI.DIM)  # kept for compatibility
+	form.add_child(pass2_box)
+	pass2_edit.text_changed.connect(func(_tx): _validate())
 	name_edit.text_submitted.connect(func(_t): pass_edit.grab_focus())
 	# Enter and the button go through the same _login() checks (password repeat included)
 	pass_edit.text_submitted.connect(func(_t):
 		if register_mode: pass2_edit.grab_focus()
 		else: _login())
 	pass2_edit.text_submitted.connect(func(_t): _login())
-	v.add_child(UI.spacer())
-	status_lbl = UI.lbl("", 18, UI.ACCENT2, "Rajdhani-Bold")
+	go_btn = UI.btn("GİRİŞ YAP", _login, 26, true, 0, 64)
+	go_btn.add_theme_font_override("font", UI.font("RussoOne-Regular"))
+	form.add_child(go_btn)
+	# status pill
+	status_pill = PanelContainer.new()
+	status_pill.add_theme_stylebox_override("panel", UI.sb(Color(1, 0.55, 0.12, 0.1), Color(1, 0.55, 0.12, 0.35), 1, 8, 10))
+	status_pill.visible = false
+	v.add_child(status_pill)
+	status_lbl = UI.lbl("", 17, UI.ACCENT2, "Rajdhani-Bold")
 	status_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(status_lbl)
-	bar = UI.bar(0, 1, UI.ACCENT, 6)
+	status_pill.add_child(status_lbl)
+	bar = UI.bar(0, 1, UI.ACCENT, 4)
+	bar.add_theme_stylebox_override("background", UI.sb(Color(1, 1, 1, 0.06), Color(0, 0, 0, 0), 0, 2, 0))
 	bar.visible = false
 	v.add_child(bar)
-	go_btn = UI.btn("GİRİŞ YAP", _login, 30, true, 0, 70)
-	go_btn.add_theme_font_override("font", UI.font("RussoOne-Regular"))
-	v.add_child(go_btn)
-	var row := UI.hbox(10)
+	# divider + secondary actions
+	var dv := UI.hbox(10)
+	v.add_child(dv)
+	for k in 2:
+		var ln := ColorRect.new(); ln.color = Color(1, 1, 1, 0.08); ln.custom_minimum_size = Vector2(0, 1)
+		ln.size_flags_horizontal = Control.SIZE_EXPAND_FILL; ln.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		dv.add_child(ln)
+		if k == 0:
+			dv.add_child(UI.lbl("VEYA", 13, UI.DIM, "Rajdhani-Bold"))
+	var row := UI.hbox(8)
 	v.add_child(row)
-	var b0 := UI.btn("ÇEVRİMDIŞI OYNA", _offline, 18, false, 0, 44)
-	b0.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var b1 := UI.btn("AYARLAR", _open_settings, 18, false, 0, 44)
-	b1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var b2 := UI.btn("ÇIKIŞ", func(): get_tree().quit(), 18, false, 0, 44)
-	b2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(b0); row.add_child(b1); row.add_child(b2)
+	row.add_child(_ghost_btn("⚡  ÇEVRİMDIŞI", _offline))
+	row.add_child(_ghost_btn("⚙  AYARLAR", _open_settings))
+	row.add_child(_ghost_btn("✕  ÇIKIŞ", func(): get_tree().quit()))
 	_set_mode(false)
 	if not Online.configured():
-		status_lbl.text = "Online servis henüz yapılandırılmadı. Çevrimdışı oynayabilirsin."
+		_msg("Online servis henüz yapılandırılmadı. Çevrimdışı oynayabilirsin.", false)
+	# entrance: the card slides in from the right
+	card.modulate.a = 0.0
+	var ct := create_tween()
+	ct.tween_interval(0.15)
+	ct.tween_property(card, "modulate:a", 1.0, 0.45)
+	ct.parallel().tween_property(card, "offset_left", -580.0, 0.55).from(-500.0).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	ct.parallel().tween_property(card, "offset_right", -90.0, 0.55).from(-10.0).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 	# update banner (filled by the updater)
 	upd_panel = PanelContainer.new()
 	upd_panel.add_theme_stylebox_override("panel", UI.sb(Color(0.2, 0.1, 0.02, 0.95), UI.ACCENT, 2, 8, 16))
@@ -278,7 +397,7 @@ func _build_ui() -> void:
 	clip.offset_top = -40; clip.offset_left = 150; clip.offset_right = -260
 	ui.add_child(clip)
 	ui.add_child(bp)
-	ticker = UI.lbl("YENİ v2.6: ÇANAKKALE ve İNŞAAT haritaları   •   AWM, RPK-16, PP-19 Vityaz, Micro UZI, BR-7 Kuzgun, M1911   •   RÜTBE sistemi ve dereceli maçlar   •   12 yeni stil   •   Silah Kasası: bol silah!", 19, Color(1, 1, 1, 0.9), "Rajdhani-SemiBold")
+	ticker = UI.lbl("YENİ v2.9.3: AKM, M4 Karabina, USP .45, Kartal .44 Toplu   •   Osmanlı Hançeri, Kasap Bıçağı, Taktik Balta   •   Yeni M4A1 modeli   •   Yeni yükseltme efekti ve öldürmelerde +seviye rozeti   •   Sabotaj modu online!", 19, Color(1, 1, 1, 0.9), "Rajdhani-SemiBold")
 	ticker.position = Vector2(1400, 8)
 	clip.add_child(ticker)
 	var ver := UI.lbl("SOKAK: Operasyon  v%s   " % Updater.VERSION, 16, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_RIGHT)
@@ -298,25 +417,134 @@ func _field(t: String, secret: bool) -> LineEdit:
 	e.add_theme_stylebox_override("focus", UI.sb(Color(0.1, 0.12, 0.17, 1), UI.ACCENT, 2, 6, 14))
 	return e
 
+func _icon_field(icon: String, label: String, t: String, secret: bool) -> Array:
+	## label + framed field with a leading icon (and a show/hide eye for passwords); returns [container, LineEdit]
+	var box := UI.vbox(4)
+	box.add_child(UI.lbl(label, 13, UI.DIM, "Rajdhani-Bold"))
+	var fr := PanelContainer.new()
+	var nsb := UI.sb(Color(0.07, 0.085, 0.12, 1), Color(1, 1, 1, 0.1), 1, 10, 0)
+	nsb.content_margin_left = 14; nsb.content_margin_right = 8
+	var fsb := UI.sb(Color(0.085, 0.1, 0.14, 1), UI.ACCENT, 2, 10, 0)
+	fsb.content_margin_left = 14; fsb.content_margin_right = 8
+	fsb.shadow_color = Color(1, 0.55, 0.12, 0.25); fsb.shadow_size = 8
+	fr.add_theme_stylebox_override("panel", nsb)
+	box.add_child(fr)
+	var h := UI.hbox(10)
+	fr.add_child(h)
+	var ic := Glyph.new()
+	ic.kind = icon
+	ic.custom_minimum_size = Vector2(22, 22)
+	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(ic)
+	var e := _field(t, secret)
+	e.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var clear := StyleBoxEmpty.new()
+	e.add_theme_stylebox_override("normal", clear)
+	e.add_theme_stylebox_override("focus", clear)
+	h.add_child(e)
+	e.focus_entered.connect(func(): fr.add_theme_stylebox_override("panel", fsb); ic.col = UI.ACCENT2; ic.queue_redraw())
+	e.focus_exited.connect(func(): fr.add_theme_stylebox_override("panel", nsb); ic.col = UI.DIM; ic.queue_redraw())
+	if secret:
+		var eye := Button.new()
+		eye.flat = true
+		eye.custom_minimum_size = Vector2(36, 36)
+		var eg := Glyph.new()
+		eg.kind = "eye"; eg.slash = true
+		eg.set_anchors_preset(Control.PRESET_FULL_RECT)
+		eg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		eye.add_child(eg)
+		eye.focus_mode = Control.FOCUS_NONE
+		eye.tooltip_text = "Şifreyi göster / gizle"
+		eye.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		eye.add_theme_font_size_override("font_size", 18)
+		eye.modulate = Color(1, 1, 1, 0.5)
+		eye.pressed.connect(func():
+			e.secret = not e.secret
+			eg.slash = e.secret; eg.queue_redraw()
+			eye.modulate = Color(1, 1, 1, 0.5 if e.secret else 1.0))
+		h.add_child(eye)
+	return [box, e]
+
+func _ghost_btn(t: String, cb: Callable) -> Button:
+	var b := UI.btn(t, cb, 15, false, 0, 42)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.add_theme_stylebox_override("normal", UI.sb(Color(1, 1, 1, 0.035), Color(1, 1, 1, 0.08), 1, 8, 6))
+	b.add_theme_stylebox_override("hover", UI.sb(Color(1, 1, 1, 0.08), Color(1, 0.55, 0.12, 0.5), 1, 8, 6))
+	b.add_theme_stylebox_override("pressed", UI.sb(Color(1, 0.55, 0.12, 0.15), UI.ACCENT, 1, 8, 6))
+	b.add_theme_color_override("font_color", Color(1, 1, 1, 0.78))
+	return b
+
+func _validate() -> void:
+	## live hints under the fields
+	var n := name_edit.text.strip_edges()
+	if n == "":
+		name_hint.text = ""
+	else:
+		var bad: String = Online.valid_username(n)
+		name_hint.text = ("✓  %d/16" % n.length()) if bad == "" else ("✕  " + bad)
+		name_hint.add_theme_color_override("font_color", UI.GREEN if bad == "" else UI.RED)
+	var pw := pass_edit.text
+	var sc := 0
+	if pw.length() >= 6: sc += 1
+	if pw.length() >= 10: sc += 1
+	var has_d := false
+	var has_u := false
+	for ch in pw:
+		if ch >= "0" and ch <= "9": has_d = true
+		if ch != ch.to_lower(): has_u = true
+	if has_d: sc += 1
+	if has_u: sc += 1
+	strength.value = sc
+	var sc_col: Color = [UI.RED, UI.RED, UI.GOLD, UI.GREEN, UI.GREEN][sc]
+	strength.add_theme_stylebox_override("fill", UI.sb(sc_col, Color(0, 0, 0, 0), 0, 2, 0))
+	strength.visible = register_mode and pw != ""
+
+func _show_form(on: bool) -> void:
+	form.visible = on
+	if on:
+		resume_box.visible = false
+		title_lbl.text = "YENİ HESAP OLUŞTUR" if register_mode else "HESABINA GİRİŞ YAP"
+		name_edit.grab_focus()
+
 func _set_mode(reg: bool) -> void:
 	register_mode = reg
-	pass2_lbl.visible = reg
-	pass2_edit.visible = reg
-	go_btn.text = "KAYIT OL" if reg else "GİRİŞ YAP"
+	pass2_box.visible = reg
+	go_btn.text = "HESAP OLUŞTUR" if reg else "GİRİŞ YAP"
+	title_lbl.text = "YENİ HESAP OLUŞTUR" if reg else "HESABINA GİRİŞ YAP"
+	sub_lbl.text = "Kullanıcı adın oyunda ve arkadaş listelerinde görünür." if reg else "Kaldığın yerden devam et: envanterin ve rütben hesabında."
 	for i in tab_btns.size():
 		var on: bool = (i == 1) == reg
 		var bt: Button = tab_btns[i]
-		bt.add_theme_stylebox_override("normal", UI.sb(UI.ACCENT if on else Color(0.07, 0.085, 0.12), UI.ACCENT2 if on else Color(1, 1, 1, 0.08), 1, 6, 8))
-		bt.add_theme_color_override("font_color", Color(0.08, 0.05, 0.02) if on else UI.TEXT)
-	status_lbl.text = "Kullanıcı adın oyunda ve arkadaş listelerinde görünür." if reg else ""
+		for stn in ["normal", "hover", "pressed"]:
+			var bsb := UI.sb(UI.ACCENT if on else (Color(1, 1, 1, 0.05) if stn == "hover" else Color(0, 0, 0, 0)), Color(0, 0, 0, 0), 0, 8, 8)
+			bt.add_theme_stylebox_override(stn, bsb)
+		bt.add_theme_color_override("font_color", Color(0.08, 0.05, 0.02) if on else Color(1, 1, 1, 0.6))
+		bt.add_theme_color_override("font_hover_color", Color(0.08, 0.05, 0.02) if on else Color.WHITE)
+	_validate()
+	if status_lbl:
+		_msg("", false)
 
 func _msg(t: String, err: bool) -> void:
-	status_lbl.text = t
-	status_lbl.add_theme_color_override("font_color", UI.RED if err else UI.ACCENT2)
+	status_lbl.text = (("⚠  " if err else "ℹ  ") + t) if t != "" else ""
+	status_lbl.add_theme_color_override("font_color", UI.RED.lightened(0.2) if err else UI.ACCENT2)
+	if status_pill:
+		status_pill.visible = t != ""
+		var c: Color = UI.RED if err else UI.ACCENT
+		status_pill.add_theme_stylebox_override("panel", UI.sb(Color(c.r, c.g, c.b, 0.1), Color(c.r, c.g, c.b, 0.4), 1, 8, 10))
+		if err and t != "":
+			var x0 := card.position.x
+			var tw := card.create_tween()
+			for k in 4:
+				tw.tween_property(card, "position:x", x0 + (7.0 if k % 2 == 0 else -7.0), 0.04)
+			tw.tween_property(card, "position:x", x0, 0.04)
 	if err:
 		SFX.play("fail", -6)
 
 func _try_resume() -> void:
+	if OS.has_environment("LOGIN_MOCK"):   # screenshot test of the saved-account card
+		Online.username = "sokakoperasyon"
+		_show_resume()
+		return
 	if not Online.configured() or not FileAccess.file_exists(Online.SESSION):
 		return
 	busy = true
@@ -327,11 +555,19 @@ func _try_resume() -> void:
 	bar.visible = false
 	if ok:
 		# never enter automatically: show the saved account and let the player choose
-		resume_lbl.text = "Kayıtlı hesap:  %s   (Seviye %d)" % [Online.username, int(GS.profile.get("level", 1))]
-		resume_box.visible = true
-		_msg("", false)
+		_show_resume()
 	else:
 		_msg("", false)
+
+func _show_resume() -> void:
+	resume_lbl.text = Online.username
+	resume_sub.text = "Seviye %d   •   %s Altın" % [int(GS.profile.get("level", 1)), UI.money(int(GS.profile.get("gold", 0)))]
+	avatar.letter = Online.username.substr(0, 1).to_upper() if Online.username != "" else "?"
+	resume_box.visible = true
+	form.visible = false
+	title_lbl.text = "TEKRAR HOŞ GELDİN"
+	sub_lbl.text = "Kayıtlı hesabınla tek tıkla devam et ya da başka bir hesapla giriş yap."
+	_msg("", false)
 
 func _login() -> void:
 	if busy:
@@ -373,7 +609,7 @@ func _switch_account() -> void:
 	resume_box.visible = false
 	name_edit.text = ""
 	pass_edit.text = ""
-	name_edit.grab_focus()
+	_show_form(true)
 	_msg("Çıkış yapıldı. Başka bir hesapla giriş yapabilir ya da KAYIT OL ile yeni hesap açabilirsin.", false)
 
 func _open_settings() -> void:

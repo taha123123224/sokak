@@ -122,7 +122,11 @@
 				"fn502",
 				"vityaz",
 				"m1911",
-				"uzi"
+				"uzi",
+				"m4k",
+				"usp",
+				"akm",
+				"kasap"
 			]
 		},
 		"osmanli": {
@@ -147,8 +151,10 @@
 			"wchance": 0.32,
 			"weapons": [
 				"revolver",
+				"kartal",
 				"deagle",
 				"karambit",
+				"hancer",
 				"m1911"
 			]
 		},
@@ -183,7 +189,12 @@
 				"m1911",
 				"fn502",
 				"uzi",
-				"kuzgun"
+				"kuzgun",
+				"m4k",
+				"usp",
+				"kartal",
+				"akm",
+				"balta"
 			]
 		},
 		"sokak": {
@@ -210,9 +221,11 @@
 				"ump45",
 				"p90",
 				"fn502",
+				"usp",
 				"deagle",
 				"spas",
-				"kar98"
+				"kar98",
+				"kasap"
 			]
 		}
 	},
@@ -416,12 +429,15 @@
 		"durbun": {
 			"fits": [
 				"ak47",
+				"m4a1",
 				"mp5",
 				"p90",
 				"vityaz",
 				"rpk16",
 				"uzi",
-				"kuzgun"
+				"kuzgun",
+				"m4k",
+				"akm"
 			],
 			"price": 1400,
 			"slot": "optik"
@@ -450,7 +466,11 @@
 				"rpk16",
 				"awm",
 				"uzi",
-				"kuzgun"
+				"kuzgun",
+				"m4k",
+				"usp",
+				"kartal",
+				"akm"
 			],
 			"price": 700,
 			"slot": "namlu"
@@ -479,7 +499,11 @@
 				"rpk16",
 				"awm",
 				"uzi",
-				"kuzgun"
+				"kuzgun",
+				"m4k",
+				"usp",
+				"kartal",
+				"akm"
 			],
 			"price": 850,
 			"slot": "alt"
@@ -487,12 +511,15 @@
 		"optik": {
 			"fits": [
 				"ak47",
+				"m4a1",
 				"mp5",
 				"p90",
 				"vityaz",
 				"rpk16",
 				"uzi",
-				"kuzgun"
+				"kuzgun",
+				"m4k",
+				"akm"
 			],
 			"price": 800,
 			"slot": "optik"
@@ -521,7 +548,11 @@
 				"rpk16",
 				"awm",
 				"uzi",
-				"kuzgun"
+				"kuzgun",
+				"m4k",
+				"usp",
+				"kartal",
+				"akm"
 			],
 			"price": 1000,
 			"slot": "sarjor"
@@ -548,7 +579,11 @@
 				"rpk16",
 				"awm",
 				"uzi",
-				"kuzgun"
+				"kuzgun",
+				"m4k",
+				"usp",
+				"kartal",
+				"akm"
 			],
 			"price": 900,
 			"slot": "namlu"
@@ -572,7 +607,9 @@
 				"rpk16",
 				"awm",
 				"uzi",
-				"kuzgun"
+				"kuzgun",
+				"m4k",
+				"akm"
 			],
 			"price": 750,
 			"slot": "alt"
@@ -696,6 +733,16 @@
 			"rpm": 600.0,
 			"throwable": false
 		},
+		"akm": {
+			"cat": "ana",
+			"dmg": 34.0,
+			"head": 2.6,
+			"melee": false,
+			"pellets": 1,
+			"price": 3000,
+			"rpm": 600.0,
+			"throwable": false
+		},
 		"aug": {
 			"cat": "ana",
 			"dmg": 31.0,
@@ -724,6 +771,16 @@
 			"pellets": 1,
 			"price": 4750,
 			"rpm": 40.0,
+			"throwable": false
+		},
+		"balta": {
+			"cat": "bicak",
+			"dmg": 75.0,
+			"head": 1.0,
+			"melee": true,
+			"pellets": 1,
+			"price": 2800,
+			"rpm": 80.0,
 			"throwable": false
 		},
 		"deagle": {
@@ -766,6 +823,16 @@
 			"rpm": 420.0,
 			"throwable": false
 		},
+		"hancer": {
+			"cat": "bicak",
+			"dmg": 58.0,
+			"head": 1.0,
+			"melee": true,
+			"pellets": 1,
+			"price": 2600,
+			"rpm": 125.0,
+			"throwable": false
+		},
 		"kar98": {
 			"cat": "ana",
 			"dmg": 105.0,
@@ -784,6 +851,26 @@
 			"pellets": 1,
 			"price": 2000,
 			"rpm": 130.0,
+			"throwable": false
+		},
+		"kartal": {
+			"cat": "tabanca",
+			"dmg": 68.0,
+			"head": 2.7,
+			"melee": false,
+			"pellets": 1,
+			"price": 3000,
+			"rpm": 130.0,
+			"throwable": false
+		},
+		"kasap": {
+			"cat": "bicak",
+			"dmg": 50.0,
+			"head": 1.0,
+			"melee": true,
+			"pellets": 1,
+			"price": 1200,
+			"rpm": 150.0,
 			"throwable": false
 		},
 		"knife": {
@@ -834,6 +921,16 @@
 			"pellets": 1,
 			"price": 2600,
 			"rpm": 740.0,
+			"throwable": false
+		},
+		"m4k": {
+			"cat": "ana",
+			"dmg": 30.0,
+			"head": 2.5,
+			"melee": false,
+			"pellets": 1,
+			"price": 3400,
+			"rpm": 780.0,
 			"throwable": false
 		},
 		"mp5": {
@@ -914,6 +1011,16 @@
 			"pellets": 1,
 			"price": 2400,
 			"rpm": 650.0,
+			"throwable": false
+		},
+		"usp": {
+			"cat": "tabanca",
+			"dmg": 29.0,
+			"head": 2.6,
+			"melee": false,
+			"pellets": 1,
+			"price": 1600,
+			"rpm": 400.0,
 			"throwable": false
 		},
 		"uzi": {
