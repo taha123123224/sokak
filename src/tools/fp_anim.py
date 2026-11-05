@@ -153,13 +153,22 @@ def choreograph(wid, rig, meta):
             return Quaternion(Z, math.radians(deg))
         def roll(deg):
             return Quaternion(Y, math.radians(deg))
-        wind = rot_state(R0, yaw(28) @ roll(-15), Vector((0.11, -0.06, 0.09)))
-        end = rot_state(R0, yaw(-62) @ roll(45), Vector((-0.3, 0.2, -0.12)))
-        follow = rot_state(R0, yaw(-70) @ roll(55), Vector((-0.34, 0.12, -0.2)))
-        acts['slash'] = make_action(rig, 'slash', 0.5, {'Right': ([(0.0, *R0), (0.22, *wind), (0.45, *end), (0.6, *follow), (1.0, *R0)], rpole)})
-        pull = rot_state(R0, Quaternion(X, math.radians(-12)), Vector((0.02, -0.1, 0.02)))
-        thrust = rot_state(R0, Quaternion(X, math.radians(8)), Vector((-0.04, 0.32, 0.04)))
-        acts['stab'] = make_action(rig, 'stab', 0.8, {'Right': ([(0.0, *R0), (0.32, *pull), (0.5, *thrust), (0.62, *thrust), (1.0, *R0)], rpole)})
+        # slash: short wind-up to the upper right, a tight diagonal cut through the crosshair, quick recovery
+        wind = rot_state(R0, yaw(26) @ roll(-18), Vector((0.08, -0.04, 0.08)))
+        mid = rot_state(R0, yaw(-18) @ roll(12), Vector((-0.06, 0.12, 0.0)))
+        end = rot_state(R0, yaw(-44) @ roll(32), Vector((-0.17, 0.1, -0.1)))
+        follow = rot_state(R0, yaw(-48) @ roll(36), Vector((-0.19, 0.05, -0.14)))
+        acts['slash'] = make_action(rig, 'slash', 0.5, {'Right': ([(0.0, *R0), (0.2, *wind), (0.34, *mid), (0.46, *end), (0.6, *follow), (1.0, *R0)], rpole)})
+        # stab: pull back, straight thrust with the wrist locked (arm never fully straight)
+        pull = rot_state(R0, Quaternion(X, math.radians(-10)), Vector((0.02, -0.07, 0.015)))
+        thrust = rot_state(R0, Quaternion(X, math.radians(6)), Vector((-0.03, 0.22, 0.035)))
+        acts['stab'] = make_action(rig, 'stab', 0.8, {'Right': ([(0.0, *R0), (0.3, *pull), (0.48, *thrust), (0.62, *thrust), (1.0, *R0)], rpole)})
+        # inspect (F): the wrist turns the blade's flat toward the camera and holds it there; the in-game
+        # code spins the knife in the fingers meanwhile (the arm itself never twists)
+        show = rot_state(R0, yaw(38) @ roll(-14), Vector((-0.05, 0.0, 0.05)))
+        show2 = rot_state(R0, yaw(42) @ roll(-18), Vector((-0.055, 0.01, 0.055)))
+        tip = rot_state(R0, yaw(30) @ roll(-8) @ Quaternion(X, math.radians(-14)), Vector((-0.045, 0.01, 0.07)))
+        acts['inspect'] = make_action(rig, 'inspect', 3.0, {'Right': ([(0.0, *R0), (0.14, *show), (0.4, *show2), (0.62, *tip), (0.84, *show), (1.0, *R0)], rpole)})
         meta['slash'] = {'len': acts['slash'], 'hit': 0.38}
         meta['stab'] = {'len': acts['stab'], 'hit': 0.5}
     if kind == 'frag':
@@ -233,8 +242,12 @@ def preview(rig, body, wid, acts):
         except Exception:
             pass
         tts = [float(x) for x in os.environ.get('PTIMES', '0,0.13,0.33,0.46,0.79,0.9').split(',')]
-        for view in ('eye', 'side'):
-            if view == 'eye':
+        for view in os.environ.get('PVIEWS', 'eye,side').split(','):
+            if view == 'close':
+                cam.location = Vector((-hip[0], hip[2], -hip[1])) * 0.55
+                cam.rotation_euler = (Vector((0, 0.05, 0.02)) - cam.location).to_track_quat('-Z', 'Y').to_euler()
+                cam.data.angle = math.radians(30)
+            elif view == 'eye':
                 cam.location = Vector((-hip[0], hip[2], -hip[1])); cam.rotation_euler = (math.radians(90), 0, 0)
                 cam.data.angle = math.radians(56)
             else:

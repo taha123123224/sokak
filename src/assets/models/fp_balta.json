@@ -11,6 +11,7 @@
  "acts": {
   "idle": 1.0,
   "slash": 0.5,
-  "stab": 0.8
+  "stab": 0.8,
+  "inspect": 3.0
  }
 }

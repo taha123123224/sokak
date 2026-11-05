@@ -38,7 +38,7 @@ func _ready() -> void:
 
 func _build_tabs() -> void:
 	UI.clear(tabs_box)
-	for t in [["grafik", "GRAFİK"], ["nisangah", "NİŞANGAH"], ["kontrol", "KONTROLLER"], ["ses", "SES"], ["oyun", "OYUN & ARAYÜZ"]]:
+	for t in [["grafik", "GRAFİK"], ["nisangah", "NİŞANGAH"], ["kontrol", "KONTROLLER"], ["ses", "SES"], ["oyun", "OYUN & ARAYÜZ"], ["lisans", "LİSANSLAR"]]:
 		var b := UI.btn(t[1], func(): tab = t[0]; _build_tabs(); _build(), 20, tab == t[0], 190, 46)
 		tabs_box.add_child(b)
 
@@ -84,6 +84,17 @@ func _build() -> void:
 	UI.clear(body)
 	preview = null
 	match tab:
+		"lisans":
+			_section("3D MODEL VE ANİMASYON LİSANSLARI")
+			body.add_child(UI.lbl("Oyundaki bazı silah modelleri ve birinci şahıs animasyonları Creative Commons Atıf 4.0 (CC-BY 4.0) lisansıyla kullanılmaktadır. Emeği geçenlere teşekkürler.", 18, UI.DIM, "Rajdhani-Medium"))
+			for c in GS.CREDITS:
+				var h := UI.hbox(14)
+				var a := UI.lbl(str(c[0]), 20, UI.TEXT, "Rajdhani-Bold")
+				a.custom_minimum_size = Vector2(520, 30)
+				h.add_child(a)
+				h.add_child(UI.lbl(str(c[1]), 18, UI.GOLD, "Rajdhani-SemiBold"))
+				h.add_child(UI.lbl(str(c[2]), 16, UI.DIM, "Rajdhani-Medium"))
+				body.add_child(h)
 		"grafik":
 			_section("GRAFİK KALİTESİ ÖN AYARI")
 			var h := UI.hbox(8)

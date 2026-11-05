@@ -1,33 +1,37 @@
 {
-	"version": "2.9.4",
-	"build": 33,
+	"version": "2.9.5",
+	"build": 34,
 	"parts": [
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v33.pck.part00",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v34.pck.part00",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v33.pck.part01",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v34.pck.part01",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v33.pck.part02",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v34.pck.part02",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v33.pck.part03",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v34.pck.part03",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v33.pck.part04",
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v34.pck.part04",
 			"size": 94371840
 		},
 		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v33.pck.part05",
-			"size": 86100716
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v34.pck.part05",
+			"size": 94371840
+		},
+		{
+			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v34.pck.part06",
+			"size": 41018120
 		}
 	],
-	"pck_size": 557959916,
+	"pck_size": 607249160,
 	"installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
-	"notes": "Performans güncellemesi: AMD/DirectX 12 maç girişinde çökme düzeltildi, doğarken ve öldürünce olan takılmalar giderildi, önceden derlenmiş shaderlar, çökme sonrası güvenli mod, Rekabetçi grafik ayarı, detaylı FPS göstergesi, HD yükleme ekranı ve oyuncu listesi."
+	"notes": "v2.9.5: M4A1 ve AWM için gerçek animasyonlu birinci şahıs kollar (çekme, ateş, şarjör, mekanizma, inceleme); bıçak yumruk kavrayışı, daha sıkı kesme/saplama ve F ile parmakta dönen bıçak incelemesi; yeni modern ölüm kartı (seni vuranın kalan canı, silahı ve +seviyesi, verilen/alınan hasar, mesafe); Ayarlar > Lisanslar sekmesi."
 }

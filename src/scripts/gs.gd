@@ -413,6 +413,17 @@ var MODES := {
 	"sniper": {"name": "Nişancı Düellosu", "desc": "Sadece keskin nişancı tüfekleri. Takımlı.", "teams": true},
 	"sabotaj": {"name": "Sabotaj", "desc": "KARTAL bombayı A ya da B noktasına kurar, AKREP çözer. Turlu, ilk 6 turu alan kazanır.", "teams": true},
 }
+## CC-BY 4.0 assets: [work, author, licence/link] — shown in Ayarlar > Lisanslar
+const CREDITS := [
+	["M4 - FPS Weapon Animations Pack v.1 (M4A1 birinci şahıs)", "BarcodeGames", "CC-BY 4.0 · sketchfab.com"],
+	["Sniper animated (AWM birinci şahıs)", "DJMaesen", "CC-BY 4.0 · sketchfab.com/bumstrum"],
+	["Sniper (AWM)", "DJMaesen", "CC-BY 4.0 · sketchfab.com/bumstrum"],
+	["Shotgun (SPAS)", "DJMaesen", "CC-BY 4.0 · sketchfab.com/bumstrum"],
+	["Low Poly Uzi", "Duane's Mind", "CC-BY 4.0 · sketchfab.com"],
+	["PP-19-01 Vityaz", "suspensy", "CC-BY 4.0 · sketchfab.com"],
+	["Pistol 9mm - semi auto (Glock)", "Hitansh 3D", "CC-BY 4.0 · sketchfab.com"],
+	["RPK-16", "FamousUnityHubSoldier", "Sketchfab Standard · sketchfab.com"],
+]
 const TEAMS := {"a": "KARTAL", "b": "AKREP"}
 const TEAM_COLORS := {"a": Color("3d8bff"), "b": Color("ff4d3d")}
 const GUNGAME_ORDER := ["glock", "deagle", "uzi", "mp5", "vityaz", "spas", "m4a1", "ak47", "kuzgun", "kar98", "awm", "knife"]

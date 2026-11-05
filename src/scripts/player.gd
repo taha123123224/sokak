@@ -54,6 +54,9 @@ var inspect_t := 0.0
 var insp_mag := false
 var busy_k := 0.0
 var melee_t := 0.0
+var test_freeze := -1.0
+var dmg_log := {}         # attacker instance id -> [damage, hits, head hits] this life (death card)
+var test_freeze_kind := ""
 var melee_heavy := false
 var throw_t := 0.0
 # animated first-person arms
@@ -244,6 +247,8 @@ func _unhandled_input(e: InputEvent) -> void:
 	if e.is_action_pressed("reload"): start_reload()
 	if e.is_action_pressed("inspect") and reload_t <= 0 and equip_t <= 0 and not ads:
 		inspect_t = 3.2
+		if _fp_has("inspect"):
+			_fp_play("inspect", 0.12, _fp_len("inspect") / 3.0)
 		SFX.play("equip", -9, 1.15)
 		if match_node and match_node.hud and match_node.hud.has_method("inspect_card"):
 			match_node.hud.inspect_card(cur)
@@ -394,6 +399,18 @@ func _process(delta: float) -> void:
 			_do_switch(pending_id, false)
 	inspect_t = max(inspect_t - delta, 0.0)
 	melee_t = max(melee_t - delta, 0.0)
+	if test_freeze >= 0.0:      # screenshot tests: hold an animation at a fixed fraction
+		if test_freeze_kind == "insp":
+			inspect_t = 3.2 * (1.0 - test_freeze)
+			if fp_ap and fp_anim == "inspect":
+				fp_ap.seek(_fp_len("inspect") * test_freeze, true)
+				fp_ap.speed_scale = 0.0
+		else:
+			var tot := 0.75 if melee_heavy else 0.45
+			melee_t = maxf(tot * (1.0 - test_freeze), 0.001)
+			if fp_ap and _fp_has(fp_anim) and fp_anim != "idle":
+				fp_ap.seek(_fp_len(fp_anim) * test_freeze, true)
+				fp_ap.speed_scale = 0.0
 	if bolt_t > 0:
 		bolt_t -= delta
 		if bolt_t <= 0.45 and bolt_t + delta > 0.45:
@@ -479,6 +496,9 @@ func _do_switch(id: String, instant: bool) -> void:
 	equip_t = 0.0 if instant else draw_total
 	_mag_release()
 	_load_vm_weapon(id)
+	if not instant and _fp_has("draw") and fp_meta.get("rig", 0):
+		_fp_play("draw", 0.0, _fp_len("draw") / max(draw_total, 0.2))
+		get_tree().create_timer(draw_total).timeout.connect(func(): if fp_anim == "draw": _fp_play("idle", 0.12))
 	if not instant:
 		var w: Dictionary = GS.WEAPONS[id]
 		if w.get("melee", false):
@@ -582,6 +602,9 @@ func _try_fire() -> void:
 	if not wdata.get("silenced", false):
 		_spawn_flash()
 	_spawn_shell()
+	if _fp_has("fire") and not wdata.get("bolt", false) and cur != "spas":
+		_fp_play("fire", 0.02, max(1.0, _fp_len("fire") / max(float(wdata.get("rate", 0.1)), 0.05)))
+		get_tree().create_timer(_fp_len("fire") / max(1.0, _fp_len("fire") / max(float(wdata.get("rate", 0.1)), 0.05)) + 0.02).timeout.connect(func(): if fp_anim == "fire": _fp_play("idle", 0.08))
 	if wdata.get("bolt", false):
 		bolt_t = 1.1
 		SFX.play("bolt_back", -6)
@@ -626,6 +649,8 @@ func start_reload() -> void:
 	if wdata.get("shell_reload", false):
 		SFX.play("equip", -10)
 		_fp_play("shell", 0.1, _fp_len("shell") / reload_total)
+	elif a[0] == 0 and _fp_has("reload_empty"):
+		_fp_play("reload_empty", 0.1, _fp_len("reload_empty") / reload_total)
 	elif _fp_has("reload"):
 		_fp_play("reload", 0.1, _fp_len("reload") / reload_total)
 	else:
@@ -883,6 +908,11 @@ func take_damage(amount: float, attacker, pos: Vector3, headshot: bool, wid: Str
 		armor -= absorbed
 		dmg -= absorbed
 	health -= dmg
+	if attacker != null and is_instance_valid(attacker):
+		var lk: int = attacker.get_instance_id()
+		var le: Array = dmg_log.get(lk, [0.0, 0, 0])
+		le[0] += amount; le[1] += 1; le[2] += 1 if headshot else 0
+		dmg_log[lk] = le
 	shake = max(shake, 0.4 if amount < 50 else 0.8)
 	punch += Vector3(randf_range(-0.03, 0.03), randf_range(-0.03, 0.03), 0)
 	SFX.play("hurt", -6, randf_range(0.9, 1.1))
@@ -909,6 +939,7 @@ func respawn(pos: Vector3, yaw_: float) -> void:
 	health = 100
 	armor = 100
 	alive = true
+	dmg_log.clear()
 	crouching = false
 	vm_rect.visible = true
 	setup_loadout(GS.active_set(), GS.room.get("mode", "ffa"))
@@ -1166,14 +1197,94 @@ func _load_vm_weapon(id: String) -> void:
 		var mp := "res://assets/models/fp_%s.json" % GS.weapon_base(id)
 		if FileAccess.file_exists(mp):
 			fp_meta = JSON.parse_string(FileAccess.get_file_as_string(mp))
+		if fp_meta.get("rig", 0):
+			_rig_setup(id, fp_path)
 		if fp_ap:
-			if fp_ap.has_animation("idle"):
-				fp_ap.get_animation("idle").loop_mode = Animation.LOOP_LINEAR
+			if _fp_has("idle"):
+				fp_ap.get_animation(_fp_name("idle")).loop_mode = Animation.LOOP_LINEAR
 			_fp_play("idle", 0.0)
 			fp_ap.advance(0.0)
 		# knives and grenades live in the right hand and follow every swing/throw
 		if fp_skel and (wdata.get("melee", false) or wdata.get("throwable", false)):
 			held_att = _attach_to_bone(vm_weapon, "RightHand")
+
+## animated first-person rig (arms + its own gun, from a CC-BY animation pack): the static weapon is
+## hidden (its markers still drive ADS / muzzle flash / shells), the rig's gun gets the skin + upgrade glow,
+## and the single baked timeline is cut into idle / fire / reload / bolt / inspect / draw clips once.
+static var _rig_cache := {}
+func _rig_setup(id: String, path: String) -> void:
+	for mi in vm_weapon.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).visible = false
+	for k in ["mag", "bolt", "slide"]:
+		vm_parts.erase(k)
+	var skin := GS.wskin(id)
+	for mi in fp_root.find_children("gun_*", "MeshInstance3D", true, false):
+		MatLib.apply(mi, skin)
+		GS.level_glow(mi, id, 0.62)
+	if fp_ap == null:
+		return
+	var secs: Dictionary = fp_meta.get("sections", {})
+	if not _rig_cache.has(path):
+		var made := {}
+		var src: Animation = null
+		for ln in fp_ap.get_animation_library_list():
+			for an in fp_ap.get_animation_library(ln).get_animation_list():
+				if src == null or fp_ap.get_animation_library(ln).get_animation(an).length > src.length:
+					src = fp_ap.get_animation_library(ln).get_animation(an)
+		for k in secs.keys():
+			var sv = secs[k]
+			if sv is Dictionary:
+				# a named clip of the pack (optionally a slice of it; negative start = from its end)
+				var nm: String = str(sv.get("anim", ""))
+				var na: Animation = null
+				for ln in fp_ap.get_animation_library_list():
+					if fp_ap.get_animation_library(ln).has_animation(nm):
+						na = fp_ap.get_animation_library(ln).get_animation(nm)
+				if na:
+					var s0: float = float(sv.get("s", 0.0))
+					if s0 < 0.0:
+						s0 = maxf(na.length + s0, 0.0)
+					made[k] = _rig_cut(na, s0, float(sv.get("e", na.length)))
+			elif src:
+				made[k] = _rig_cut(src, float(sv[0]), float(sv[1]))
+		_rig_cache[path] = made
+	var lib := AnimationLibrary.new()
+	for k in _rig_cache[path].keys():
+		lib.add_animation(k, _rig_cache[path][k])
+	if fp_ap.has_animation_library("rig"):
+		fp_ap.remove_animation_library("rig")
+	fp_ap.add_animation_library("rig", lib)
+	# play by plain name ("idle") through the "rig/" library
+	fp_meta["prefix"] = "rig/"
+
+static func _rig_cut(src: Animation, s: float, e: float) -> Animation:
+	var a := Animation.new()
+	a.length = maxf(e - s, 0.05)
+	for t in src.get_track_count():
+		var ty := src.track_get_type(t)
+		var nt := a.add_track(ty)
+		a.track_set_path(nt, src.track_get_path(t))
+		a.track_set_interpolation_type(nt, src.track_get_interpolation_type(t))
+		var v0 = null
+		var v1 = null
+		match ty:
+			Animation.TYPE_POSITION_3D:
+				v0 = src.position_track_interpolate(t, s); v1 = src.position_track_interpolate(t, e)
+			Animation.TYPE_ROTATION_3D:
+				v0 = src.rotation_track_interpolate(t, s); v1 = src.rotation_track_interpolate(t, e)
+			Animation.TYPE_SCALE_3D:
+				v0 = src.scale_track_interpolate(t, s); v1 = src.scale_track_interpolate(t, e)
+			Animation.TYPE_VALUE:
+				v0 = src.value_track_interpolate(t, s); v1 = src.value_track_interpolate(t, e)
+			_:
+				continue
+		a.track_insert_key(nt, 0.0, v0)
+		for ki in src.track_get_key_count(t):
+			var kt := src.track_get_key_time(t, ki)
+			if kt > s + 0.0005 and kt < e - 0.0005:
+				a.track_insert_key(nt, kt - s, src.track_get_key_value(t, ki))
+		a.track_insert_key(nt, a.length, v1)
+	return a
 
 func _fp_bone(n: String) -> int:
 	if fp_skel == null:
@@ -1199,19 +1310,22 @@ func _attach_to_bone(node: Node3D, bone: String) -> Node3D:
 	node.reparent(holder, true)
 	return ba
 
+func _fp_name(a: String) -> String:
+	return str(fp_meta.get("prefix", "")) + a
+
 func _fp_play(a: String, blend: float = 0.12, speed: float = 1.0) -> void:
-	if fp_ap == null or not fp_ap.has_animation(a):
+	if fp_ap == null or not fp_ap.has_animation(_fp_name(a)):
 		return
 	fp_anim = a
-	fp_ap.play(a, blend, speed)
+	fp_ap.play(_fp_name(a), blend, speed)
 
 func _fp_len(a: String) -> float:
-	if fp_ap and fp_ap.has_animation(a):
-		return fp_ap.get_animation(a).length
+	if fp_ap and fp_ap.has_animation(_fp_name(a)):
+		return fp_ap.get_animation(_fp_name(a)).length
 	return 1.0
 
 func _fp_has(a: String) -> bool:
-	return fp_ap != null and fp_ap.has_animation(a)
+	return fp_ap != null and fp_ap.has_animation(_fp_name(a))
 
 func _mag_grab() -> void:
 	if mag_att or not vm_parts.has("mag"):
@@ -1305,7 +1419,7 @@ func _update_viewmodel(delta: float) -> void:
 	var rot := Vector3.ZERO
 	if vm_parts.has("sight") and kind != "knife" and kind != "frag":
 		var sight_rest: Transform3D = (vm_parts["sight"] as Node3D).get_meta("rest")
-		var sp: Vector3 = sight_rest.origin
+		var sp: Vector3 = sight_rest.origin + Vector3(0, float(fp_meta.get("sight_dy", 0.0)), 0)
 		var ads_pos := Vector3(-sp.x, -sp.y, -sp.z - (0.14 if kind != "pistol" else 0.3) - (0.1 if GS.wparts(cur).has("optik") else (0.09 if GS.wparts(cur).has("durbun") else 0.0)))
 		if wdata.get("scope", false):
 			ads_pos.z = -sp.z - 0.06
@@ -1410,7 +1524,20 @@ func _update_viewmodel(delta: float) -> void:
 		insp_mag = false
 		if reload_t <= 0 and vm_parts.has("mag") and is_instance_valid(vm_parts["mag"]) and (vm_parts["mag"] as Node3D).has_meta("rest"):
 			(vm_parts["mag"] as Node3D).transform = vm_parts["mag"].get_meta("rest")
-	if inspect_t > 0:
+	if inspect_t <= 0 and fp_anim == "inspect":
+		_fp_play("idle", 0.15)
+	if inspect_t <= 0 and vm_weapon and is_instance_valid(vm_weapon) and vm_weapon.has_meta("insp_rest"):
+		vm_weapon.transform = vm_weapon.get_meta("insp_rest")
+		vm_weapon.remove_meta("insp_rest")
+	if inspect_t > 0 and fp_anim == "inspect":
+		# the clip itself is the inspect; knives also spin in the fingers (handle stays in the fist)
+		if kind == "knife" and vm_weapon and is_instance_valid(vm_weapon) and held_att:
+			if not vm_weapon.has_meta("insp_rest"):
+				vm_weapon.set_meta("insp_rest", vm_weapon.transform)
+			var it2 := 1.0 - inspect_t / 3.2
+			var spin := smoothstep(0.4, 0.56, it2) * PI + smoothstep(0.8, 0.95, it2) * PI
+			vm_weapon.transform = (vm_weapon.get_meta("insp_rest") as Transform3D) * Transform3D(Basis(Vector3(0, 0, 1), spin), Vector3.ZERO)
+	elif inspect_t > 0:
 		var it := 1.0 - inspect_t / 3.2
 		var kp := _inspect_pose(kind, it)
 		pos += kp[0]

@@ -262,13 +262,13 @@ func setup(p) -> void:
 	death_panel.visible = false
 	root.add_child(death_panel)
 	var dv := UI.vbox(6)
-	dv.set_anchors_preset(Control.PRESET_CENTER)
-	dv.position = Vector2(-400, 140)
+	dv.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	dv.position = Vector2(-400, -130)
 	dv.custom_minimum_size = Vector2(800, 0)
 	death_panel.add_child(dv)
 	death_lbl = UI.lbl("", 34, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
 	dv.add_child(death_lbl)
-	death_timer_lbl = UI.lbl("", 22, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+	death_timer_lbl = UI.lbl("", 17, Color(1, 1, 1, 0.75), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
 	dv.add_child(death_timer_lbl)
 	on_weapon_changed()
 	call_deferred("chat_help")
@@ -490,7 +490,9 @@ func _process(delta: float) -> void:
 	# death
 	if death_panel.visible:
 		death_t -= delta
-		death_timer_lbl.text = ("Tur sonunu bekle  •  birazdan takım arkadaşını izleyeceksin" if match_node.sab else "Yeniden doğuluyor: %.1f" % max(death_t, 0.0))
+		death_timer_lbl.text = ("TUR SONUNU BEKLE  •  BİRAZDAN TAKIM ARKADAŞINI İZLEYECEKSİN" if match_node.sab else "YENİDEN DOĞUYORSUN  %.1f" % max(death_t, 0.0))
+		if _death_bar and is_instance_valid(_death_bar):
+			_death_bar.value = 3.5 - max(death_t, 0.0)
 	# weapon menu (B)
 	if Input.is_action_just_pressed("buy_menu") and not m.ended and not m.paused:
 		toggle_buy(not buy_open)
@@ -1021,38 +1023,155 @@ func center_msg(t: String, c: Color) -> void:
 	tw.tween_interval(1.6)
 	tw.tween_property(center, "modulate:a", 0.0, 0.5)
 
-func show_death(killer: String, wid: String, head: bool) -> void:
+var _death_card: Control
+var _death_bar: ProgressBar
+## death card: one clean, centred card — who killed you, with what (+level), how hard, and what they have left
+func show_death(killer: String, wid: String, head: bool, info: Dictionary = {}) -> void:
 	death_panel.visible = true
 	death_t = 3.5
-	var wn: String = GS.WEAPONS[wid]["name"] if GS.WEAPONS.has(wid) else ""
-	death_lbl.text = "ÖLDÜRÜLDÜN"
-	death_lbl.add_theme_color_override("font_color", Color(1, 0.35, 0.3))
-	var dv: Node = death_lbl.get_parent()
-	var old_card := dv.get_node_or_null("KillerCard")
-	if old_card:
-		old_card.queue_free()
-	var card := UI.panel(Color(0.03, 0.03, 0.045, 0.85), UI.GOLD if head else Color(1, 0.35, 0.3), 14, 2)
-	card.name = "KillerCard"
-	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var ch := UI.hbox(14)
-	card.add_child(ch)
-	var kv := UI.vbox(0)
-	ch.add_child(kv)
-	kv.add_child(UI.lbl("SENİ VURAN", 14, UI.DIM, "Rajdhani-Bold"))
-	kv.add_child(UI.lbl(killer, 30, Color.WHITE, "RussoOne-Regular"))
+	death_lbl.text = ""
+	if _death_card and is_instance_valid(_death_card):
+		_death_card.queue_free()
+	var accent: Color = UI.GOLD if head else Color(1, 0.33, 0.28)
+	var tc: Color = GS.TEAM_COLORS.get(str(info.get("team", "")), Color(1, 0.42, 0.35))
+	var card := PanelContainer.new()
+	var csb := UI.sb(Color(0.02, 0.022, 0.032, 0.92), Color(1, 1, 1, 0.08), 1, 14, 0)
+	csb.shadow_color = Color(0, 0, 0, 0.5); csb.shadow_size = 24
+	card.add_theme_stylebox_override("panel", csb)
+	card.custom_minimum_size = Vector2(660, 0)
+	card.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	card.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	card.offset_bottom = -150
+	death_panel.add_child(card)
+	_death_card = card
+	var v := UI.vbox(0)
+	card.add_child(v)
+	# header strip
+	var hs := PanelContainer.new()
+	var hsb := UI.sb(Color(accent.r, accent.g, accent.b, 0.16), Color(0, 0, 0, 0), 0, 0, 0)
+	hsb.corner_radius_top_left = 14; hsb.corner_radius_top_right = 14
+	hsb.content_margin_left = 20; hsb.content_margin_right = 20; hsb.content_margin_top = 8; hsb.content_margin_bottom = 8
+	hsb.border_width_bottom = 2; hsb.border_color = accent
+	hs.add_theme_stylebox_override("panel", hsb)
+	v.add_child(hs)
+	var hh := UI.hbox(10)
+	hs.add_child(hh)
+	hh.add_child(UI.lbl("✖  ÖLDÜRÜLDÜN", 20, accent.lightened(0.15), "RussoOne-Regular"))
+	hh.add_child(UI.spacer())
+	if head:
+		hh.add_child(_death_chip("KAFADAN", UI.GOLD))
+	if info.get("self", false):
+		hh.add_child(_death_chip("KENDİNİ", UI.DIM))
+	# body
+	var bm := MarginContainer.new()
+	for k in ["left", "right"]:
+		bm.add_theme_constant_override("margin_" + k, 20)
+	bm.add_theme_constant_override("margin_top", 14); bm.add_theme_constant_override("margin_bottom", 14)
+	v.add_child(bm)
+	var bv := UI.vbox(14)
+	bm.add_child(bv)
+	var top := UI.hbox(14)
+	bv.add_child(top)
+	# avatar: team-coloured disc with the initial
+	var av := PanelContainer.new()
+	var asb := UI.sb(Color(tc.r * 0.3, tc.g * 0.3, tc.b * 0.3, 1), tc, 2, 30, 0)
+	av.add_theme_stylebox_override("panel", asb)
+	av.custom_minimum_size = Vector2(60, 60)
+	av.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var al := UI.lbl(killer.substr(0, 1).to_upper(), 28, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
+	al.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	av.add_child(al)
+	top.add_child(av)
+	var nv := UI.vbox(-2)
+	nv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(nv)
+	nv.add_child(UI.lbl("SENİ VURAN", 13, UI.DIM, "Rajdhani-Bold"))
+	nv.add_child(UI.lbl(killer, 30, Color.WHITE, "RussoOne-Regular"))
+	var tags := UI.hbox(6)
+	nv.add_child(tags)
+	tags.add_child(_death_chip("SEVİYE %d" % int(info.get("lvl", 1)), Color(0.6, 0.75, 1.0)))
+	var tn: String = str(GS.TEAMS.get(str(info.get("team", "")), ""))
+	if tn != "":
+		tags.add_child(_death_chip(tn, tc))
+	# weapon block (right)
+	var wv := UI.vbox(2)
+	wv.alignment = BoxContainer.ALIGNMENT_CENTER
+	top.add_child(wv)
 	var ic := TextureRect.new()
 	ic.texture = _kf_icon(wid)
 	ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	ic.custom_minimum_size = Vector2(150, 50)
-	ch.add_child(ic)
-	var wv := UI.vbox(0)
-	ch.add_child(wv)
-	wv.add_child(UI.lbl(wn.to_upper(), 20, Color.WHITE, "Rajdhani-Bold"))
-	wv.add_child(UI.lbl("KAFADAN!" if head else "gövdeden", 18, UI.GOLD if head else UI.DIM, "Rajdhani-Bold"))
-	dv.add_child(card)
-	dv.move_child(card, death_lbl.get_index() + 1)
+	ic.custom_minimum_size = Vector2(170, 48)
+	var wl: int = int(info.get("wlvl", 0))
+	ic.modulate = Color.WHITE if wl <= 0 else Color(1, 1, 1).lerp(GS.lvl_color(wl), 0.4)
+	wv.add_child(ic)
+	var wh := UI.hbox(6)
+	wh.alignment = BoxContainer.ALIGNMENT_END
+	wv.add_child(wh)
+	if wl > 0:
+		wh.add_child(lvl_badge(wl, 14))
+	wh.add_child(UI.lbl(str(GS.WEAPONS.get(wid, {}).get("name", "")).to_upper(), 17, Color.WHITE, "Rajdhani-Bold"))
+	# stat tiles
+	var tiles := UI.hbox(10)
+	bv.add_child(tiles)
+	if info.has("hp"):
+		var hp: float = float(info["hp"])
+		var t1 := _death_tile("KALAN CANI")
+		var hl := UI.lbl("%d" % int(ceil(hp)), 30, UI.GREEN if hp > 60 else (UI.GOLD if hp > 25 else UI.RED), "Teko")
+		t1.add_child(hl)
+		var hb := UI.bar(hp, 100, UI.GREEN if hp > 60 else (UI.GOLD if hp > 25 else UI.RED), 6)
+		hb.add_theme_stylebox_override("background", UI.sb(Color(1, 1, 1, 0.08), Color(0, 0, 0, 0), 0, 3, 0))
+		t1.add_child(hb)
+		tiles.add_child(t1.get_parent())
+	if info.has("dmg"):
+		var t2 := _death_tile("SANA VERDİĞİ HASAR")
+		t2.add_child(UI.lbl("%d" % int(info["dmg"]), 30, Color(1, 0.45, 0.4), "Teko"))
+		t2.add_child(UI.lbl("%d isabet%s" % [int(info.get("hits", 0)), ("  •  %d kafa" % int(info["heads"])) if int(info.get("heads", 0)) > 0 else ""], 13, UI.DIM, "Rajdhani-Bold"))
+		tiles.add_child(t2.get_parent())
+	if info.has("my_dmg"):
+		var t3 := _death_tile("SENİN VERDİĞİN")
+		t3.add_child(UI.lbl("%d" % int(info["my_dmg"]), 30, Color(0.55, 0.85, 1.0), "Teko"))
+		t3.add_child(UI.lbl("hasar", 13, UI.DIM, "Rajdhani-Bold"))
+		tiles.add_child(t3.get_parent())
+	if info.has("dist"):
+		var t4 := _death_tile("MESAFE")
+		t4.add_child(UI.lbl("%d m" % int(round(float(info["dist"]))), 30, Color.WHITE, "Teko"))
+		t4.add_child(UI.lbl("uzak" if float(info["dist"]) > 30 else ("orta" if float(info["dist"]) > 10 else "yakın"), 13, UI.DIM, "Rajdhani-Bold"))
+		tiles.add_child(t4.get_parent())
+	# respawn bar
+	var rv := UI.vbox(4)
+	bv.add_child(rv)
+	_death_bar = UI.bar(0, 3.5, accent, 5)
+	_death_bar.add_theme_stylebox_override("background", UI.sb(Color(1, 1, 1, 0.07), Color(0, 0, 0, 0), 0, 3, 0))
+	rv.add_child(_death_bar)
 	_ignore_mouse(card)
+	# entrance
+	card.modulate.a = 0.0
+	card.pivot_offset = Vector2(300, 100)
+	card.scale = Vector2(0.94, 0.94)
+	var tw := card.create_tween()
+	tw.tween_property(card, "modulate:a", 1.0, 0.22)
+	tw.parallel().tween_property(card, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _death_chip(t: String, c: Color) -> Control:
+	var p := PanelContainer.new()
+	var sbx := UI.sb(Color(c.r, c.g, c.b, 0.15), Color(c.r, c.g, c.b, 0.55), 1, 5, 0)
+	sbx.content_margin_left = 8; sbx.content_margin_right = 8; sbx.content_margin_top = 1; sbx.content_margin_bottom = 1
+	p.add_theme_stylebox_override("panel", sbx)
+	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	p.add_child(UI.lbl(t, 13, c.lightened(0.25), "Rajdhani-Bold"))
+	return p
+
+func _death_tile(title: String) -> VBoxContainer:
+	var p := PanelContainer.new()
+	var sbx := UI.sb(Color(1, 1, 1, 0.04), Color(1, 1, 1, 0.07), 1, 10, 10)
+	p.add_theme_stylebox_override("panel", sbx)
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var v := UI.vbox(-2)
+	p.add_child(v)
+	v.add_child(UI.lbl(title, 12, UI.DIM, "Rajdhani-Bold"))
+	return v
 
 # ---------------------------------------------------------------- scoreboard
 func _ignore_mouse(n: Node) -> void:

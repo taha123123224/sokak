@@ -232,7 +232,7 @@ def pose_for(wid, body, rig):
         cv = 78 if kind == 'knife' else 50
         for f in ('Index', 'Middle', 'Ring', 'Pinky'):
             curl(rig, 'Right', f, [cv, cv * 0.95, cv * 0.5], r_palm)
-        curl(rig, 'Right', 'Thumb', [30, 35, 20], r_palm)
+        curl(rig, 'Right', 'Thumb', [62, 55, 45] if kind == 'knife' else [30, 35, 20], r_palm, spread=(-25 if kind == 'knife' else 0.0))
         shoulder = bw(rig, 'LeftArm').translation
         arm_ik(rig, 'Left', shoulder + Vector((0.0, 0.1, -0.5)), shoulder + Vector((-0.6, 0.0, -0.3)), Vector((0, 0.3, -1)), Vector((1, 0, 0)))
 

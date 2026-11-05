@@ -799,6 +799,7 @@ var net_pitch := 0.0
 var net_t := 0.0
 var _net_force := false
 
+var dmg_from_player := 0.0
 var net_wlvl := 0      # online: the remote player's upgrade level of the held weapon (kill feed badge)
 var net_use := false     # online: the remote player is holding E (sabotage plant / defuse)
 
@@ -885,6 +886,8 @@ func _sp_take_damage(amount: float, attacker, pos: Vector3, headshot: bool, w: S
 		hit_head = headshot
 		return
 	health -= amount
+	if attacker == match_node.player:
+		dmg_from_player += amount
 	if GS.ball(w).get("abil", "") == "slow":
 		slow_t = 0.9
 	# hit reaction: torso jerks, head snaps on headshots, small stagger away from the shot
@@ -980,6 +983,7 @@ func respawn(pos: Vector3, yaw_: float, weapon: String) -> void:
 	aim_yaw = yaw_
 	aim_pitch = 0
 	health = 100
+	dmg_from_player = 0.0
 	alive = true
 	collision_layer = 2
 	collision_mask = 1 | 2

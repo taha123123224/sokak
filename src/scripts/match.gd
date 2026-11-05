@@ -1231,7 +1231,15 @@ func _sp_on_death(victim, attacker, wid: String, head: bool) -> void:
 		_player_kill(head, wid)
 	if victim == player:
 		player_streak = 0
-		hud.show_death(ae.get("name", "Kendini"), wid, head)
+		var dinfo := {"team": str(ae.get("team", "")), "lvl": int(ae.get("lvl", 1)), "wlvl": klvl, "self": attacker == null or attacker == player}
+		if attacker != null and is_instance_valid(attacker) and attacker != player:
+			var lg: Array = player.dmg_log.get(attacker.get_instance_id(), [0.0, 0, 0])
+			dinfo["dmg"] = lg[0]; dinfo["hits"] = lg[1]; dinfo["heads"] = lg[2]
+			dinfo["dist"] = attacker.global_position.distance_to(player.global_position)
+			dinfo["my_dmg"] = float(attacker.get("dmg_from_player")) if "dmg_from_player" in attacker else 0.0
+			if not bool(attacker.get("puppet")):
+				dinfo["hp"] = maxf(float(attacker.health), 0.0)
+		hud.show_death(ae.get("name", "Kendini"), wid, head, dinfo)
 		if attacker != null and is_instance_valid(attacker) and attacker != player:
 			_killcam(attacker)
 	# gun game progression
@@ -1623,6 +1631,25 @@ func test_hook(i: int) -> void:
 		player.ammo[wid] = [int(GS.WEAPONS[wid].get("mag", 1)), 99]
 		player.cur = ""
 		player.switch_to(wid, true)
+	elif i == 40 or i == 41 or i == 42:
+		# 40 slash / 41 stab / 42 inspect, frozen at env FR (0..1)
+		var frs: PackedStringArray = (OS.get_environment("FR") if OS.has_environment("FR") else "0.4").split(",")
+		var fk: int = int(get_meta("fr_i", 0))
+		set_meta("fr_i", fk + 1)
+		var fr := float(frs[fk % frs.size()])
+		player.test_freeze = -1.0
+		player.inspect_t = 0.0
+		if i == 42:
+			player.inspect_t = 3.2
+			player._fp_play("inspect", 0.0)
+			player.test_freeze_kind = "insp"
+		else:
+			player._melee(i == 41)
+			player.test_freeze_kind = "melee"
+		player.test_freeze = fr
+	elif i == 45:
+		# death card check
+		hud.show_death("GeceKurdu", "m4a1", true, {"team": "b", "lvl": 37, "wlvl": 5, "self": false, "dmg": 100, "hits": 3, "heads": 1, "my_dmg": 64, "dist": 23.4, "hp": 36.0})
 	elif i == 22:
 		# HUD check: kill feed with weapon icons + inspect card + inspect pose
 		hud.kill_feed("Oyuncu", "Kartal07", "ak47", true, "a", "b", true, false, GS.wlvl("ak47"))
