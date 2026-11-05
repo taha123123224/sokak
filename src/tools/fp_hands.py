@@ -166,6 +166,47 @@ def build_base():
     return body, rig
 
 
+## per-knife viewmodel framing, identical to player.gd KNIFE_VIEW: (Godot euler rot, hip position)
+KNIFE_VIEW = {'default': ((0.05, 0.25, -0.3), (0.16, -0.13, -0.36)),
+              'karambit': ((0.1, 0.6, -0.2), (0.17, -0.13, -0.37)),
+              'balta': ((0.15, -0.5, 0.2), (0.11, -0.11, -0.36))}
+
+
+def knife_view(wid):
+    return KNIFE_VIEW.get(wid, KNIFE_VIEW['default'])
+
+
+def _view_m(wid):
+    (rx, ry, rz), hp = knife_view(wid)
+    R = Matrix.Rotation(ry, 4, 'Y') @ Matrix.Rotation(rx, 4, 'X') @ Matrix.Rotation(rz, 4, 'Z')
+    return Matrix.Translation(Vector(hp)) @ R          # weapon(godot) -> camera(godot)
+
+
+def _b2g(v):
+    return Vector((v.x, v.z, -v.y))
+
+
+def _g2b(v):
+    return Vector((v.x, -v.z, v.y))
+
+
+def cam_to_weapon(wid, p_cam_g, is_dir=False):
+    M = _view_m(wid).inverted()
+    return _g2b((M.to_3x3() @ p_cam_g) if is_dir else (M @ p_cam_g))
+
+
+def weapon_to_cam(wid, p_b, is_dir=False):
+    M = _view_m(wid)
+    return (M.to_3x3() @ _b2g(p_b)) if is_dir else (M @ _b2g(p_b))
+
+
+def knife_pole(wid=''):
+    ## CS:GO-style knife arm: elbow low and slightly out, so the forearm rises diagonally from the
+    ## bottom-right corner instead of lying flat across the screen
+    import os
+    return Vector([float(x) for x in os.environ.get('KPOLE', '0.3,0.05,-1.0').split(',')])
+
+
 def pose_for(wid, body, rig):
     kind = KIND[wid]
     pts = weapon_points(wid)
@@ -180,7 +221,7 @@ def pose_for(wid, body, rig):
     eye = head + Vector((0, -0.11, 0.1))  # approx eye offset from head joint (front is -Y before rotation)
     rot = Matrix.Rotation(math.pi, 4, 'Z')
     eye_r = rot @ eye
-    rig.matrix_world = Matrix.Translation(cam - eye_r + Vector((0.02, float(os.environ.get("FP_FWD", "0.40")), -0.06))) @ rot
+    rig.matrix_world = Matrix.Translation(cam - eye_r + Vector((0.02, float(os.environ.get("KFWD", "0.20") if kind == "knife" else os.environ.get("FP_FWD", "0.40")), -0.06))) @ rot
     bpy.context.view_layer.update()
     palm_axes_done = 'palm_axis_Left' in rig.keys()
     if not palm_axes_done:
@@ -228,13 +269,28 @@ def pose_for(wid, body, rig):
         r_palm = (-X).normalized()
         r_wrist = rh + Vector((0.035, -0.09, -0.02))
         shoulder = bw(rig, 'RightArm').translation
-        arm_ik(rig, 'Right', r_wrist, shoulder + Vector((0.6, 0.0, -0.7)), r_fwd, r_palm)
+        arm_ik(rig, 'Right', r_wrist, shoulder + (knife_pole(wid) if kind == 'knife' else Vector((0.6, 0.0, -0.7))), r_fwd, r_palm)
         cv = 78 if kind == 'knife' else 50
         for f in ('Index', 'Middle', 'Ring', 'Pinky'):
             curl(rig, 'Right', f, [cv, cv * 0.95, cv * 0.5], r_palm)
         curl(rig, 'Right', 'Thumb', [62, 55, 45] if kind == 'knife' else [30, 35, 20], r_palm, spread=(-25 if kind == 'knife' else 0.0))
         shoulder = bw(rig, 'LeftArm').translation
-        arm_ik(rig, 'Left', shoulder + Vector((0.0, 0.1, -0.5)), shoulder + Vector((-0.6, 0.0, -0.3)), Vector((0, 0.3, -1)), Vector((1, 0, 0)))
+        if kind == 'knife':
+            # CS:GO-style idle: the free left hand rests low on the left, back of the hand up, fingers relaxed
+            # the target is tuned for the default knife framing and then expressed in camera space, so the left
+            # hand sits at the same spot on screen whatever angle a particular knife is held at
+            lp0 = Vector([float(x) for x in os.environ.get('LHAND', '-0.27,0.12,-0.14').split(',')])
+            lf0 = Vector([float(x) for x in os.environ.get('LFWD', '0.55,0.65,0.5').split(',')]).normalized()
+            lpa0 = Vector([float(x) for x in os.environ.get('LPALM', '0.5,0.5,-0.7').split(',')]).normalized()
+            lp = cam_to_weapon(wid, weapon_to_cam('default', lp0))
+            lf = cam_to_weapon(wid, weapon_to_cam('default', lf0, True), True).normalized()
+            lpa = cam_to_weapon(wid, weapon_to_cam('default', lpa0, True), True).normalized()
+            arm_ik(rig, 'Left', lp, shoulder + Vector((-0.55, -0.05, -0.8)), lf, lpa)
+            for f, c in [('Index', [18, 22, 12]), ('Middle', [24, 28, 14]), ('Ring', [30, 32, 16]), ('Pinky', [36, 34, 18])]:
+                curl(rig, 'Left', f, c, lpa)
+            curl(rig, 'Left', 'Thumb', [12, 14, 8], lpa)
+        else:
+            arm_ik(rig, 'Left', shoulder + Vector((0.0, 0.1, -0.5)), shoulder + Vector((-0.6, 0.0, -0.3)), Vector((0, 0.3, -1)), Vector((1, 0, 0)))
 
 
 def bake_and_cut(body, rig, wid):

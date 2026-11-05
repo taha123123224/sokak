@@ -618,7 +618,7 @@ func _build_topbar() -> void:
 	topbar = UI.hbox(4)
 	topbar.alignment = BoxContainer.ALIGNMENT_BEGIN
 	var m := MarginContainer.new()
-	m.add_theme_constant_override("margin_left", 22); m.add_theme_constant_override("margin_right", 18)
+	m.add_theme_constant_override("margin_left", 22); m.add_theme_constant_override("margin_right", 84)
 	bar.add_child(m)
 	m.add_child(topbar)
 	var logo := TextureRect.new()
@@ -664,12 +664,61 @@ func _build_topbar() -> void:
 	cur_box = UI.hbox(8)
 	cur_box.alignment = BoxContainer.ALIGNMENT_END
 	topbar.add_child(cur_box)
-	topbar.add_child(UI.spacer(false, 8))
-	var q := UI.btn("⏻", func(): get_tree().quit(), 24, false, 48, 48)
+	# quit button lives outside the bar's flow, pinned to the top-right corner: it can never be pushed off-screen
+	var q := Button.new()
+	q.text = "⏻"
+	q.focus_mode = Control.FOCUS_NONE
 	q.tooltip_text = "Oyundan çık"
-	q.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	topbar.add_child(q)
+	q.add_theme_font_size_override("font_size", 24)
+	q.add_theme_stylebox_override("normal", UI.sb(Color(0.35, 0.05, 0.07, 0.55), Color(1, 0.3, 0.3, 0.5), 1, 8, 0))
+	q.add_theme_stylebox_override("hover", UI.sb(Color(0.7, 0.1, 0.12, 0.9), Color(1, 0.5, 0.5, 0.9), 1, 8, 0))
+	q.add_theme_stylebox_override("pressed", UI.sb(Color(0.9, 0.15, 0.15, 1), Color.WHITE, 1, 8, 0))
+	q.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	q.offset_left = -66; q.offset_right = -14; q.offset_top = 17; q.offset_bottom = 69
+	q.pressed.connect(func(): _confirm_quit())
+	ui.add_child(q)
 	_refresh_currency()
+	get_viewport().size_changed.connect(_topbar_fit)
+	_topbar_fit.call_deferred()
+
+## narrow screens (4:3, 16:10, small laptops): drop the least important bits so nothing is cut off
+func _topbar_fit() -> void:
+	if topbar == null or not is_instance_valid(topbar):
+		return
+	var w: float = get_viewport().get_visible_rect().size.x
+	var tight := w < 1900
+	var very := w < 1650
+	for k in nav_btns.keys():
+		var b: Button = nav_btns[k]
+		b.add_theme_font_size_override("font_size", 14 if very else (15 if tight else 16))
+		for st in ["normal", "hover", "pressed"]:
+			var sbx: StyleBox = b.get_theme_stylebox(st)
+			if sbx:
+				sbx.content_margin_left = 5 if very else (7 if tight else 9)
+				sbx.content_margin_right = sbx.content_margin_left
+	if cur_box and is_instance_valid(cur_box):
+		for c in cur_box.get_children():
+			if c.has_meta("optional"):
+				(c as Control).visible = not very
+
+func _confirm_quit() -> void:
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ui.add_child(dim)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.add_child(cc)
+	var p := UI.panel(Color(0.03, 0.035, 0.05, 0.98), Color(1, 0.35, 0.3, 0.7), 22, 10)
+	cc.add_child(p)
+	var v := UI.vbox(14)
+	p.add_child(v)
+	v.add_child(UI.lbl("OYUNDAN ÇIKILSIN MI?", 28, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER))
+	var h := UI.hbox(10)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(h)
+	h.add_child(UI.btn("ÇIK", func(): get_tree().quit(), 20, true, 180, 50))
+	h.add_child(UI.btn("VAZGEÇ", func(): dim.queue_free(), 20, false, 180, 50))
 
 func _refresh_currency() -> void:
 	if cur_box == null:
@@ -686,8 +735,32 @@ func _refresh_currency() -> void:
 	lv.tooltip_text = "Seviye %d  •  %d / %d TP" % [int(p["level"]), int(p["xp"]), GS.xp_for_level(int(p["level"]))]
 	cur_box.add_child(lv)
 	cur_box.add_child(_cur("gold", UI.money(int(p["gold"])), UI.GOLD, "Altın"))
+	# the four upgrade materials share one compact chip
+	var mc := PanelContainer.new()
+	var msb := UI.sb(Color(0.07, 0.085, 0.11, 0.95), Color(0.5, 0.7, 1.0, 0.3), 1, 6, 0)
+	msb.content_margin_left = 6; msb.content_margin_right = 8; msb.content_margin_top = 3; msb.content_margin_bottom = 3
+	mc.add_theme_stylebox_override("panel", msb)
+	mc.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	mc.mouse_filter = Control.MOUSE_FILTER_PASS
+	mc.set_meta("optional", true)
+	var tip := "Silah geliştirme malzemeleri:"
+	var mh := UI.hbox(4)
+	mh.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mc.add_child(mh)
 	for k in [["demir", Color("aab3bb")], ["krom", Color("d9ecff")], ["titanyum", Color("62c8ff")], ["kobalt", Color("5b7cff")]]:
-		cur_box.add_child(_cur("gem", str(int(p["mats"].get(k[0], 0))), k[1], GS.MATS[k[0]] + " (silah geliştirme malzemesi)"))
+		var ic := CurIcon.new()
+		ic.kind = "gem"; ic.col = k[1]
+		ic.custom_minimum_size = Vector2(18, 18)
+		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		mh.add_child(ic)
+		var n := int(p["mats"].get(k[0], 0))
+		var nl := UI.lbl(str(n) if n < 1000 else "%.1fB" % (n / 1000.0), 16, Color.WHITE, "Rajdhani-Bold")
+		nl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		mh.add_child(nl)
+		tip += "\n%s: %d" % [GS.MATS[k[0]], n]
+	mc.tooltip_text = tip
+	cur_box.add_child(mc)
 	cur_box.add_child(_cur("crate", str(int(p.get("crates", 0))), Color("ff8a1f"), "Kasa"))
 
 func _cur(kind: String, v: String, c: Color, tip: String = "Altın") -> Control:

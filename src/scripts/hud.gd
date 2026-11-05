@@ -1356,15 +1356,19 @@ func show_pause(p: bool) -> void:
 	(pause_panel as ColorRect).color = Color(0, 0, 0, 0.6)
 	pause_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(pause_panel)
-	var v := UI.vbox(14)
-	v.set_anchors_preset(Control.PRESET_CENTER)
-	v.position = Vector2(-180, -200)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pause_panel.add_child(cc)
+	var pp := UI.panel(Color(0.03, 0.035, 0.05, 0.94), Color(1, 1, 1, 0.08), 26, 12)
+	cc.add_child(pp)
+	var v := UI.vbox(12)
 	v.custom_minimum_size = Vector2(360, 0)
-	pause_panel.add_child(v)
-	v.add_child(UI.lbl("DURAKLATILDI", 44, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER))
+	pp.add_child(v)
+	v.add_child(UI.lbl("DURAKLATILDI", 40, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(UI.btn("DEVAM ET", func(): match_node.set_paused(false), 24, true, 360, 56))
 	v.add_child(UI.btn("AYARLAR", _open_settings, 22, false, 360, 52))
 	v.add_child(UI.btn("MAÇTAN AYRIL", func(): match_node.leave(), 22, false, 360, 52))
+	v.add_child(UI.btn("OYUNDAN ÇIK", func(): get_tree().quit(), 20, false, 360, 48))
 
 func _open_settings() -> void:
 	var holder := ColorRect.new()
@@ -1928,6 +1932,17 @@ class MedalRing extends Control:
 const BUY_GROUPS := [["TÜFEKLER", ["ak47", "akm", "m4a1", "m4k", "scar", "aug", "m249", "rpk16", "kuzgun"]], ["HAFİF MAKİNALI", ["mp5", "p90", "ump45", "vector", "vityaz", "uzi"]], ["POMPALI", ["spas"]],
 	["KESKİN NİŞANCI", ["awp", "awm", "kar98"]], ["TABANCALAR", ["glock", "usp", "deagle", "revolver", "kartal", "fn502", "m1911"]], ["BIÇAKLAR", ["knife", "karambit", "hancer", "kasap", "balta"]]]
 
+## Valorant-style loadout panel: one compact window over the (still visible) game, weapon classes as columns
+## of white silhouette cards, and a detail pane for the hovered weapon on the right.
+const BUY_COLS := [
+	[["TABANCALAR", ["glock", "usp", "m1911", "fn502", "deagle", "revolver", "kartal"]]],
+	[["HAFİF MAKİNALI", ["mp5", "p90", "ump45", "vector", "vityaz", "uzi"]], ["POMPALI", ["spas"]]],
+	[["TÜFEKLER", ["ak47", "akm", "m4a1", "m4k", "scar", "aug", "kuzgun"]]],
+	[["NİŞANCI", ["awp", "awm", "kar98"]], ["AĞIR", ["m249", "rpk16"]]],
+	[["BIÇAKLAR", ["knife", "karambit", "hancer", "kasap", "balta"]]],
+]
+var _buy_detail: VBoxContainer
+
 func toggle_buy(open: bool) -> void:
 	if buy_panel:
 		buy_panel.queue_free()
@@ -1941,46 +1956,91 @@ func toggle_buy(open: bool) -> void:
 	SFX.play("equip", -8)
 	var mode: String = match_node.mode
 	var dim := ColorRect.new()
-	dim.color = Color(0, 0.01, 0.03, 0.55)
+	dim.color = Color(0, 0.01, 0.03, 0.42)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(dim)
 	buy_panel = dim
-	var center_c := CenterContainer.new()
-	center_c.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.add_child(center_c)
-	var p := UI.panel(Color(0.03, 0.04, 0.06, 0.94), Color(1, 0.55, 0.12, 0.6), 22, 6)
-	p.custom_minimum_size = Vector2(1180, 0)
-	center_c.add_child(p)
-	var v := UI.vbox(14)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.add_child(cc)
+	var p := PanelContainer.new()
+	var psb := UI.sb(Color(0.02, 0.025, 0.035, 0.86), Color(1, 1, 1, 0.07), 1, 12, 18)
+	psb.shadow_color = Color(0, 0, 0, 0.45); psb.shadow_size = 30
+	p.add_theme_stylebox_override("panel", psb)
+	cc.add_child(p)
+	var v := UI.vbox(12)
 	p.add_child(v)
+	# header
 	var top := UI.hbox(12)
 	v.add_child(top)
-	var acc := ColorRect.new(); acc.color = UI.ACCENT; acc.custom_minimum_size = Vector2(6, 38)
+	var acc := ColorRect.new(); acc.color = UI.ACCENT; acc.custom_minimum_size = Vector2(4, 30)
 	top.add_child(acc)
-	top.add_child(UI.lbl("SİLAH SEÇİMİ", 36, Color.WHITE, "RussoOne-Regular"))
+	top.add_child(UI.lbl("SİLAH SEÇİMİ", 28, Color.WHITE, "RussoOne-Regular"))
 	top.add_child(UI.spacer())
-	top.add_child(UI.lbl("[B] Kapat  •  Seçim anında kuşanılır ve sonraki doğuşta da kalır", 18, UI.DIM, "Rajdhani-SemiBold"))
+	for cat in [["ana", "ANA"], ["tabanca", "TABANCA"], ["bicak", "BIÇAK"]]:
+		var cur_id: String = player.slots.get(cat[0], "")
+		if cur_id == "" or not GS.WEAPONS.has(cur_id):
+			continue
+		var chip := PanelContainer.new()
+		var csb := UI.sb(Color(1, 1, 1, 0.04), Color(1, 1, 1, 0.08), 1, 6, 0)
+		csb.content_margin_left = 8; csb.content_margin_right = 10; csb.content_margin_top = 2; csb.content_margin_bottom = 2
+		chip.add_theme_stylebox_override("panel", csb)
+		var ch := UI.hbox(6)
+		chip.add_child(ch)
+		var ci := TextureRect.new()
+		ci.texture = _kf_icon(cur_id); ci.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ci.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED; ci.custom_minimum_size = Vector2(54, 22)
+		ch.add_child(ci)
+		var cv := UI.vbox(-4)
+		ch.add_child(cv)
+		cv.add_child(UI.lbl(cat[1], 11, UI.DIM, "Rajdhani-Bold"))
+		cv.add_child(UI.lbl(str(GS.WEAPONS[cur_id]["name"]), 15, Color.WHITE, "Rajdhani-Bold"))
+		top.add_child(chip)
+	var kb := UI.lbl("[B] KAPAT", 15, UI.DIM, "Rajdhani-Bold")
+	top.add_child(kb)
 	if mode == "gungame" or mode == "knife":
-		v.add_child(UI.lbl("Bu modda silah değiştirilemez.", 26, UI.RED, "Rajdhani-Bold"))
+		v.add_child(UI.lbl("Bu modda silah değiştirilemez.", 24, UI.RED, "Rajdhani-Bold"))
+		_ignore_unless_button(p)
 		return
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 14)
-	grid.add_theme_constant_override("v_separation", 14)
-	v.add_child(grid)
-	var groups: Array = BUY_GROUPS.duplicate(true)
+	var body := UI.hbox(14)
+	v.add_child(body)
+	var cols: Array = BUY_COLS.duplicate(true)
 	var extra: Array = []
 	for wid in GS.mod_weapon_model.keys():
 		extra.append(wid)
 	if extra.size() > 0:
-		groups.append(["EKLENTİ SİLAHLARI", extra])
-	for g in groups:
-		var col := UI.vbox(8)
-		col.custom_minimum_size = Vector2(370, 0)
-		grid.add_child(col)
-		col.add_child(UI.lbl(g[0], 20, UI.ACCENT2, "Rajdhani-Bold"))
-		for id in g[1]:
-			col.add_child(_buy_card(id, mode))
+		cols[4].append(["EKLENTİ", extra])
+	var first := ""
+	for col in cols:
+		var cv2 := UI.vbox(6)
+		cv2.custom_minimum_size = Vector2(196, 0)
+		body.add_child(cv2)
+		for g in col:
+			var hh := UI.hbox(6)
+			cv2.add_child(hh)
+			var dot := ColorRect.new(); dot.color = UI.ACCENT; dot.custom_minimum_size = Vector2(3, 14)
+			dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			hh.add_child(dot)
+			hh.add_child(UI.lbl(g[0], 14, UI.ACCENT2, "Rajdhani-Bold"))
+			for id in g[1]:
+				if not GS.WEAPONS.has(id):
+					continue
+				if first == "" or player.slots.get(GS.WEAPONS[id]["cat"], "") == id and GS.WEAPONS[id]["cat"] == "ana":
+					first = id
+				cv2.add_child(_buy_card(id, mode))
+	# detail pane
+	var dp := PanelContainer.new()
+	var dsb := UI.sb(Color(1, 1, 1, 0.03), Color(1, 1, 1, 0.07), 1, 10, 14)
+	dp.add_theme_stylebox_override("panel", dsb)
+	dp.custom_minimum_size = Vector2(320, 0)
+	body.add_child(dp)
+	_buy_detail = UI.vbox(8)
+	dp.add_child(_buy_detail)
+	if first != "":
+		_buy_show(first, mode)
+
+func _ignore_unless_button(n: Node) -> void:
+	pass
 
 func _buy_card(id: String, mode: String) -> Control:
 	var w: Dictionary = GS.WEAPONS[id]
@@ -1990,53 +2050,46 @@ func _buy_card(id: String, mode: String) -> Control:
 	var equipped: bool = player.slots.get(cat, "") == id
 	var b := Button.new()
 	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(370, 104)
+	b.custom_minimum_size = Vector2(196, 76)
 	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	var border := UI.ACCENT if equipped else Color(1, 1, 1, 0.08)
-	b.add_theme_stylebox_override("normal", UI.sb(Color(0.07, 0.085, 0.12, 0.95) if allowed else Color(0.05, 0.05, 0.06, 0.9), border, 2 if equipped else 1, 5, 8))
-	b.add_theme_stylebox_override("hover", UI.sb(Color(0.12, 0.1, 0.07, 0.98), UI.ACCENT2, 2, 5, 8))
-	b.add_theme_stylebox_override("pressed", UI.sb(Color(0.2, 0.12, 0.04, 1), Color.WHITE, 2, 5, 8))
-	var h := UI.hbox(10)
-	h.set_anchors_preset(Control.PRESET_FULL_RECT)
-	h.offset_left = 10; h.offset_right = -10; h.offset_top = 6; h.offset_bottom = -6
-	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.add_child(h)
-	var th := Thumbs.make_rect(id, GS.wskin(id), Vector2(150, 76))
-	if not allowed:
-		th.modulate = Color(0.4, 0.4, 0.45, 0.8)
-	h.add_child(th)
-	var info := UI.vbox(2)
-	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	h.add_child(info)
-	var nm := UI.lbl(w["name"], 22, Color.WHITE if allowed else UI.DIM, "Rajdhani-Bold")
-	info.add_child(nm)
-	var st := GS.stats_for(id)
-	if w.get("melee", false):
-		info.add_child(UI.lbl("Hasar %d" % int(st["dmg"]), 16, UI.DIM))
-	else:
-		var r1 := UI.hbox(6); r1.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		r1.add_child(UI.lbl("HSR", 14, UI.DIM, "Rajdhani-Bold"))
-		r1.add_child(UI.bar(float(st["dmg"]) * float(w.get("pellets", 1)), 140.0, UI.ACCENT, 6, 140))
-		info.add_child(r1)
-		var r2 := UI.hbox(6); r2.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		r2.add_child(UI.lbl("HIZ", 14, UI.DIM, "Rajdhani-Bold"))
-		r2.add_child(UI.bar(float(w["rpm"]), 950.0, Color("4fb3ff"), 6, 140))
-		info.add_child(r2)
+	var bg := Color(UI.ACCENT.r * 0.22, UI.ACCENT.g * 0.18, UI.ACCENT.b * 0.12, 0.95) if equipped else (Color(0.06, 0.07, 0.09, 0.92) if allowed else Color(0.04, 0.04, 0.05, 0.85))
+	b.add_theme_stylebox_override("normal", UI.sb(bg, UI.ACCENT if equipped else Color(1, 1, 1, 0.06), 2 if equipped else 1, 4, 0))
+	b.add_theme_stylebox_override("hover", UI.sb(Color(0.11, 0.12, 0.15, 0.98), UI.ACCENT2, 1, 4, 0))
+	b.add_theme_stylebox_override("pressed", UI.sb(Color(0.2, 0.12, 0.04, 1), Color.WHITE, 2, 4, 0))
+	var ic := TextureRect.new()
+	ic.texture = _kf_icon(id)
+	ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	ic.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ic.offset_left = 14; ic.offset_right = -14; ic.offset_top = 8; ic.offset_bottom = -24
+	ic.modulate = Color(1, 1, 1, 0.95) if allowed else Color(0.55, 0.57, 0.62, 0.45)
+	b.add_child(ic)
+	var nm := UI.lbl(str(w["name"]).to_upper(), 13, Color.WHITE if allowed else UI.DIM, "Rajdhani-Bold")
+	nm.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	nm.offset_left = 8; nm.offset_top = -21; nm.offset_bottom = -3
+	b.add_child(nm)
 	var tag := ""
 	var tc := UI.DIM
 	if equipped:
-		tag = "KUŞANILDI"; tc = UI.GREEN
+		tag = "✓"; tc = UI.GREEN
 	elif not owned:
-		tag = "🔒 MARKET  %s" % UI.money(int(w.get("price", 0))); tc = UI.GOLD
+		tag = "◆ %s" % UI.money(int(w.get("price", 0))); tc = UI.GOLD
 	elif not allowed:
-		tag = "BU MODDA YOK"; tc = UI.RED
-	else:
-		tag = "SEÇ"; tc = UI.ACCENT2
-	info.add_child(UI.lbl(tag, 16, tc, "Rajdhani-Bold"))
+		tag = "MODDA YOK"; tc = UI.RED
+	if tag != "":
+		var tl := UI.lbl(tag, 13, tc, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_RIGHT)
+		tl.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+		tl.offset_left = -110; tl.offset_right = -8; tl.offset_top = -21; tl.offset_bottom = -3
+		b.add_child(tl)
+	var wl := GS.wlvl(id)
+	if owned and wl > 0:
+		var bd := lvl_badge(wl, 11)
+		bd.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		bd.position = Vector2(-44, 5)
+		b.add_child(bd)
 	for c in b.find_children("*", "Control", true, false):
 		(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.mouse_entered.connect(func(): SFX.play("ui_hover", -14))
+	b.mouse_entered.connect(func(): SFX.play("ui_hover", -16); _buy_show(id, mode))
 	if allowed:
 		b.pressed.connect(func():
 			player.equip_from_menu(cat, id)
@@ -2045,3 +2098,57 @@ func _buy_card(id: String, mode: String) -> Control:
 	else:
 		b.pressed.connect(func(): SFX.play("fail", -6))
 	return b
+
+func _buy_show(id: String, mode: String) -> void:
+	if _buy_detail == null or not is_instance_valid(_buy_detail):
+		return
+	UI.clear(_buy_detail)
+	var w: Dictionary = GS.WEAPONS[id]
+	var st := GS.stats_for(id)
+	var owned: bool = GS.owned(id)
+	var th := Thumbs.make_rect(id, GS.wskin(id), Vector2(290, 130))
+	_buy_detail.add_child(th)
+	var nh := UI.hbox(8)
+	_buy_detail.add_child(nh)
+	nh.add_child(UI.lbl(str(w["name"]).to_upper(), 26, Color.WHITE, "RussoOne-Regular"))
+	var wl := GS.wlvl(id)
+	if owned and wl > 0:
+		var bd := lvl_badge(wl, 13)
+		bd.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		nh.add_child(bd)
+	var sk: String = GS.wskin(id)
+	var skn: String = str(GS.SKINS.get(sk, {}).get("name", "Standart")) if sk != "std" else "Standart"
+	_buy_detail.add_child(UI.lbl("%s  •  %s" % [str(w.get("cls", w["cat"])).to_upper(), skn], 14, UI.ACCENT2, "Rajdhani-Bold"))
+	var rows: Array = []
+	if w.get("melee", false):
+		rows = [["HASAR", float(st["dmg"]), 120.0, "%d" % int(st["dmg"])]]
+	else:
+		var dmg := float(st["dmg"]) * float(w.get("pellets", 1))
+		rows = [
+			["HASAR", dmg, 140.0, "%d" % int(dmg)],
+			["ATIŞ HIZI", float(w["rpm"]), 1200.0, "%d/dk" % int(w["rpm"])],
+			["İSABET", clampf(1.0 - float(st["spread"]) / 0.09, 0.0, 1.0) * 100.0, 100.0, ""],
+			["MENZİL", float(w.get("range", 100.0)), 450.0, "%d m" % int(w.get("range", 100.0))],
+			["HAREKET", float(w.get("speed", 1.0)) * 100.0, 115.0, "%d%%" % int(float(w.get("speed", 1.0)) * 100.0)],
+		]
+	for r in rows:
+		var rh := UI.hbox(8)
+		_buy_detail.add_child(rh)
+		var rl := UI.lbl(r[0], 13, UI.DIM, "Rajdhani-Bold")
+		rl.custom_minimum_size = Vector2(74, 0)
+		rh.add_child(rl)
+		var bar := UI.bar(r[1], r[2], UI.ACCENT, 6, 150)
+		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		bar.add_theme_stylebox_override("background", UI.sb(Color(1, 1, 1, 0.07), Color(0, 0, 0, 0), 0, 3, 0))
+		rh.add_child(bar)
+		rh.add_child(UI.lbl(r[3], 14, Color.WHITE, "Rajdhani-Bold"))
+	if not w.get("melee", false):
+		_buy_detail.add_child(UI.lbl("ŞARJÖR  %d / %d" % [int(st["mag"]), int(w.get("reserve", 0))], 15, Color.WHITE, "Rajdhani-Bold"))
+	var ab: String = str(GS.BALLISTICS.get(id, {}).get("ability", ""))
+	if ab != "":
+		var al := UI.lbl(ab, 14, Color(0.8, 0.85, 0.9), "Rajdhani-SemiBold")
+		al.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		al.custom_minimum_size = Vector2(290, 0)
+		_buy_detail.add_child(al)
+	var note := "Tıkla: kuşan (sonraki doğuşta da kalır)" if owned else "Marketten açılır: %s altın" % UI.money(int(w.get("price", 0)))
+	_buy_detail.add_child(UI.lbl(note, 13, UI.GREEN if owned else UI.GOLD, "Rajdhani-Bold"))

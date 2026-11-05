@@ -104,7 +104,7 @@ def choreograph(wid, rig, meta):
     parts = weapon_parts(wid)
     L0 = hand_state(rig, 'Left'); R0 = hand_state(rig, 'Right')
     lsh = F.bw(rig, 'LeftArm').translation.copy(); rsh = F.bw(rig, 'RightArm').translation.copy()
-    lpole = lsh + Vector((-0.6, 0.0, -0.7)); rpole = rsh + Vector((0.6, 0.0, -0.7))
+    lpole = lsh + Vector((-0.6, 0.0, -0.7)); rpole = rsh + (F.knife_pole(wid) if kind == 'knife' else Vector((0.6, 0.0, -0.7)))
     rh = F.weapon_points(wid).get('rhand', Vector())
     acts = {}
     acts['idle'] = make_action(rig, 'idle', 1.0, {})
@@ -242,7 +242,20 @@ def preview(rig, body, wid, acts):
             pass
         tts = [float(x) for x in os.environ.get('PTIMES', '0,0.13,0.33,0.46,0.79,0.9').split(',')]
         for view in os.environ.get('PVIEWS', 'eye,side').split(','):
-            if view == 'close':
+            if view == 'game':
+                # exactly the in-game viewmodel camera: vm_off = translate(hip) * rotation (Godot YXZ euler),
+                # camera = inverse of that, Godot (x, y, z) -> Blender (x, -z, y), vertical fov 56
+                kv = F.knife_view(wid) if F.KIND[wid] == 'knife' else ((0, 0, 0), hip)
+                rx, ry, rz = [float(x) for x in os.environ['KROT'].split(',')] if os.environ.get('KROT') else kv[0]
+                R = Matrix.Rotation(ry, 4, 'Y') @ Matrix.Rotation(rx, 4, 'X') @ Matrix.Rotation(rz, 4, 'Z')
+                hp = [float(x) for x in os.environ['KHIP'].split(',')] if os.environ.get('KHIP') else list(kv[1])
+                Tg = Matrix.Translation(Vector(hp)) @ R
+                Cm = Matrix(((1, 0, 0, 0), (0, 0, -1, 0), (0, 1, 0, 0), (0, 0, 0, 1)))
+                cam.matrix_world = Cm @ Tg.inverted()
+                cam.data.sensor_fit = 'VERTICAL'
+                cam.data.angle = math.radians(56)
+                sc.render.resolution_x = 1280; sc.render.resolution_y = 720
+            elif view == 'close':
                 cam.location = Vector((-hip[0], hip[2], -hip[1])) * 0.55
                 cam.rotation_euler = (Vector((0, 0.05, 0.02)) - cam.location).to_track_quat('-Z', 'Y').to_euler()
                 cam.data.angle = math.radians(30)

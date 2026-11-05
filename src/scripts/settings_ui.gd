@@ -129,6 +129,11 @@ func _build() -> void:
 			_section("EKRAN")
 			_check("fullscreen", "Tam Ekran")
 			_check("vsync", "Dikey Senkronizasyon (V-Sync)", "Yırtılmayı önler, gecikme ekler")
+			var llc := CheckButton.new()
+			llc.button_pressed = preload("res://scripts/gfx.gd").low_latency()
+			llc.focus_mode = Control.FOCUS_NONE
+			llc.toggled.connect(func(on): preload("res://scripts/gfx.gd").set_low_latency(on); SFX.play("ui_click", -8); _gfx_restart_dialog())
+			_row("Düşük Gecikme Modu", llc, "Fare ile ekran arası 1 kare daha az bekleme (Reflex benzeri) • yeniden başlatma ister")
 			_options("fps_cap", "FPS Sınırı", [[-1, "Otomatik (akıcı, önerilen)"], [0, "Sınırsız"], [60, "60"], [144, "144"], [165, "165"], [240, "240"]], "Otomatik: ekranın yenileme hızının hemen altı — takılmasız, düzgün kare akışı")
 			_slide("resolution_scale", "Çözünürlük Ölçeği", 0.5, 2.0, 0.05, "%.2fx", "1.0 üstü = süper örnekleme")
 			_options("upscaler", "Ölçekleyici", [["fsr2", "AMD FSR 2.2"], ["fsr", "FSR 1.0"]], "Ölçek < 1 iken kullanılır")
@@ -296,6 +301,7 @@ func _competitive() -> void:
 	GS.settings["glow"] = false
 	GS.settings["dyn_res"] = true
 	GS.settings["draw_distance"] = 0.8
+	GS.settings["vsync"] = false
 
 func _confirm_reset() -> void:
 	## two-step: first press arms, second press within 4 s resets (on the server for online accounts)
@@ -382,7 +388,7 @@ func _gfx_restart_dialog() -> void:
 	w.z_index = 50
 	var v := UI.vbox(12)
 	w.add_child(v)
-	v.add_child(UI.lbl("Grafik sürücüsü değişti", 26, UI.ACCENT2, "RussoOne-Regular"))
+	v.add_child(UI.lbl("Grafik ayarı değişti", 26, UI.ACCENT2, "RussoOne-Regular"))
 	v.add_child(UI.lbl("Değişiklik oyun yeniden başlayınca geçerli olur.", 18, UI.TEXT, "Rajdhani-Bold"))
 	var h := UI.hbox(10)
 	v.add_child(h)

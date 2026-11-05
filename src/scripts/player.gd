@@ -1132,8 +1132,11 @@ func set_vm_env(sky: Sky, sun_dir_basis: Basis, sun_color: Color, sun_energy: fl
 	vm_sun.set_meta("world_basis", sun_dir_basis)
 
 const GRIP := {"ak47": 20, "m4a1": 22, "mp5": 15, "p90": 0, "spas": 20, "awp": 10, "kar98": 10, "glock": 22, "deagle": 18}
+const KNIFE_VIEW := {"default": [Vector3(0.05, 0.25, -0.3), Vector3(0.16, -0.13, -0.36)],
+	"karambit": [Vector3(0.1, 0.6, -0.2), Vector3(0.17, -0.13, -0.37)],
+	"balta": [Vector3(0.15, -0.5, 0.2), Vector3(0.11, -0.11, -0.36)]}
 const HIP := {
-	"rifle": Vector3(0.14, -0.165, -0.36), "pistol": Vector3(0.13, -0.14, -0.4), "knife": Vector3(0.12, -0.135, -0.38), "frag": Vector3(0.16, -0.17, -0.34), "sniper": Vector3(0.14, -0.17, -0.33),
+	"rifle": Vector3(0.14, -0.165, -0.36), "pistol": Vector3(0.13, -0.14, -0.4), "knife": Vector3(0.16, -0.13, -0.36), "frag": Vector3(0.16, -0.17, -0.34), "sniper": Vector3(0.14, -0.17, -0.33),
 }
 
 func _vm_kind(id: String) -> String:
@@ -1504,7 +1507,7 @@ func _update_viewmodel(delta: float) -> void:
 	# soft background blur while inspecting (weapon stays sharp: it is in its own viewport)
 	if match_node and match_node.world_env and match_node.world_env.camera_attributes:
 		var ca: CameraAttributesPractical = match_node.world_env.camera_attributes
-		var want := 0.12 if inspect_t > 0.25 else 0.0
+		var want := 0.12 if inspect_t > 0.25 and str(GS.settings.get("quality", "high")) != "low" else 0.0
 		ca.dof_blur_amount = move_toward(ca.dof_blur_amount, want, delta * 0.5)
 		ca.dof_blur_far_enabled = ca.dof_blur_amount > 0.002
 		ca.dof_blur_far_distance = 4.0
@@ -1577,7 +1580,11 @@ func _update_viewmodel(delta: float) -> void:
 		pos += Vector3(0.05, 0.1, 0.16) * (1.0 - sw) + Vector3(-0.08, -0.05, -0.38) * sin(sw * PI * 0.5) - Vector3(0, 0.25, 0) * smoothstep(0.6, 1.0, tt)
 		rot += Vector3(0.75, -0.15, 0.2) * (1.0 - sw) + Vector3(-1.1, 0.25, -0.3) * sin(sw * PI * 0.5) * (1.0 - smoothstep(0.7, 1.0, tt))
 	if kind == "knife":
-		rot += Vector3(0.14, -0.12, 0.08)     # blade up toward the crosshair, CS-style ready grip
+		# CS:GO-style framing (blade up-left, knuckles to the camera, free left hand low on the left);
+		# must match tools/fp_hands.py KNIFE_VIEW, the arms are baked for exactly this view
+		var kv: Array = KNIFE_VIEW.get(cur, KNIFE_VIEW["default"])
+		rot += kv[0]
+		pos += kv[1] - HIP["knife"]
 	vm_off.position = vm_off.position.lerp(pos, min(delta * 30.0, 1.0))
 	vm_off.rotation = vm_off.rotation.lerp(rot, min(delta * 25.0, 1.0))
 	if vm_off.rotation.z > PI and inspect_t <= 0:
@@ -1585,6 +1592,11 @@ func _update_viewmodel(delta: float) -> void:
 	# hide for scope
 	var scoped: bool = wdata.get("scope", false) and ads_k > 0.92
 	vm_off.visible = not scoped
+	# the weapon is a whole second 3D render pass: skip it entirely while scoped in or dead
+	var vm_need := not scoped and alive
+	if vm_rect and vm_rect.visible != vm_need:
+		vm_rect.visible = vm_need
+		vm_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if vm_need else SubViewport.UPDATE_DISABLED
 	# shells physics
 	for s in shells.duplicate():
 		s["t"] += delta

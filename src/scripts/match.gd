@@ -1647,6 +1647,11 @@ func test_hook(i: int) -> void:
 			player._melee(i == 41)
 			player.test_freeze_kind = "melee"
 		player.test_freeze = fr
+	elif i == 46:
+		hud.toggle_buy(true)
+	elif i == 47:
+		hud.toggle_buy(false)
+		hud.show_pause(true)
 	elif i == 45:
 		# death card check
 		hud.show_death("GeceKurdu", "m4a1", true, {"team": "b", "lvl": 37, "wlvl": 5, "self": false, "dmg": 100, "hits": 3, "heads": 1, "my_dmg": 64, "dist": 23.4, "hp": 36.0})

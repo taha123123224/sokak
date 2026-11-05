@@ -26,6 +26,7 @@ static func driver() -> String:
 
 ## write the override file. mode: auto (= vulkan unless auto-switched), vulkan, d3d12, gl
 static func write(mode_: String, auto_pick: String = "") -> void:
+	var low := low_latency()
 	var c := ConfigFile.new()
 	var eff := auto_pick if mode_ == "auto" and auto_pick != "" else mode_
 	c.set_value("sokak", "mode", mode_)
@@ -38,7 +39,20 @@ static func write(mode_: String, auto_pick: String = "") -> void:
 		c.set_value("rendering", "renderer/rendering_method", "gl_compatibility")
 	elif eff == "mobile":
 		c.set_value("rendering", "renderer/rendering_method", "mobile")
+	c.set_value("sokak", "low_latency", low)
+	if low:
+		# 2 swapchain images instead of 3: one frame less between the mouse and the screen (like Reflex "On")
+		c.set_value("rendering", "rendering_device/vsync/swapchain_image_count", 2)
 	c.save(CFG)
+
+static func low_latency() -> bool:
+	return bool(load_cfg().get_value("sokak", "low_latency", false))
+
+static func set_low_latency(on: bool) -> void:
+	var c := load_cfg()
+	c.set_value("sokak", "low_latency", on)
+	c.save(CFG)
+	write(mode(), str(load_cfg().get_value("sokak", "auto_pick", "")))
 
 static func restart() -> void:
 	OS.set_restart_on_exit(true, OS.get_cmdline_args())
