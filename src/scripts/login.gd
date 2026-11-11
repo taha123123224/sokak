@@ -90,7 +90,22 @@ func _ready() -> void:
 	_build_ui()
 	SFX.play_music("music_menu")
 
+var bg_still: TextureRect
 func _build_world() -> void:
+	# CS2-style: a sunlit street still (same art as the lobby) with a slow drift instead of loading a whole map
+	for p in ["res://assets/ui/lobby_bg_1.jpg", "res://assets/ui/lobby_bg_0.jpg"]:
+		if ResourceLoader.exists(p):
+			var cl := CanvasLayer.new()
+			cl.layer = -1
+			add_child(cl)
+			bg_still = TextureRect.new()
+			bg_still.texture = load(p)
+			bg_still.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			bg_still.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+			bg_still.set_anchors_preset(Control.PRESET_FULL_RECT)
+			bg_still.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			cl.add_child(bg_still)
+			return
 	var we := WorldEnvironment.new()
 	var e := Environment.new()
 	var sky := Sky.new()
@@ -143,6 +158,21 @@ func _build_world() -> void:
 
 func _process(delta: float) -> void:
 	t += delta
+	if bg_still:
+		var vs := get_viewport().get_visible_rect().size
+		var k := 1.06 + sin(t * 0.05) * 0.03
+		bg_still.size = vs * k
+		bg_still.position = -(vs * (k - 1.0)) * Vector2(0.5 + sin(t * 0.031) * 0.35, 0.5)
+		bg_still.pivot_offset = Vector2.ZERO
+	if bg_still:
+		if logo:
+			var k2 := 1.0 + sin(t * 1.6) * 0.012
+			logo.scale = Vector2(k2, k2)
+		if ticker:
+			ticker.position.x -= delta * 70.0
+			if ticker.position.x < -ticker.size.x:
+				ticker.position.x = get_viewport().get_visible_rect().size.x
+		return
 	# slow cinematic orbit around the ship at sunset
 	var a := t * 0.045 + 0.6
 	var r := 95.0 + sin(t * 0.07) * 12.0
@@ -183,7 +213,7 @@ func _build_ui() -> void:
 	var side := TextureRect.new()
 	var st := GradientTexture2D.new()
 	var sg := Gradient.new()
-	sg.set_color(0, Color(0.01, 0.015, 0.03, 0.0)); sg.set_color(1, Color(0.01, 0.015, 0.03, 0.88))
+	sg.set_color(0, Color(0.02, 0.022, 0.026, 0.0)); sg.set_color(1, Color(0.02, 0.022, 0.026, 0.82))
 	st.gradient = sg; st.fill_from = Vector2(0.45, 0); st.fill_to = Vector2(1, 0)
 	side.texture = st
 	side.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -215,7 +245,7 @@ func _build_ui() -> void:
 	ui.add_child(tag)
 	# ---------------- account card (right): glass panel, segmented tabs, icon fields, saved-account profile card
 	card = PanelContainer.new()
-	var csb := UI.sb(Color(0.025, 0.03, 0.045, 0.86), Color(1, 1, 1, 0.09), 1, 16, 34)
+	var csb := UI.sb(Color(0.045, 0.05, 0.058, 0.8), Color(1, 1, 1, 0.1), 1, 8, 34)
 	csb.shadow_color = Color(0, 0, 0, 0.55); csb.shadow_size = 30
 	card.add_theme_stylebox_override("panel", csb)
 	card.anchor_left = 1; card.anchor_right = 1; card.anchor_top = 0.5; card.anchor_bottom = 0.5
@@ -397,7 +427,7 @@ func _build_ui() -> void:
 	clip.offset_top = -40; clip.offset_left = 150; clip.offset_right = -260
 	ui.add_child(clip)
 	ui.add_child(bp)
-	ticker = UI.lbl("YENİ v2.9.3: AKM, M4 Karabina, USP .45, Kartal .44 Toplu   •   Osmanlı Hançeri, Kasap Bıçağı, Taktik Balta   •   Yeni M4A1 modeli   •   Yeni yükseltme efekti ve öldürmelerde +seviye rozeti   •   Sabotaj modu online!", 19, Color(1, 1, 1, 0.9), "Rajdhani-SemiBold")
+	ticker = UI.lbl("YENİ v2.9.8: CS2 tarzı lobi ve grafik   •   Önceden hesaplanmış gölgeler ve yansımalar   •   4 tuşu: hacimsel SİS BOMBASI   •   Gerçek animasyonlu M4A1 ve AWM   •   CS:GO tarzı bıçak duruşu   •   Yeni B silah menüsü", 19, Color(1, 1, 1, 0.9), "Rajdhani-SemiBold")
 	ticker.position = Vector2(1400, 8)
 	clip.add_child(ticker)
 	var ver := UI.lbl("SOKAK: Operasyon  v%s   " % Updater.VERSION, 16, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_RIGHT)
@@ -413,8 +443,8 @@ func _field(t: String, secret: bool) -> LineEdit:
 	e.custom_minimum_size = Vector2(0, 52)
 	e.add_theme_font_override("font", UI.font("Rajdhani-Bold"))
 	e.add_theme_font_size_override("font_size", 24)
-	e.add_theme_stylebox_override("normal", UI.sb(Color(0.08, 0.1, 0.14, 1), Color(1, 1, 1, 0.12), 1, 6, 14))
-	e.add_theme_stylebox_override("focus", UI.sb(Color(0.1, 0.12, 0.17, 1), UI.ACCENT, 2, 6, 14))
+	e.add_theme_stylebox_override("normal", UI.sb(Color(0.1, 0.105, 0.115, 1), Color(1, 1, 1, 0.12), 1, 4, 14))
+	e.add_theme_stylebox_override("focus", UI.sb(Color(0.13, 0.135, 0.15, 1), UI.ACCENT, 2, 4, 14))
 	return e
 
 func _icon_field(icon: String, label: String, t: String, secret: bool) -> Array:
@@ -422,9 +452,9 @@ func _icon_field(icon: String, label: String, t: String, secret: bool) -> Array:
 	var box := UI.vbox(4)
 	box.add_child(UI.lbl(label, 13, UI.DIM, "Rajdhani-Bold"))
 	var fr := PanelContainer.new()
-	var nsb := UI.sb(Color(0.07, 0.085, 0.12, 1), Color(1, 1, 1, 0.1), 1, 10, 0)
+	var nsb := UI.sb(Color(0.09, 0.095, 0.105, 1), Color(1, 1, 1, 0.1), 1, 4, 0)
 	nsb.content_margin_left = 14; nsb.content_margin_right = 8
-	var fsb := UI.sb(Color(0.085, 0.1, 0.14, 1), UI.ACCENT, 2, 10, 0)
+	var fsb := UI.sb(Color(0.115, 0.12, 0.13, 1), UI.ACCENT, 2, 4, 0)
 	fsb.content_margin_left = 14; fsb.content_margin_right = 8
 	fsb.shadow_color = Color(1, 0.55, 0.12, 0.25); fsb.shadow_size = 8
 	fr.add_theme_stylebox_override("panel", nsb)

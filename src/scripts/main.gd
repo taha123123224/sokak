@@ -50,6 +50,10 @@ func _test(args: Dictionary) -> void:
 		GS.settings["ssil"] = false
 	if args.has("nofog"):
 		GS.set_meta("nofog", true)
+	if args.has("nonav"):
+		GS.set_meta("nonav", true)
+	if args.has("noao"):
+		GS.set_meta("noao", true)
 	if args.has("quality"):
 		GS.apply_preset(args["quality"])
 	if true:

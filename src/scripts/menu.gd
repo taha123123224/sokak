@@ -153,22 +153,24 @@ func _ready() -> void:
 	ui.theme = main.theme
 	ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cl.add_child(ui)
-	# gradient overlays for readability
-	var grad := TextureRect.new()
-	var gt := GradientTexture2D.new()
-	var g := Gradient.new()
-	g.set_color(0, Color(0.01, 0.015, 0.025, 0.92)); g.set_color(1, Color(0.01, 0.015, 0.025, 0.0))
-	g.add_point(0.35, Color(0.01, 0.015, 0.025, 0.55))
-	gt.gradient = g; gt.fill_from = Vector2(0, 0); gt.fill_to = Vector2(1, 0)
-	grad.texture = gt
-	grad.set_anchors_preset(Control.PRESET_FULL_RECT)
-	grad.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	grad.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ui.add_child(grad)
+	# soft vignette (edges a touch darker so the panels read on the bright street, centre stays clean)
+	var vig := TextureRect.new()
+	var vt := GradientTexture2D.new()
+	var vg := Gradient.new()
+	vg.set_color(0, Color(0, 0, 0, 0.0)); vg.set_color(1, Color(0.01, 0.012, 0.018, 0.5))
+	vg.add_point(0.55, Color(0, 0, 0, 0.0))
+	vt.gradient = vg; vt.fill = GradientTexture2D.FILL_RADIAL
+	vt.fill_from = Vector2(0.5, 0.45); vt.fill_to = Vector2(1.05, 1.05)
+	vig.texture = vt
+	vig.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vig.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	vig.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(vig)
 	_build_topbar()
 	content = Control.new()
 	content.set_anchors_preset(Control.PRESET_FULL_RECT)
-	content.offset_top = 96
+	content.offset_top = 76
+	content.offset_right = -72      # friends rail
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(content)
 	GS.profile_changed.connect(_refresh_currency)
@@ -268,97 +270,133 @@ void fragment() {
 	fill.position = Vector3(0.6, 3.0, -4.5); fill.light_color = UI.ACCENT; fill.light_energy = 1.2; fill.omni_range = 9.0
 	if not dbg.contains("nolight"): setn.add_child(fill)
 
+## CS2-style lobby: the soldier stands on a sunlit street of one of our maps. The street is a high-quality still
+## (rendered offline from the map at ultra, tools: mapshot) drawn as the 3D background; a shadow-catcher floor
+## lets the soldier cast a real shadow onto it. Costs a fraction of loading the map itself.
+const LOBBY_BGS := ["res://assets/ui/lobby_bg_0.jpg", "res://assets/ui/lobby_bg_1.jpg", "res://assets/ui/lobby_bg_2.jpg"]
+const LOBBY_CAM := Vector3(0.5, 1.22, 3.3)
+const LOBBY_LOOK := Vector3(0.5, 0.97, 0.0)
+var bg_rect: TextureRect
+var pedestal: Array = []
+var lobby_bg := ""
+
+func _build_backdrop() -> bool:
+	var avail: Array = LOBBY_BGS.filter(func(p): return ResourceLoader.exists(p))
+	if OS.get_environment("SETDBG") != "" or avail.is_empty():
+		return false
+	# a different street each day
+	lobby_bg = avail[int(Time.get_unix_time_from_system() / 86400.0) % avail.size()]
+	if OS.get_environment("LOBBYBG") != "":
+		lobby_bg = avail[clampi(int(OS.get_environment("LOBBYBG")), 0, avail.size() - 1)]
+	var cl := CanvasLayer.new()
+	cl.layer = -1
+	add_child(cl)
+	bg_rect = TextureRect.new()
+	bg_rect.texture = load(lobby_bg)
+	bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	bg_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg_rect.offset_left = -24; bg_rect.offset_right = 24; bg_rect.offset_top = -14; bg_rect.offset_bottom = 14
+	bg_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cl.add_child(bg_rect)
+	# shadow catcher: invisible ground that only shows the soldier's shadow (+ a soft contact shadow)
+	var g := MeshInstance3D.new()
+	var pm := PlaneMesh.new(); pm.size = Vector2(14, 14)
+	g.mesh = pm
+	var sh := Shader.new()
+	sh.code = """shader_type spatial;
+render_mode shadow_to_opacity, cull_disabled, depth_draw_never;
+uniform vec3 c = vec3(0.5, 0.0, 0.0);
+varying vec3 wp;
+void vertex() { wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+void fragment() {
+	ALBEDO = vec3(0.0);
+	float d = length((wp.xz - c.xz) * vec2(1.0, 1.6));
+	ALPHA = 0.42 * exp(-d * d * 7.0);
+}"""
+	var gm := ShaderMaterial.new(); gm.shader = sh
+	g.material_override = gm
+	g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	g.position = Vector3(0, 0.002, 0)
+	world.add_child(g)
+	return true
+
 func _build_world() -> void:
 	world = Node3D.new()
 	add_child(world)
 	var we := WorldEnvironment.new()
 	var e := Environment.new()
-	# golden-hour sky over Safranbolu: the lobby stands on a real terrace of the map
 	var sky := Sky.new()
 	var sm := ProceduralSkyMaterial.new()
-	sm.sky_top_color = Color("2f6fc8")
-	sm.sky_horizon_color = Color("f4c08c")
-	sm.ground_horizon_color = Color("f4c08c")
-	sm.ground_bottom_color = Color(0.3, 0.27, 0.24)
-	sm.sun_angle_max = 28
-	sm.sky_energy_multiplier = 1.2
-	if ResourceLoader.exists("res://assets/tex/clouds.png"):
-		sm.sky_cover = load("res://assets/tex/clouds.png")
-		sm.sky_cover_modulate = Color(1, 0.92, 0.85, 0.9)
+	sm.sky_top_color = Color("4a7bb7")
+	sm.sky_horizon_color = Color("d9d2c4")
+	sm.ground_horizon_color = Color("d9d2c4")
+	sm.ground_bottom_color = Color(0.45, 0.42, 0.38)
+	sm.sun_angle_max = 20
 	sky.sky_material = sm
-	e.background_mode = Environment.BG_COLOR
-	e.background_color = Color(0.02, 0.022, 0.03)
+	var qi: int = ["low", "medium", "high", "ultra", "uhd"].find(str(GS.settings.get("quality", "high")))
 	e.sky = sky
-	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	e.ambient_light_color = Color(0.55, 0.58, 0.66)
-	e.ambient_light_energy = 0.7
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	e.ambient_light_sky_contribution = 0.75
+	e.ambient_light_color = Color(0.72, 0.72, 0.74)
+	e.ambient_light_energy = 0.9
 	e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	e.tonemap_mode = Environment.TONE_MAPPER_ACES
 	e.tonemap_exposure = 1.0
 	e.tonemap_white = 6.0
 	e.glow_enabled = true
-	e.glow_intensity = 0.6; e.glow_bloom = 0.05; e.glow_hdr_threshold = 1.1
-	var qi: int = ["low", "medium", "high", "ultra", "uhd"].find(str(GS.settings.get("quality", "high")))
-	e.ssr_enabled = bool(GS.settings["ssr"]) and qi >= 3
+	e.glow_intensity = 0.35; e.glow_bloom = 0.02; e.glow_hdr_threshold = 1.3
 	e.ssao_enabled = qi >= 1
-	e.ssao_intensity = 1.2
+	e.ssao_intensity = 1.4; e.ssao_radius = 0.6
 	e.adjustment_enabled = true
-	e.adjustment_saturation = 1.18
-	e.adjustment_contrast = 1.05
-	e.fog_enabled = true
-	e.fog_mode = Environment.FOG_MODE_DEPTH
-	e.fog_depth_begin = 6.0
-	e.fog_depth_end = 30.0
-	e.fog_light_color = Color(0.03, 0.035, 0.045)
-	e.fog_density = 0.5
-	e.volumetric_fog_enabled = bool(GS.settings["volumetric"]) and qi >= 3
-	e.volumetric_fog_density = 0.006
-	e.volumetric_fog_albedo = Color(1.0, 0.9, 0.8)
-	e.volumetric_fog_anisotropy = 0.75
+	e.adjustment_saturation = 1.02
+	e.adjustment_contrast = 1.04
 	we.environment = e
 	world.add_child(we)
+	var street := _build_backdrop()
+	if street:
+		e.background_mode = Environment.BG_CANVAS
+		e.background_canvas_max_layer = -1
+	else:
+		e.background_mode = Environment.BG_COLOR
+		e.background_color = Color(0.02, 0.022, 0.03)
+		e.fog_enabled = true
+		e.fog_mode = Environment.FOG_MODE_DEPTH
+		e.fog_depth_begin = 6.0; e.fog_depth_end = 30.0
+		e.fog_light_color = Color(0.03, 0.035, 0.045)
+		_build_lobby_set()
+	# warm midday sun from behind-left (matches the street stills), sharp shadow on the ground
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-24, 150, 0)
-	sun.light_color = Color(1.0, 0.82, 0.6)
-	sun.light_energy = 1.3
+	# same sun as the map the still was rendered in, turned by the still's camera heading
+	var bi := LOBBY_BGS.find(lobby_bg)
+	sun.rotation_degrees = Vector3(-52, [35.0, 215.0, 215.0][bi] if bi >= 0 else -35.0, 0)
+	sun.light_color = Color(1.0, 0.93, 0.82)
+	sun.light_energy = 2.2
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 60.0
-	sun.light_angular_distance = 0.6
+	sun.shadow_opacity = 0.85
+	sun.directional_shadow_max_distance = 20.0
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	sun.light_angular_distance = 0.8
 	world.add_child(sun)
-	_build_lobby_set()
-	# lights
+	# soft front fill so the face/vest read (no colored rim lights: natural daylight like CS2)
 	var key := SpotLight3D.new()
-	key.position = Vector3(2.5, 5.5, 3.5)
-	key.look_at_from_position(key.position, Vector3(0.5, 1, 0))
-	key.light_energy = 6; key.spot_range = 14; key.spot_angle = 30
-	key.light_color = Color(1, 0.95, 0.88)
-	key.shadow_enabled = qi >= 2
-	key.light_volumetric_fog_energy = 1.5
+	key.position = Vector3(2.0, 2.6, 4.2)
+	key.look_at_from_position(key.position, Vector3(0.5, 1.1, 0))
+	key.light_energy = 2.2; key.spot_range = 10; key.spot_angle = 34
+	key.light_color = Color(1, 0.97, 0.92)
+	key.shadow_enabled = false
 	world.add_child(key)
 	rim = SpotLight3D.new()
-	rim.position = Vector3(-3, 3.5, -2.5)
-	rim.look_at_from_position(rim.position, Vector3(0, 1.2, 0))
-	rim.light_energy = 9; rim.spot_range = 12; rim.spot_angle = 35
-	rim.light_color = UI.ACCENT
-	rim.light_volumetric_fog_energy = 2.0
+	rim.position = Vector3(-2.5, 2.8, -2.0)
+	rim.look_at_from_position(rim.position, Vector3(0.5, 1.3, 0))
+	rim.light_energy = 2.5; rim.spot_range = 9; rim.spot_angle = 35
+	rim.light_color = Color(1.0, 0.92, 0.8)
+	rim.shadow_enabled = false
 	world.add_child(rim)
-	var rim2 := SpotLight3D.new()
-	rim2.position = Vector3(4, 3, -2)
-	rim2.look_at_from_position(rim2.position, Vector3(1.5, 1.2, 0))
-	rim2.light_energy = 6; rim2.spot_range = 12; rim2.spot_angle = 35
-	rim2.light_color = Color(0.3, 0.55, 1.0)
-	world.add_child(rim2)
-	# soldier
-	var sps: PackedScene = GS.char_scene(GS.cur_char())
-	soldier = sps.instantiate()
-	MatLib.apply(soldier)
-	soldier.position = Vector3(-0.5, 0, 0)
-	soldier.rotation.y = deg_to_rad(18)
-	world.add_child(soldier)
-	var ap := soldier.find_child("AnimationPlayer", true, false) as AnimationPlayer
-	if ap and ap.has_animation("Idle"):
-		ap.get_animation("Idle").loop_mode = Animation.LOOP_LINEAR
-		ap.play("Idle")
+	cam_target = LOBBY_CAM
+	cam_look = LOBBY_LOOK
+	# soldier, holding the active set's main weapon at low ready
+	soldier = _make_soldier(GS.cur_char())
 	# weapon pedestal
 	var ped := MeshInstance3D.new()
 	var cm := CylinderMesh.new(); cm.top_radius = 0.42; cm.bottom_radius = 0.46; cm.height = 0.85
@@ -368,6 +406,7 @@ func _build_world() -> void:
 	ped.material_override = pmat
 	ped.position = Vector3(1.6, 0.425, -0.4)
 	world.add_child(ped)
+	pedestal.append(ped)
 	var ring := MeshInstance3D.new()
 	var tm := TorusMesh.new(); tm.inner_radius = 0.41; tm.outer_radius = 0.44
 	ring.mesh = tm
@@ -376,6 +415,7 @@ func _build_world() -> void:
 	ring.material_override = rmat
 	ring.position = Vector3(1.6, 0.86, -0.4)
 	world.add_child(ring)
+	pedestal.append(ring)
 	show_pivot = Node3D.new()
 	show_pivot.position = Vector3(1.6, 1.3, -0.4)
 	world.add_child(show_pivot)
@@ -543,8 +583,14 @@ func _process(delta: float) -> void:
 		show_pivot.rotate_y(delta * spin_speed)
 		show_pivot.rotation.x = lerp(show_pivot.rotation.x, 0.0, min(delta * 6.0, 1.0))
 	var mp := get_viewport().get_mouse_position() / get_viewport().get_visible_rect().size - Vector2(0.5, 0.5)
-	cam.position = cam.position.lerp(cam_target + Vector3(mp.x * 0.25, -mp.y * 0.15, 0), min(delta * 3.0, 1.0))
+	var lobby_view := cam_target == LOBBY_CAM
+	var amt := 0.05 if lobby_view and bg_rect else 0.25
+	cam.position = cam.position.lerp(cam_target + Vector3(mp.x * amt, -mp.y * amt * 0.6, 0), min(delta * 3.0, 1.0))
 	cam.look_at(cam_look)
+	if bg_rect:
+		# the street drifts a little against the soldier: cheap depth
+		bg_rect.position = bg_rect.position.lerp(Vector2(-24, -14) - mp * Vector2(30, 16), min(delta * 3.0, 1.0))
+	_pose_soldier(delta)
 	_process_thumbs()
 	online.tick(delta)
 	if room_countdown > 0:
@@ -602,104 +648,247 @@ func thumb_rect(id: String, skin: String, size: Vector2) -> TextureRect:
 	return Thumbs.make_rect(id, skin, size)
 
 # ================================================================ top bar
+## CS2-style top bar: a soft dark gradient (no hard box) with icon buttons on the left, the page tabs centred
+## with the LOBİ tab in the middle, and currencies + level on the right; friends live in a slim rail on the right edge.
+const NAV_L := [["bag", "ÇANTA"], ["market", "MARKET"], ["crate", "KASA"]]
+const NAV_R := [["rooms", "ODALAR"], ["leader", "SIRALAMA"], ["mods", "EKLENTİLER"]]
+var friends_rail: VBoxContainer
+
 func _build_topbar() -> void:
-	var bar := PanelContainer.new()
-	bar.add_theme_stylebox_override("panel", UI.sb(Color(0.02, 0.025, 0.04, 0.94), Color(0, 0, 0, 0), 0, 0, 0))
+	var bar := Control.new()
 	bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	bar.custom_minimum_size = Vector2(0, 86)
+	bar.custom_minimum_size = Vector2(0, 72)
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(bar)
-	var line := TopGlow.new()
-	line.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	line.position.y = 85
-	line.custom_minimum_size = Vector2(0, 4)
-	line.size = Vector2(4000, 4)
-	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ui.add_child(line)
-	topbar = UI.hbox(4)
-	topbar.alignment = BoxContainer.ALIGNMENT_BEGIN
-	var m := MarginContainer.new()
-	m.add_theme_constant_override("margin_left", 22); m.add_theme_constant_override("margin_right", 84)
-	bar.add_child(m)
-	m.add_child(topbar)
-	var logo := TextureRect.new()
-	logo.texture = load("res://assets/ui/logo_bar.png")
-	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	logo.custom_minimum_size = Vector2(170, 64)
-	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	topbar.add_child(logo)
-	topbar.add_child(UI.spacer(false, 6))
-	mode_chip = UI.btn("", func(): show_page("mode"), 15, false, 0, 40)
+	var bg := TextureRect.new()
+	var gt := GradientTexture2D.new()
+	var g := Gradient.new()
+	g.set_color(0, Color(0.02, 0.025, 0.03, 0.88)); g.set_color(1, Color(0.02, 0.025, 0.03, 0.0))
+	g.add_point(0.6, Color(0.02, 0.025, 0.03, 0.62))
+	gt.gradient = g; gt.fill_from = Vector2(0, 0); gt.fill_to = Vector2(0, 1); gt.width = 4; gt.height = 64
+	bg.texture = gt
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_SCALE
+	bg.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	bg.offset_bottom = 104
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(bg)
+	# left: icons
+	var lh := UI.hbox(2)
+	lh.position = Vector2(18, 12)
+	bar.add_child(lh)
+	var home := NavIcon.make("home", "Lobi", func(): show_page("lobby"))
+	nav_btns["lobby_icon"] = home
+	lh.add_child(home)
+	lh.add_child(NavIcon.make("gear", "Ayarlar", func(): show_page("settings")))
+	lh.add_child(NavIcon.make("user", "Profil", func(): show_page("profile")))
+	if Online.is_admin:
+		lh.add_child(NavIcon.make("shield", "Yönetim", func(): show_page("admin")))
+	lh.add_child(NavIcon.make("power", "Oyundan çık", func(): _confirm_quit()))
+	lh.add_child(UI.spacer(false, 10))
+	mode_chip = UI.btn("", func(): show_page("mode"), 14, false, 0, 34)
 	mode_chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	mode_chip.tooltip_text = "Oyun modunu değiştir"
-	topbar.add_child(mode_chip)
-	topbar.add_child(UI.spacer(false, 8))
-	for it in [["lobby", "LOBİ"], ["rooms", "ODALAR"], ["friends", "ARKADAŞLAR"], ["leader", "SIRALAMA"], ["bag", "ÇANTA"], ["market", "MARKET"], ["crate", "KASA"], ["mods", "EKLENTİLER"], ["profile", "PROFİL"], ["settings", "AYARLAR"]]:
-		var b := UI.btn(it[1], func(): show_page(it[0]), 16, false, 0, 86)
-		for st in ["normal", "hover", "pressed"]:
-			var sbx := UI.sb(Color(1, 1, 1, 0.05) if st == "hover" else Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0, 0, 0)
-			sbx.content_margin_left = 9; sbx.content_margin_right = 9
+	for st in ["normal", "hover", "pressed"]:
+		var ms := UI.sb(Color(1, 1, 1, 0.1 if st == "hover" else 0.05), Color(1, 1, 1, 0.16 if st == "normal" else 0.3), 1, 4, 0)
+		ms.content_margin_left = 12; ms.content_margin_right = 12
+		mode_chip.add_theme_stylebox_override(st, ms)
+	lh.add_child(mode_chip)
+	# centre: tabs (lobby in the middle, bigger)
+	topbar = UI.hbox(0)
+	topbar.alignment = BoxContainer.ALIGNMENT_CENTER
+	topbar.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	topbar.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	topbar.offset_top = 6
+	bar.add_child(topbar)
+	var items: Array = NAV_L + [["lobby", "LOBİ"]] + NAV_R
+	for i in items.size():
+		var it: Array = items[i]
+		if i > 0:
+			var sep := ColorRect.new()
+			sep.color = Color(1, 1, 1, 0.18)
+			sep.custom_minimum_size = Vector2(1, 18)
+			sep.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			topbar.add_child(sep)
+		var big: bool = it[0] == "lobby"
+		var b := UI.btn(it[1], func(): show_page(it[0]), 30 if big else 19, false, 0, 56)
+		b.add_theme_font_override("font", UI.font("Teko" if big else "Rajdhani-SemiBold"))
+		for st in ["normal", "hover", "pressed", "focus"]:
+			var sbx := UI.sb(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0, 0, 0)
+			sbx.content_margin_left = 22 if big else 13; sbx.content_margin_right = sbx.content_margin_left
 			b.add_theme_stylebox_override(st, sbx)
+		b.add_theme_color_override("font_color", Color(1, 1, 1, 0.72))
+		b.add_theme_color_override("font_hover_color", Color.WHITE)
+		b.add_theme_constant_override("outline_size", 0)
 		nav_btns[it[0]] = b
 		topbar.add_child(b)
-	if Online.is_admin:
-		var ab := UI.btn("◆ YÖNETİM", func(): show_page("admin"), 16, false, 0, 86)
-		for st in ["normal", "hover", "pressed"]:
-			var sbx2 := UI.sb(Color(0.4, 0.05, 0.1, 0.35) if st != "hover" else Color(0.55, 0.08, 0.14, 0.5), Color(0, 0, 0, 0), 0, 0, 0)
-			sbx2.content_margin_left = 9; sbx2.content_margin_right = 9
-			ab.add_theme_stylebox_override(st, sbx2)
-		ab.add_theme_color_override("font_color", Color("ff7a8a"))
-		nav_btns["admin"] = ab
-		topbar.add_child(ab)
-	topbar.add_child(UI.spacer())
-	var rinf: Dictionary = GS.rank_info(int(GS.profile.get("rp", 0)))
-	var rbadge := TextureRect.new()
-	rbadge.texture = rinf["icon"]; rbadge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	rbadge.custom_minimum_size = Vector2(52, 52); rbadge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	rbadge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	rbadge.tooltip_text = "%s  •  %d RP" % [rinf["name"], int(rinf["rp"])]
-	rbadge.mouse_filter = Control.MOUSE_FILTER_PASS
-	rbadge.gui_input.connect(func(ev): if ev is InputEventMouseButton and ev.pressed: show_page("profile"))
-	topbar.add_child(rbadge)
+	# keep the friends page reachable from code paths that style nav_btns["friends"] (badge)
+	# right: rank + level + currencies
 	cur_box = UI.hbox(8)
 	cur_box.alignment = BoxContainer.ALIGNMENT_END
-	topbar.add_child(cur_box)
-	# quit button lives outside the bar's flow, pinned to the top-right corner: it can never be pushed off-screen
-	var q := Button.new()
-	q.text = "⏻"
-	q.focus_mode = Control.FOCUS_NONE
-	q.tooltip_text = "Oyundan çık"
-	q.add_theme_font_size_override("font_size", 24)
-	q.add_theme_stylebox_override("normal", UI.sb(Color(0.35, 0.05, 0.07, 0.55), Color(1, 0.3, 0.3, 0.5), 1, 8, 0))
-	q.add_theme_stylebox_override("hover", UI.sb(Color(0.7, 0.1, 0.12, 0.9), Color(1, 0.5, 0.5, 0.9), 1, 8, 0))
-	q.add_theme_stylebox_override("pressed", UI.sb(Color(0.9, 0.15, 0.15, 1), Color.WHITE, 1, 8, 0))
-	q.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	q.offset_left = -66; q.offset_right = -14; q.offset_top = 17; q.offset_bottom = 69
-	q.pressed.connect(func(): _confirm_quit())
-	ui.add_child(q)
+	cur_box.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	cur_box.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	cur_box.offset_right = -92; cur_box.offset_top = 10
+	bar.add_child(cur_box)
+	_build_friends_rail()
 	_refresh_currency()
 	get_viewport().size_changed.connect(_topbar_fit)
 	_topbar_fit.call_deferred()
+
+## CS2-style friends rail on the right edge: friend count on top, online friends as avatars below
+func _build_friends_rail() -> void:
+	var rail := PanelContainer.new()
+	var rsb := UI.sb(Color(0.03, 0.035, 0.045, 0.72), Color(0, 0, 0, 0), 0, 0, 0)
+	rsb.border_width_left = 1; rsb.border_color = Color(1, 1, 1, 0.06)
+	rsb.content_margin_top = 8; rsb.content_margin_bottom = 8; rsb.content_margin_left = 6; rsb.content_margin_right = 6
+	rail.add_theme_stylebox_override("panel", rsb)
+	rail.anchor_left = 1; rail.anchor_right = 1; rail.anchor_bottom = 1
+	rail.offset_left = -72; rail.offset_right = 0
+	ui.add_child(rail)
+	friends_rail = UI.vbox(8)
+	rail.add_child(friends_rail)
+	Online.friends_updated.connect(func(_l): _fill_friends_rail())
+	_fill_friends_rail()
+
+func _fill_friends_rail() -> void:
+	if friends_rail == null or not is_instance_valid(friends_rail):
+		return
+	UI.clear(friends_rail)
+	var all: Array = Online.friends if Online.is_logged_in() else []
+	var on: Array = []
+	for f in all:
+		if f is Dictionary and not bool(f.get("pending", false)) and bool(f.get("online", false)) and str(f.get("status", "")) != "offline":
+			on.append(f)
+	var top := NavIcon.make("friends", "Arkadaşlar", func(): show_page("friends"))
+	top.custom_minimum_size = Vector2(60, 52)
+	top.badge = str(on.size()) if Online.is_logged_in() else ""
+	nav_btns["friends"] = top
+	friends_rail.add_child(top)
+	var line := ColorRect.new()
+	line.color = Color(1, 1, 1, 0.08); line.custom_minimum_size = Vector2(0, 1)
+	friends_rail.add_child(line)
+	for f in on.slice(0, 12):
+		var av := FriendAvatar.new()
+		av.uname = str(f.get("username", "?"))
+		av.status = str(f.get("status", "online"))
+		av.custom_minimum_size = Vector2(60, 52)
+		av.tooltip_text = "%s  •  %s" % [av.uname, {"match": "Maçta", "room": "Odada", "lobby": "Lobide"}.get(av.status, "Çevrimiçi")]
+		av.gui_input.connect(func(ev): if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT: show_page("friends"))
+		friends_rail.add_child(av)
+	if on.is_empty():
+		var add := NavIcon.make("plus", "Arkadaş ekle", func(): show_page("friends"))
+		add.custom_minimum_size = Vector2(60, 52)
+		add.dim = true
+		friends_rail.add_child(add)
+
+class NavIcon extends Control:
+	## flat white vector icons (CS2 style): home, gear, user, shield, power, friends, plus
+	var kind := "home"
+	var on := false
+	var dim := false
+	var badge := ""
+	var _hover := false
+	var cb: Callable
+	static func make(k: String, tip: String, c: Callable) -> NavIcon:
+		var n := NavIcon.new()
+		n.kind = k; n.cb = c; n.tooltip_text = tip
+		n.custom_minimum_size = Vector2(46, 46)
+		n.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		n.mouse_entered.connect(func(): n._hover = true; n.queue_redraw())
+		n.mouse_exited.connect(func(): n._hover = false; n.queue_redraw())
+		n.gui_input.connect(func(ev):
+			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+				SFX.play("ui_click", -8)
+				n.cb.call())
+		return n
+	func _draw() -> void:
+		var c := size * 0.5
+		var r: float = minf(size.x, size.y) * 0.26
+		if _hover:
+			draw_rect(Rect2(Vector2.ZERO, size), Color(1, 1, 1, 0.08))
+		var col := UI.ACCENT2 if on else (Color(1, 1, 1, 0.45) if dim else (Color.WHITE if _hover else Color(1, 1, 1, 0.82)))
+		var w := 2.2
+		match kind:
+			"home":
+				draw_colored_polygon(PackedVector2Array([c + Vector2(-r * 1.05, -r * 0.05), c + Vector2(0, -r * 1.05), c + Vector2(r * 1.05, -r * 0.05)]), col)
+				draw_rect(Rect2(c + Vector2(-r * 0.75, -r * 0.1), Vector2(r * 1.5, r * 1.05)), col)
+				draw_rect(Rect2(c + Vector2(-r * 0.2, r * 0.35), Vector2(r * 0.4, r * 0.6)), Color(0.05, 0.06, 0.07))
+			"gear":
+				for i in 8:
+					var a := i * TAU / 8.0
+					draw_line(c + Vector2.from_angle(a) * r * 0.7, c + Vector2.from_angle(a) * r * 1.12, col, r * 0.42)
+				draw_circle(c, r * 0.78, col)
+				draw_circle(c, r * 0.34, Color(0.05, 0.06, 0.07))
+			"user":
+				draw_circle(c + Vector2(0, -r * 0.42), r * 0.46, col)
+				draw_colored_polygon(PackedVector2Array([c + Vector2(-r * 0.95, r * 1.0), c + Vector2(-r * 0.7, r * 0.25), c + Vector2(0, r * 0.05), c + Vector2(r * 0.7, r * 0.25), c + Vector2(r * 0.95, r * 1.0)]), col)
+			"friends":
+				draw_circle(c + Vector2(-r * 0.45, -r * 0.38), r * 0.4, col)
+				draw_colored_polygon(PackedVector2Array([c + Vector2(-r * 1.25, r * 0.9), c + Vector2(-r * 1.0, r * 0.2), c + Vector2(-r * 0.45, r * 0.05), c + Vector2(r * 0.1, r * 0.2), c + Vector2(r * 0.35, r * 0.9)]), col)
+				draw_circle(c + Vector2(r * 0.55, -r * 0.5), r * 0.32, col.darkened(0.25))
+				draw_colored_polygon(PackedVector2Array([c + Vector2(r * 0.25, r * 0.0), c + Vector2(r * 0.55, -r * 0.1), c + Vector2(r * 1.05, r * 0.05), c + Vector2(r * 1.25, r * 0.7), c + Vector2(r * 0.5, r * 0.7)]), col.darkened(0.25))
+			"shield":
+				draw_colored_polygon(PackedVector2Array([c + Vector2(0, -r * 1.05), c + Vector2(r * 0.9, -r * 0.65), c + Vector2(r * 0.75, r * 0.4), c + Vector2(0, r * 1.05), c + Vector2(-r * 0.75, r * 0.4), c + Vector2(-r * 0.9, -r * 0.65)]), Color("ff7a8a") if not _hover else Color("ffb0b8"))
+			"power":
+				draw_arc(c, r * 0.85, deg_to_rad(-55), deg_to_rad(235), 28, col, w, true)
+				draw_line(c + Vector2(0, -r * 1.05), c + Vector2(0, -r * 0.15), col, w)
+			"plus":
+				draw_arc(c, r * 0.95, 0, TAU, 32, col, 1.6, true)
+				draw_line(c + Vector2(-r * 0.45, 0), c + Vector2(r * 0.45, 0), col, w)
+				draw_line(c + Vector2(0, -r * 0.45), c + Vector2(0, r * 0.45), col, w)
+		if badge != "":
+			var f: Font = UI.font("Rajdhani-Bold")
+			var tw := f.get_string_size(badge, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+			draw_string(f, Vector2(c.x - tw * 0.5, size.y - 2), badge, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1, 1, 1, 0.75))
+
+class FriendAvatar extends Control:
+	## round avatar with the friend's initial, coloured by name; green bar = online, orange = in a match
+	var uname := "?"
+	var status := "online"
+	var _hover := false
+	func _ready() -> void:
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		mouse_entered.connect(func(): _hover = true; queue_redraw())
+		mouse_exited.connect(func(): _hover = false; queue_redraw())
+	func _draw() -> void:
+		var h := absi(hash(uname))
+		var col := Color.from_hsv(float(h % 360) / 360.0, 0.45, 0.62)
+		var c := size * 0.5
+		var r: float = minf(size.x, size.y) * 0.4
+		if _hover:
+			draw_rect(Rect2(Vector2.ZERO, size), Color(1, 1, 1, 0.07))
+		draw_rect(Rect2(c - Vector2(r, r), Vector2(r * 2, r * 2)), col.darkened(0.35))
+		draw_rect(Rect2(c - Vector2(r, r) + Vector2(2, 2), Vector2(r * 2 - 4, r * 2 - 4)), col)
+		var f: Font = UI.font("RussoOne-Regular")
+		var t := uname.substr(0, 1).to_upper()
+		var tw := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, int(r * 1.15)).x
+		draw_string(f, Vector2(c.x - tw * 0.5, c.y + r * 0.42), t, HORIZONTAL_ALIGNMENT_LEFT, -1, int(r * 1.15), Color.WHITE)
+		var sc := UI.ACCENT if status == "match" else (Color("7fd1ff") if status == "room" else UI.GREEN)
+		draw_rect(Rect2(c.x - r - 5, c.y - r, 3, r * 2), sc)
 
 ## narrow screens (4:3, 16:10, small laptops): drop the least important bits so nothing is cut off
 func _topbar_fit() -> void:
 	if topbar == null or not is_instance_valid(topbar):
 		return
 	var w: float = get_viewport().get_visible_rect().size.x
-	var tight := w < 1900
-	var very := w < 1650
+	var tight := w < 2100
+	var very := w < 1600
 	for k in nav_btns.keys():
-		var b: Button = nav_btns[k]
-		b.add_theme_font_size_override("font_size", 14 if very else (15 if tight else 16))
-		for st in ["normal", "hover", "pressed"]:
+		var b = nav_btns[k]
+		if not is_instance_valid(b) or not (b is Button) or b.get_parent() != topbar:
+			continue
+		var big: bool = k == "lobby"
+		b.add_theme_font_size_override("font_size", (24 if very else 30) if big else (15 if very else (18 if tight else 19)))
+		for st in ["normal", "hover", "pressed", "focus"]:
 			var sbx: StyleBox = b.get_theme_stylebox(st)
 			if sbx:
-				sbx.content_margin_left = 5 if very else (7 if tight else 9)
+				sbx.content_margin_left = (14 if big else 7) if very else ((20 if big else 12) if tight else (24 if big else 16))
 				sbx.content_margin_right = sbx.content_margin_left
 	if cur_box and is_instance_valid(cur_box):
 		for c in cur_box.get_children():
 			if c.has_meta("optional"):
-				(c as Control).visible = not very
+				(c as Control).visible = not tight
 
 func _confirm_quit() -> void:
 	var dim := ColorRect.new()
@@ -730,14 +919,14 @@ func _refresh_currency() -> void:
 	lv.level = int(p["level"])
 	lv.frac = clamp(float(p["xp"]) / max(float(GS.xp_for_level(int(p["level"]))), 1.0), 0.0, 1.0)
 	lv.pname = str(p["name"])
-	lv.custom_minimum_size = Vector2(190, 56)
+	lv.custom_minimum_size = Vector2(180, 48)
 	lv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	lv.tooltip_text = "Seviye %d  •  %d / %d TP" % [int(p["level"]), int(p["xp"]), GS.xp_for_level(int(p["level"]))]
 	cur_box.add_child(lv)
 	cur_box.add_child(_cur("gold", UI.money(int(p["gold"])), UI.GOLD, "Altın"))
 	# the four upgrade materials share one compact chip
 	var mc := PanelContainer.new()
-	var msb := UI.sb(Color(0.07, 0.085, 0.11, 0.95), Color(0.5, 0.7, 1.0, 0.3), 1, 6, 0)
+	var msb := UI.sb(Color(0.04, 0.045, 0.05, 0.55), Color(1, 1, 1, 0.1), 1, 4, 0)
 	msb.content_margin_left = 6; msb.content_margin_right = 8; msb.content_margin_top = 3; msb.content_margin_bottom = 3
 	mc.add_theme_stylebox_override("panel", msb)
 	mc.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -765,7 +954,7 @@ func _refresh_currency() -> void:
 
 func _cur(kind: String, v: String, c: Color, tip: String = "Altın") -> Control:
 	var chip := PanelContainer.new()
-	var sbx := UI.sb(Color(0.07, 0.085, 0.11, 0.95), Color(c.r, c.g, c.b, 0.35), 1, 6, 0)
+	var sbx := UI.sb(Color(0.04, 0.045, 0.05, 0.55), Color(1, 1, 1, 0.1), 1, 4, 0)
 	sbx.content_margin_left = 6; sbx.content_margin_right = 10; sbx.content_margin_top = 3; sbx.content_margin_bottom = 3
 	chip.add_theme_stylebox_override("panel", sbx)
 	chip.tooltip_text = tip
@@ -776,10 +965,10 @@ func _cur(kind: String, v: String, c: Color, tip: String = "Altın") -> Control:
 	chip.add_child(h)
 	var ic := CurIcon.new()
 	ic.kind = kind; ic.col = c
-	ic.custom_minimum_size = Vector2(26, 26)
+	ic.custom_minimum_size = Vector2(22, 22)
 	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(ic)
-	var l := UI.lbl(v, 20, Color.WHITE, "Rajdhani-Bold")
+	var l := UI.lbl(v, 18, Color.WHITE, "Rajdhani-Bold")
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(l)
 	return chip
@@ -867,14 +1056,23 @@ func show_page(p: String) -> void:
 	if modal:
 		modal.queue_free(); modal = null
 	for k in nav_btns.keys():
-		var b: Button = nav_btns[k]
-		var on: bool = k == p or (k == "rooms" and (p == "room" or p == "netroom"))
-		b.add_theme_color_override("font_color", UI.ACCENT2 if on else UI.TEXT)
+		var nb = nav_btns[k]
+		if not is_instance_valid(nb):
+			continue
+		var on: bool = k == p or (k == "rooms" and (p == "room" or p == "netroom")) or (k == "lobby_icon" and p == "lobby")
+		if nb is NavIcon:
+			nb.on = on
+			nb.queue_redraw()
+			continue
+		var b: Button = nb
+		b.add_theme_color_override("font_color", Color.WHITE if on else Color(1, 1, 1, 0.68))
+		var old_sb: StyleBox = b.get_theme_stylebox("normal")
 		var nsb := StyleBoxFlat.new()
-		nsb.bg_color = Color(1, 0.55, 0.12, 0.10) if on else Color(0, 0, 0, 0)
+		nsb.bg_color = Color(0, 0, 0, 0)
 		nsb.border_color = UI.ACCENT
-		nsb.border_width_bottom = 4 if on else 0
-		nsb.content_margin_left = 9; nsb.content_margin_right = 9
+		nsb.border_width_bottom = 3 if on else 0
+		nsb.content_margin_left = old_sb.content_margin_left if old_sb else 18
+		nsb.content_margin_right = nsb.content_margin_left
 		b.add_theme_stylebox_override("normal", nsb)
 	UI.clear(content)
 	if p != "lobby" and char_view != "" and char_view != GS.cur_char():
@@ -883,9 +1081,13 @@ func show_page(p: String) -> void:
 	spin_speed = 0.5
 	if studio:
 		studio.visible = p in ["bag", "market"]
-	cam_target = Vector3(0.5, 1.5, 4.6)
-	cam_look = Vector3(0.5, 1.1, 0)
+	cam_target = LOBBY_CAM
+	cam_look = LOBBY_LOOK
 	soldier.visible = true
+	for pd in pedestal:
+		pd.visible = p in ["bag", "market"]
+	if show_pivot:
+		show_pivot.visible = p in ["bag", "market"] or studio == null
 	_refresh_mode_chip()
 	if mode_chip:
 		mode_chip.visible = p != "mode"
@@ -912,10 +1114,11 @@ func show_page(p: String) -> void:
 ## floating "you are still in a room" bar on every other page
 var _fr_badge: Label
 func _update_friend_badge() -> void:
-	if not nav_btns.has("friends"):
+	## pending friend requests: red dot on the friends icon of the rail
+	if not nav_btns.has("friends") or not is_instance_valid(nav_btns["friends"]):
 		return
 	var n: int = Online.incoming_count() if Online.is_logged_in() else 0
-	var b: Button = nav_btns["friends"]
+	var b: Control = nav_btns["friends"]
 	if _fr_badge == null or not is_instance_valid(_fr_badge):
 		_fr_badge = UI.lbl("", 12, Color.WHITE, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
 		_fr_badge.add_theme_stylebox_override("normal", UI.sb(UI.RED, Color(0, 0, 0, 0), 0, 9, 0))
@@ -925,7 +1128,7 @@ func _update_friend_badge() -> void:
 		b.add_child(_fr_badge)
 	_fr_badge.text = str(n)
 	_fr_badge.visible = n > 0
-	_fr_badge.position = Vector2(b.size.x - 14, 2)
+	_fr_badge.position = Vector2(b.size.x - 20, 2)
 
 func _room_return_bar() -> void:
 	var online_r := Net.active()
@@ -955,20 +1158,28 @@ func _margin(c: Control, l: int, t: int, r: int, b: int) -> void:
 
 # ================================================================ sets panel (shared)
 func _sets_panel(compact: bool = false) -> Control:
-	var p := UI.panel(UI.BG, UI.LINE, 14)
-	var v := UI.vbox(8)
+	var p := UI.glass(12) if compact else UI.panel(UI.BG, UI.LINE, 14)
+	var v := UI.vbox(7 if compact else 8)
 	p.add_child(v)
-	v.add_child(UI.header("SETLER", 22))
+	if compact:
+		var hh := UI.hbox(8)
+		hh.add_child(UI.lbl("TEÇHİZAT", 17, Color.WHITE, "Rajdhani-Bold"))
+		hh.add_child(UI.spacer())
+		var eb := UI.btn("DÜZENLE", func(): show_page("bag"), 13, false, 0, 26)
+		hh.add_child(eb)
+		v.add_child(hh)
+	else:
+		v.add_child(UI.header("SETLER", 22))
 	var tabs := UI.hbox(4)
 	v.add_child(tabs)
 	for i in GS.Econ.SET_COUNT:
-		var b := UI.btn("Set %d" % (i + 1), func(): GS.profile["active_set"] = i; GS.save_profile(); show_page(page), 15, GS.profile["active_set"] == i, 0, 38)
+		var b := UI.btn("Set %d" % (i + 1), func(): GS.profile["active_set"] = i; GS.save_profile(); show_page(page), 14 if compact else 15, GS.profile["active_set"] == i, 0, 32 if compact else 38)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tabs.add_child(b)
 	var set := GS.active_set()
 	for c in GS.SLOT_ORDER:
 		var id: String = set.get(c, "")
-		var card := UI.panel(Color(0.07, 0.085, 0.115, 0.95), UI.LINE, 8)
+		var card := UI.panel(Color(1, 1, 1, 0.04) if compact else Color(0.07, 0.085, 0.115, 0.95), Color(1, 1, 1, 0.06) if compact else UI.LINE, 6 if compact else 8)
 		var h := UI.hbox(8)
 		card.add_child(h)
 		if id != "":
@@ -976,9 +1187,15 @@ func _sets_panel(compact: bool = false) -> Control:
 			var tv := UI.vbox(0)
 			tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			var lv := GS.wlvl(id)
-			tv.add_child(UI.lbl(GS.WEAPONS[id]["name"] + (" [+%d]" % lv if lv > 0 else ""), 20, Color.WHITE, "Rajdhani-Bold"))
+			var nh := UI.hbox(6)
+			nh.add_child(UI.lbl(GS.WEAPONS[id]["name"], 18 if compact else 20, Color.WHITE, "Rajdhani-Bold"))
+			if lv > 0:
+				var bd := preload("res://scripts/ui.gd").lvl_badge(lv, 11)
+				bd.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+				nh.add_child(bd)
+			tv.add_child(nh)
 			var sk: Dictionary = GS.SKINS[GS.wskin(id)]
-			tv.add_child(UI.lbl(GS.CATS[c] + "  •  " + sk["name"], 15, GS.RARITY_COLORS[int(sk["rarity"])], "Rajdhani-SemiBold"))
+			tv.add_child(UI.lbl(GS.CATS[c] + "  ·  " + sk["name"], 14 if compact else 15, GS.RARITY_COLORS[int(sk["rarity"])], "Rajdhani-SemiBold"))
 			h.add_child(tv)
 		v.add_child(card)
 	return p
@@ -990,25 +1207,57 @@ func _char_owned(c: String) -> bool:
 	var own: Array = GS.profile.get("chars", ["takim", "deri", "asker1"])
 	return c in own or int(GS.CHARACTERS[c]["price"]) == 0
 
+## the lobby soldier is a "puppet" bot: same model, weapon, IK hands and finger grip as in a match,
+## with all AI / physics switched off and the rifle held at low ready across the chest
+func _make_soldier(cid: String) -> Node3D:
+	var wid: String = str(GS.active_set().get("ana", "ak47"))
+	if not GS.WEAPONS.has(wid):
+		wid = "ak47"
+	var b = preload("res://scripts/bot.gd").new()
+	b.name = "LobbySoldier"
+	world.add_child(b)
+	b.set_physics_process(false)
+	b.collision_layer = 0; b.collision_mask = 0
+	b.setup(GS.char_scene(cid), "", "", 1, wid)
+	b.name_tag.visible = false
+	if b.gun:
+		MatLib.apply(b.gun, GS.wskin(wid))
+		GS.parts_visual(b.gun, wid)
+		GS.level_glow(b.gun, wid)
+	b.position = Vector3(0.5, 0, 0)
+	b.rotation.y = deg_to_rad(float(OS.get_environment("LYAW")) if OS.get_environment("LYAW") != "" else 240.0)
+	b.set_meta("wid", wid)
+	if b.anim and b.anim.has_animation("Idle"):
+		b._play("Idle")
+	return b
+
 func _swap_soldier(c: String) -> void:
-	var ps: PackedScene = GS.char_scene(c)
-	if ps == null:
-		return
 	var old_vis := soldier.visible
-	var t := soldier.transform
 	soldier.queue_free()
-	soldier = ps.instantiate()
-	MatLib.apply(soldier)
-	soldier.transform = t
+	soldier = _make_soldier(c)
 	soldier.visible = old_vis
-	world.add_child(soldier)
-	var ap := soldier.find_child("AnimationPlayer", true, false) as AnimationPlayer
-	if ap and ap.has_animation("Idle"):
-		ap.get_animation("Idle").loop_mode = Animation.LOOP_LINEAR
-		ap.play("Idle")
 	# little 'spawn' pop
-	soldier.scale = Vector3(0.92, 0.92, 0.92)
+	soldier.scale = Vector3(0.94, 0.94, 0.94)
 	create_tween().tween_property(soldier, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _pose_soldier(delta: float) -> void:
+	if soldier == null or not is_instance_valid(soldier) or not soldier.visible or not ("aim_node" in soldier):
+		return
+	# weapon changed in the bag: re-arm
+	if str(soldier.get_meta("wid", "")) != str(GS.active_set().get("ana", "ak47")):
+		var vis := soldier.visible
+		var t := soldier.transform
+		soldier.queue_free()
+		soldier = _make_soldier(GS.cur_char())
+		soldier.transform = t
+		soldier.visible = vis
+		return
+	# relaxed low ready: the shouldered aim pose with the torso bent so the muzzle points at the ground ahead
+	var br := sin(Time.get_ticks_msec() * 0.0011) * 0.02
+	if soldier.twist:
+		soldier.twist.lean = (float(OS.get_environment("LLEAN")) if OS.get_environment("LLEAN") != "" else 0.47) + br
+		soldier.twist.twist = float(OS.get_environment("LTWIST")) if OS.get_environment("LTWIST") != "" else 0.25
+	soldier._follow_chest(delta)
 
 func _char_picker() -> Control:
 	if char_view == "":
@@ -1057,107 +1306,133 @@ func _char_picker() -> Control:
 	return p
 
 func _page_lobby() -> void:
-	## CS-style lobby: player card + loadout on the left, news + missions on the right,
-	## one big PLAY button bottom-right; the 3D soldier stays the centre piece.
-	set_showcase(GS.active_set().get("ana", "ak47"))
+	## CS2-style lobby: the soldier on a sunlit street is the centrepiece; a compact player card under him,
+	## the loadout on the left, news + missions on the right and the PLAY block bottom-right — all frosted glass.
 	var p := GS.profile
-	var left := UI.vbox(12)
-	left.position = Vector2(28, 18)
-	left.custom_minimum_size = Vector2(400, 0)
-	content.add_child(left)
-	# player card with rank emblem
 	var ri: Dictionary = GS.rank_info(int(p.get("rp", 0)))
-	var pc := UI.panel(Color(0.03, 0.04, 0.06, 0.88), ri["color"].darkened(0.35), 14, 2)
-	left.add_child(pc)
-	var ph := UI.hbox(12)
-	pc.add_child(ph)
+	# ---- left: loadout
+	var left := UI.vbox(10)
+	left.position = Vector2(26, 14)
+	left.custom_minimum_size = Vector2(372, 0)
+	content.add_child(left)
+	left.add_child(_sets_panel(true))
+	# ---- centre bottom: player card (click -> profile)
+	var card := UI.glass(12, 4)
+	card.anchor_left = 0.5; card.anchor_right = 0.5; card.anchor_top = 1; card.anchor_bottom = 1
+	card.offset_left = -170; card.offset_right = 170; card.offset_top = -132; card.offset_bottom = -26
+	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	card.tooltip_text = "Profilini aç"
+	card.gui_input.connect(func(ev): if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT: show_page("profile"))
+	content.add_child(card)
+	var ch := UI.hbox(12)
+	ch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(ch)
 	var em := TextureRect.new()
-	em.texture = ri["icon"]; em.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; em.custom_minimum_size = Vector2(84, 84)
+	em.texture = ri["icon"]; em.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; em.custom_minimum_size = Vector2(72, 72)
 	em.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	em.tooltip_text = "%s • %d RP" % [ri["name"], int(ri["rp"])]
-	ph.add_child(em)
-	var pv := UI.vbox(2)
-	pv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	ph.add_child(pv)
-	var nm := UI.lbl(str(p["name"]), 26, Color.WHITE, "RussoOne-Regular")
+	em.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	em.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ch.add_child(em)
+	var cv := UI.vbox(1)
+	cv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ch.add_child(cv)
+	var nm := UI.lbl(str(p["name"]), 24, Color.WHITE, "RussoOne-Regular")
 	nm.clip_text = true
-	pv.add_child(nm)
-	pv.add_child(UI.lbl(str(ri["name"]).to_upper() + "   •   SEVİYE %d" % int(p["level"]), 16, ri["color"], "Rajdhani-Bold"))
-	pv.add_child(UI.bar(float(p["xp"]), float(GS.xp_for_level(int(p["level"]))), Color("7fd1ff"), 6))
+	cv.add_child(nm)
+	cv.add_child(UI.lbl("%s  ·  SEVİYE %d  ·  %d RP" % [str(ri["name"]).to_upper(), int(p["level"]), int(ri["rp"])], 14, ri["color"], "Rajdhani-Bold"))
+	var xb := UI.bar(float(p["xp"]), float(GS.xp_for_level(int(p["level"]))), Color("7fd1ff"), 4)
+	xb.add_theme_stylebox_override("background", UI.sb(Color(1, 1, 1, 0.1), Color(0, 0, 0, 0), 0, 2, 0))
+	cv.add_child(xb)
 	var st: Dictionary = p["stats"]
-	var sh := UI.hbox(16)
-	pv.add_child(sh)
-	for pair in [["MAÇ", st["matches"]], ["GALİBİYET", st["wins"]], ["K/D", "%.2f" % (float(st["kills"]) / max(1.0, float(st["deaths"])))]]:
-		var vv := UI.vbox(-6)
-		vv.add_child(UI.lbl(str(pair[1]), 24, Color.WHITE, "Teko"))
-		vv.add_child(UI.lbl(pair[0], 12, UI.DIM, "Rajdhani-Bold"))
-		sh.add_child(vv)
-	left.add_child(_sets_panel())
-	# right column: news card + compact missions
-	var right := UI.vbox(12)
+	cv.add_child(UI.lbl("%d MAÇ   ·   %d GALİBİYET   ·   %.2f K/D" % [int(st["matches"]), int(st["wins"]), float(st["kills"]) / max(1.0, float(st["deaths"]))], 13, UI.DIM, "Rajdhani-Bold"))
+	for c in cv.get_children():
+		(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# ---- right: news + missions
+	var right := UI.vbox(10)
 	right.anchor_left = 1; right.anchor_right = 1
-	right.offset_left = -440; right.offset_right = -28; right.offset_top = 18
+	right.offset_left = -396; right.offset_right = -22; right.offset_top = 14
 	content.add_child(right)
 	var news := PanelContainer.new()
-	news.add_theme_stylebox_override("panel", UI.sb(Color(0, 0, 0, 0.9), UI.ACCENT, 1, 6, 0))
-	news.custom_minimum_size = Vector2(412, 230)
+	var nsb := UI.sb(Color(0, 0, 0, 0.5), Color(1, 1, 1, 0.1), 1, 4, 0)
+	news.add_theme_stylebox_override("panel", nsb)
+	news.custom_minimum_size = Vector2(374, 196)
+	news.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
 	right.add_child(news)
 	var nimg := TextureRect.new()
-	nimg.texture = load("res://assets/ui/map_canakkale.jpg") if ResourceLoader.exists("res://assets/ui/map_canakkale.jpg") else load("res://assets/ui/map_liman.jpg")
+	var nimg_p := "res://assets/ui/load_insaat.jpg"
+	nimg.texture = load(nimg_p) if ResourceLoader.exists(nimg_p) else load("res://assets/ui/map_liman.jpg")
 	nimg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	nimg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	nimg.modulate = Color(0.75, 0.75, 0.75)
 	news.add_child(nimg)
-	var nv := UI.vbox(2)
-	nv.alignment = BoxContainer.ALIGNMENT_END
+	var shade := TextureRect.new()
+	var sgt := GradientTexture2D.new()
+	var sg := Gradient.new()
+	sg.set_color(0, Color(0, 0, 0, 0.0)); sg.set_color(1, Color(0, 0, 0, 0.88))
+	sgt.gradient = sg; sgt.fill_from = Vector2(0, 0.2); sgt.fill_to = Vector2(0, 1)
+	shade.texture = sgt; shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	news.add_child(shade)
 	var nm2 := MarginContainer.new()
 	for side in ["left", "right", "bottom"]:
 		nm2.add_theme_constant_override("margin_" + side, 14)
-	nm2.add_child(nv)
 	news.add_child(nm2)
-	var tag := UI.lbl("YENİ GÜNCELLEME", 14, UI.ACCENT, "Rajdhani-Bold")
-	nv.add_child(tag)
-	nv.add_child(UI.lbl("ÇANAKKALE & İNŞAAT", 28, Color.WHITE, "RussoOne-Regular"))
-	nv.add_child(_wrap("2 yeni harita, 8 yeni silah (AWM, RPK-16, Vityaz, Micro UZI, BR-7 Kuzgun, M1911...), RÜTBE sistemi ve dereceli maçlar!", 16))
-	var mp := UI.panel(Color(0.03, 0.04, 0.06, 0.88), UI.LINE, 12)
+	var nv := UI.vbox(0)
+	nv.alignment = BoxContainer.ALIGNMENT_END
+	nm2.add_child(nv)
+	nv.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, UI.ACCENT2, "Rajdhani-Bold"))
+	nv.add_child(UI.lbl("CS2 TARZI GRAFİK", 26, Color.WHITE, "RussoOne-Regular"))
+	nv.add_child(_wrap("Önceden hesaplanmış gölgeler, yansımalar ve 4 tuşuyla gerçek hacimsel sis bombası!", 15))
+	var mp := UI.glass(12, 4)
 	right.add_child(mp)
-	var mv := UI.vbox(8)
+	var mv := UI.vbox(7)
 	mp.add_child(mv)
-	mv.add_child(UI.header("GÜNLÜK GÖREVLER", 20))
+	var mh := UI.hbox(8)
+	mv.add_child(mh)
+	mh.add_child(UI.lbl("GÜNLÜK GÖREVLER", 17, Color.WHITE, "Rajdhani-Bold"))
+	mh.add_child(UI.spacer())
+	var ndone := 0
+	for ms in GS.MISSIONS:
+		if p["missions"]["claimed"].has(ms["id"]): ndone += 1
+	mh.add_child(UI.lbl("%d / %d" % [ndone, GS.MISSIONS.size()], 15, UI.DIM, "Rajdhani-Bold"))
 	for ms in GS.MISSIONS:
 		var have := int(p["missions"].get(ms["key"], 0))
 		var done := have >= int(ms["goal"])
 		var claimed: bool = p["missions"]["claimed"].has(ms["id"])
 		var rh := UI.hbox(8)
-		var ml := UI.lbl(("✔ " if claimed else "") + str(ms["text"]), 16, UI.DIM if claimed else Color.WHITE, "Rajdhani-Bold")
+		var ml := UI.lbl(("✓ " if claimed else "") + str(ms["text"]), 15, UI.DIM if claimed else Color(1, 1, 1, 0.92), "Rajdhani-SemiBold")
 		ml.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		ml.clip_text = true
 		rh.add_child(ml)
 		if done and not claimed:
-			rh.add_child(UI.btn("ÖDÜLÜ AL", func(): _claim(ms), 14, true, 0, 28))
+			rh.add_child(UI.btn("ÖDÜLÜ AL", func(): _claim(ms), 13, true, 0, 26))
 		elif not claimed:
-			rh.add_child(UI.lbl("%d/%d" % [min(have, int(ms["goal"])), int(ms["goal"])], 15, UI.ACCENT2, "Rajdhani-Bold"))
+			rh.add_child(UI.lbl("%d/%d" % [min(have, int(ms["goal"])), int(ms["goal"])], 14, UI.ACCENT2, "Rajdhani-Bold"))
 		mv.add_child(rh)
 		if not claimed:
-			mv.add_child(UI.bar(min(have, int(ms["goal"])), int(ms["goal"]), UI.GREEN if done else UI.ACCENT, 4))
-	# PLAY block (bottom right)
+			var pb0 := UI.bar(min(have, int(ms["goal"])), int(ms["goal"]), UI.GREEN if done else UI.ACCENT, 3)
+			pb0.add_theme_stylebox_override("background", UI.sb(Color(1, 1, 1, 0.08), Color(0, 0, 0, 0), 0, 2, 0))
+			mv.add_child(pb0)
+	# ---- PLAY block (bottom right)
 	var pb := UI.vbox(8)
 	pb.anchor_left = 1; pb.anchor_right = 1; pb.anchor_top = 1; pb.anchor_bottom = 1
-	pb.offset_left = -440; pb.offset_right = -28; pb.offset_top = -196; pb.offset_bottom = -28
+	pb.offset_left = -396; pb.offset_right = -22; pb.offset_top = -176; pb.offset_bottom = -26
 	content.add_child(pb)
 	var mode_txt := "ÇEVRİMİÇİ" if GS.play_mode == "online" else "BOT MAÇI"
-	pb.add_child(UI.lbl(mode_txt + "  •  " + str(GS.MAPS.size()) + " HARİTA  •  " + str(GS.MODES.size()) + " MOD", 14, UI.DIM, "Rajdhani-Bold"))
-	var quick := UI.btn("OYNA", _quick_play, 46, true, 412, 92)
+	var info := UI.lbl(mode_txt + "  ·  " + str(GS.MAPS.size()) + " HARİTA  ·  " + str(GS.MODES.size()) + " MOD", 14, Color(1, 1, 1, 0.8), "Rajdhani-Bold")
+	info.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	info.add_theme_constant_override("shadow_outline_size", 4)
+	pb.add_child(info)
+	var quick := UI.btn("OYNA", _quick_play, 44, true, 374, 82)
 	quick.add_theme_font_override("font", UI.font("RussoOne-Regular"))
 	pb.add_child(quick)
 	var pulse := quick.create_tween().set_loops()
-	pulse.tween_property(quick, "modulate", Color(1.12, 1.12, 1.12), 0.9).set_trans(Tween.TRANS_SINE)
-	pulse.tween_property(quick, "modulate", Color(1, 1, 1), 0.9).set_trans(Tween.TRANS_SINE)
+	pulse.tween_property(quick, "modulate", Color(1.1, 1.1, 1.1), 1.0).set_trans(Tween.TRANS_SINE)
+	pulse.tween_property(quick, "modulate", Color(1, 1, 1), 1.0).set_trans(Tween.TRANS_SINE)
 	var h2 := UI.hbox(8)
 	pb.add_child(h2)
-	var b1 := UI.btn("ODA LİSTESİ", func(): show_page("rooms"), 18, false, 0, 46)
+	var b1 := UI.btn("ODA LİSTESİ", func(): show_page("rooms"), 17, false, 0, 42)
 	b1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var b2 := UI.btn("ODA KUR", _create_room_dialog, 18, false, 0, 46)
+	var b2 := UI.btn("ODA KUR", _create_room_dialog, 17, false, 0, 42)
 	b2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h2.add_child(b1); h2.add_child(b2)
 
@@ -1200,6 +1475,8 @@ func _page_bag() -> void:
 	content.add_child(left)
 	var ids: Array = []
 	for id in GS.WEAPONS.keys():
+		if GS.WEAPONS[id].get("hidden", false):
+			continue
 		if GS.owned(id) and (bag_cat == "tum" or GS.WEAPONS[id]["cat"] == bag_cat):
 			ids.append(id)
 	if bag_sel == "" or not GS.owned(bag_sel):
@@ -1881,6 +2158,8 @@ func _page_market() -> void:
 		"silah":
 			var any := false
 			for id in GS.WEAPONS.keys():
+				if GS.WEAPONS[id].get("hidden", false):
+					continue
 				if GS.owned(id) and GS.wtime_left(id) <= 0.0:
 					continue      # timed (crate) weapons stay buyable: buying makes them permanent
 				any = true

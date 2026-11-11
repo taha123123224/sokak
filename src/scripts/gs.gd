@@ -44,6 +44,7 @@ var WEAPONS := {
 	"kasap":  {"name": "Kasap Bıçağı", "cat": "bicak", "cls": "Bıçak", "dmg": 50, "rpm": 150, "melee": true, "speed": 1.18, "price": 1200, "head": 1.0},
 	"balta":  {"name": "Taktik Balta", "cat": "bicak", "cls": "Bıçak", "dmg": 75, "rpm": 80, "melee": true, "speed": 1.08, "price": 2800, "head": 1.0},
 	"frag":   {"name": "El Bombası MK3", "cat": "bomba", "cls": "Bomba", "dmg": 130, "count": 2, "throwable": true, "speed": 1.1, "price": 0, "head": 1.0},
+	"smoke":  {"name": "Sis Bombası M18", "cat": "bomba", "cls": "Bomba", "dmg": 0, "count": 1, "throwable": true, "smoke": true, "speed": 1.1, "price": 0, "head": 1.0, "hidden": true, "base": "frag"},
 }
 const CATS := {"ana": "Ana Silah", "tabanca": "Tabanca", "bicak": "Bıçak", "bomba": "Bomba"}
 const SLOT_ORDER := ["ana", "tabanca", "bicak", "bomba"]
@@ -563,6 +564,8 @@ func catalog() -> Dictionary:
 	var w := {}
 	for id in WEAPONS.keys():
 		var d: Dictionary = WEAPONS[id]
+		if d.get("hidden", false):
+			continue
 		w[id] = {"price": int(d.get("price", 0)), "cat": str(d["cat"]), "throwable": bool(d.get("throwable", false)), "melee": bool(d.get("melee", false))}
 	var sk := {}
 	for id in SKINS.keys():
@@ -1052,14 +1055,14 @@ func weapon_scene(id: String) -> PackedScene:
 		var ps := _load_ext_glb(mm["glb"])
 		if ps:
 			return ps
-	var base: String = mm.get("base", id)
+	var base: String = mm.get("base", str(WEAPONS.get(id, {}).get("base", id)))
 	# keep loaded weapon scenes in memory: without a reference Godot frees them and reads them from disk again
 	if not _wscene_cache.has(base):
 		_wscene_cache[base] = load("res://assets/models/w_%s.glb" % base)
 	return _wscene_cache[base]
 
 func weapon_base(id: String) -> String:
-	return str(mod_weapon_model.get(id, {}).get("base", id))
+	return str(mod_weapon_model.get(id, {}).get("base", str(WEAPONS.get(id, {}).get("base", id))))
 
 func char_scene(id: String) -> PackedScene:
 	var p: String = mod_char_model.get(id, "")

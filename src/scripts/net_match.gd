@@ -91,6 +91,12 @@ func send_death(killer, wid: String, head: bool) -> void:
 		kid = killer.net_id
 	Net.send({"t": "die", "k": kid, "w": wid, "h": head})
 
+func send_smoke(pos: Vector3) -> void:
+	Net.send({"t": "smk", "p": [snappedf(pos.x, 0.01), snappedf(pos.y, 0.01), snappedf(pos.z, 0.01)]})
+
+func send_nade(pos: Vector3, vel: Vector3) -> void:
+	Net.send({"t": "nad", "p": [snappedf(pos.x, 0.01), snappedf(pos.y, 0.01), snappedf(pos.z, 0.01)], "v": [snappedf(vel.x, 0.01), snappedf(vel.y, 0.01), snappedf(vel.z, 0.01)]})
+
 # ---------------------------------------------------------------- incoming
 func _on_msg(d: Dictionary) -> void:
 	var from := str(d.get("from", ""))
@@ -109,6 +115,19 @@ func _on_msg(d: Dictionary) -> void:
 				var o: Array = d.get("o", [0, 0, 0])
 				var attacker = puppets.get(from, null)
 				mt.player.take_damage(float(d.get("d", 0)), attacker, Vector3(float(o[0]), float(o[1]), float(o[2])), bool(d.get("h", false)), str(d.get("w", "")))
+		"smk":
+			var sp: Array = d.get("p", [0, 0, 0])
+			mt.spawn_smoke(Vector3(float(sp[0]), float(sp[1]), float(sp[2])), puppets.get(from, null))
+		"nad":
+			var np: Array = d.get("p", [0, 0, 0])
+			var nv: Array = d.get("v", [0, 0, 0])
+			var g := preload("res://scripts/grenade.gd").new()
+			g.match_node = mt
+			g.thrower = puppets.get(from, null)
+			g.visual_only = true
+			mt.add_child(g)
+			g.global_position = Vector3(float(np[0]), float(np[1]), float(np[2]))
+			g.linear_velocity = Vector3(float(nv[0]), float(nv[1]), float(nv[2]))
 		"die":
 			if puppets.has(from):
 				var kid := str(d.get("k", ""))

@@ -4,11 +4,13 @@ extends RefCounted
 
 const ACCENT := Color("ff8a1f")
 const ACCENT2 := Color("ffb347")
-const BG := Color(0.05, 0.06, 0.085, 0.88)
-const BG2 := Color(0.08, 0.095, 0.13, 0.92)
-const LINE := Color(0.18, 0.22, 0.3, 1)
-const TEXT := Color(0.9, 0.92, 0.95)
-const DIM := Color(0.55, 0.6, 0.68)
+# CS2-like neutral palette: smoky graphite glass instead of navy, hairline white borders
+const BG := Color(0.055, 0.06, 0.07, 0.84)
+const BG2 := Color(0.085, 0.09, 0.105, 0.9)
+const LINE := Color(1, 1, 1, 0.1)
+const TEXT := Color(0.92, 0.93, 0.95)
+const DIM := Color(0.6, 0.63, 0.68)
+const GLASS := Color(0.045, 0.05, 0.058, 0.68)
 const RED := Color("ff3b3b")
 const GREEN := Color("38e07b")
 const GOLD := Color("ffc23d")
@@ -39,8 +41,8 @@ static func build_theme() -> Theme:
 	t.default_font = font("Rajdhani-SemiBold")
 	t.default_font_size = 20
 	# Button
-	var bn := sb(Color(0.1, 0.12, 0.165, 0.95), LINE, 1, 3, 14)
-	var bh := sb(Color(0.14, 0.16, 0.22, 0.98), ACCENT, 1, 3, 14)
+	var bn := sb(Color(0.12, 0.125, 0.14, 0.9), LINE, 1, 3, 14)
+	var bh := sb(Color(0.19, 0.2, 0.22, 0.95), Color(1, 1, 1, 0.32), 1, 3, 14)
 	var bp := sb(ACCENT.darkened(0.15), ACCENT2, 1, 3, 14)
 	var bd := sb(Color(0.08, 0.09, 0.11, 0.7), Color(0.15, 0.16, 0.2), 1, 3, 14)
 	var bf := sb(Color(0, 0, 0, 0), ACCENT2, 1, 3, 14)
@@ -117,8 +119,10 @@ static func btn(text: String, cb: Callable = Callable(), size: int = 20, primary
 	b.focus_mode = Control.FOCUS_NONE
 	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	if primary:
-		var n := sb(ACCENT, ACCENT2, 1, 3, 18)
+		var n := sb(ACCENT, Color(1, 0.75, 0.45, 0.9), 1, 3, 18)
+		n.shadow_color = Color(1, 0.5, 0.1, 0.25); n.shadow_size = 10
 		var h := sb(ACCENT2, Color.WHITE, 1, 3, 18)
+		h.shadow_color = Color(1, 0.55, 0.15, 0.4); h.shadow_size = 14
 		var p := sb(ACCENT.darkened(0.25), ACCENT2, 1, 3, 18)
 		b.add_theme_stylebox_override("normal", n); b.add_theme_stylebox_override("hover", h); b.add_theme_stylebox_override("pressed", p)
 		b.add_theme_color_override("font_color", Color(0.08, 0.05, 0.02))
@@ -128,6 +132,14 @@ static func btn(text: String, cb: Callable = Callable(), size: int = 20, primary
 		b.pressed.connect(func(): SFX.play("ui_click", -4); cb.call())
 	b.mouse_entered.connect(func(): SFX.play("ui_hover", -14))
 	return b
+
+## CS2-style frosted panel
+static func glass(pad: int = 14, radius: int = 4) -> PanelContainer:
+	var p := PanelContainer.new()
+	var st := sb(GLASS, Color(1, 1, 1, 0.08), 1, radius, pad)
+	st.shadow_color = Color(0, 0, 0, 0.18); st.shadow_size = 12
+	p.add_theme_stylebox_override("panel", st)
+	return p
 
 static func panel(bg: Color = BG, border: Color = LINE, pad: int = 14, radius: int = 4) -> PanelContainer:
 	var p := PanelContainer.new()

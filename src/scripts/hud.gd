@@ -450,9 +450,9 @@ func _process(delta: float) -> void:
 	else:
 		ammo_lbl.visible = player.wdata.get("throwable", false)
 		ammo_lbl.add_theme_color_override("font_color", Color.WHITE)
-		ammo_lbl.text = ("x%d" % player.grenades) if player.wdata.get("throwable", false) else ""
+		ammo_lbl.text = ("x%d" % (player.smokes if player.cur == "smoke" else player.grenades)) if player.wdata.get("throwable", false) else ""
 		reserve_lbl.visible = false
-	nade_lbl.text = ("💣 x%d" % player.grenades) if player.slots.has("bomba") else ""
+	nade_lbl.text = ("💣 x%d   ☁ x%d" % [player.grenades, player.smokes]) if player.slots.has("bomba") else ""
 	reload_bar.visible = player.reload_t > 0 and not player.wdata.get("shell_reload", false)
 	if reload_bar.visible:
 		reload_bar.value = 1.0 - player.reload_t / max(player.reload_total, 0.01)
@@ -1873,7 +1873,7 @@ class AmmoPanel extends Control:
 			draw_string(f, Vector2(right - 150, 80), "YAKIN", HORIZONTAL_ALIGNMENT_RIGHT, 150, 46, Color.WHITE)
 			draw_string(fb, Vector2(right - 200, 104), "SOL TIK: KES  •  SAĞ TIK: SAPLA", HORIZONTAL_ALIGNMENT_RIGHT, 200, 14, UI.DIM)
 		elif w.get("throwable", false):
-			draw_string(f, Vector2(right - 150, 84), "x%d" % p.grenades, HORIZONTAL_ALIGNMENT_RIGHT, 150, 64, Color.WHITE)
+			draw_string(f, Vector2(right - 150, 84), "x%d" % (p.smokes if p.cur == "smoke" else p.grenades), HORIZONTAL_ALIGNMENT_RIGHT, 150, 64, Color.WHITE)
 			draw_string(fb, Vector2(right - 220, 104), "BASILI TUT: NİŞAN  •  BIRAK: AT", HORIZONTAL_ALIGNMENT_RIGHT, 220, 14, UI.DIM)
 		elif p.ammo.has(p.cur):
 			var a: Array = p.ammo[p.cur]
@@ -1905,6 +1905,11 @@ class AmmoPanel extends Control:
 			draw_circle(Vector2(gx, 30), 9, Color(0.35, 0.42, 0.25))
 			draw_rect(Rect2(gx - 3, 17, 6, 5), Color(0.5, 0.5, 0.5))
 			draw_string(fb, Vector2(gx + 14, 36), "x%d" % p.grenades, HORIZONTAL_ALIGNMENT_LEFT, 40, 18, Color(1, 1, 1, 0.85))
+			# smoke grenade (key 4 twice)
+			var sx := gx + 52.0
+			draw_rect(Rect2(sx - 6, 21, 12, 18), Color(0.55, 0.6, 0.5) if p.smokes > 0 else Color(0.3, 0.32, 0.3))
+			draw_rect(Rect2(sx - 6, 21, 12, 3), Color(0.8, 0.82, 0.78))
+			draw_string(fb, Vector2(sx + 11, 36), "x%d" % p.smokes, HORIZONTAL_ALIGNMENT_LEFT, 40, 18, Color(1, 1, 1, 0.85 if p.smokes > 0 else 0.4))
 
 
 class MedalRing extends Control:

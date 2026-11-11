@@ -343,9 +343,12 @@ func _build() -> void:
 		map_data["env"] = {"preset": "day"}
 	var ps: PackedScene = GS.map_scene(map_id)
 	var vis := ps.instantiate()
+	vis.name = "Map"
+	map_vis = vis
 	add_child(vis)
 	await _progress(30, "Malzemeler ve dokular hazırlanıyor...")
 	MatLib.apply(vis)
+	_apply_baked_ao(vis)
 	var dd := float(GS.settings["draw_distance"])
 	for mi in vis.find_children("*", "MeshInstance3D", true, false):
 		var m3 := mi as MeshInstance3D
@@ -392,8 +395,10 @@ func _build() -> void:
 	await _progress(55, "Atmosfer ve ışıklandırma...")
 	_setup_env(map_data["env"])
 	await _progress(65, "Yol ağı (navigasyon) hesaplanıyor...")
-	await _bake_nav()
+	if not GS.has_meta("nonav"):
+		await _bake_nav()
 	_add_occluders()
+	_add_reflection_probes()
 	await _render_minimap()
 	await _progress(85, "Oyuncular hazırlanıyor...")
 	var char_scenes := {}
@@ -550,6 +555,40 @@ func _add_occluders() -> void:
 		occ_root.add_child(oi)
 		oi.global_transform = Transform3D(Basis(Vector3.UP, float(r[1])), ctr)
 
+## CS2-style local cubemaps: a grid of ReflectionProbes over the playable area, each rendered once at load.
+## Metal, glass, wet ground and gun bodies then mirror their real surroundings instead of only the sky.
+## Update-once probes cost nothing per frame; the grid is coarser on lower settings.
+func _add_reflection_probes() -> void:
+	var qi := ["low", "medium", "high", "ultra"].find(str(GS.settings.get("quality", "high")))
+	if qi <= 0 or GS.has_meta("noprobes"):
+		return
+	var root := Node3D.new()
+	root.name = "Probes"
+	add_child(root)
+	var w: float = bounds[2] - bounds[0]
+	var h: float = bounds[3] - bounds[1]
+	var cell: float = [0.0, 36.0, 26.0, 20.0][qi]
+	var nx := maxi(1, int(ceil(w / cell)))
+	var nz := maxi(1, int(ceil(h / cell)))
+	var cx: float = w / nx
+	var cz: float = h / nz
+	var base_y := 0.0 if map_id != "gemi" else 30.0
+	for ix in nx:
+		for iz in nz:
+			var p := ReflectionProbe.new()
+			p.update_mode = ReflectionProbe.UPDATE_ONCE
+			p.size = Vector3(cx + 4.0, 18.0, cz + 4.0)
+			p.origin_offset = Vector3(0, -5.0, 0)
+			p.box_projection = true
+			p.interior = false
+			p.enable_shadows = false
+			p.max_distance = 60.0
+			p.intensity = 0.85
+			p.cull_mask = 1
+			p.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
+			root.add_child(p)
+			p.global_position = Vector3(bounds[0] + cx * (ix + 0.5), base_y + 7.0, -(bounds[1] + cz * (iz + 0.5)))
+
 # ---------------------------------------------------------------- bot gun pool
 ## guns are built during the loading screen and handed to bots when they (re)spawn: building a gun model
 ## mid-match took 5-28 ms (a visible hitch every time a bot respawned with a new weapon)
@@ -610,6 +649,37 @@ func _bot_weapon(gg: int) -> String:
 	return pool[randi() % pool.size()]
 
 var env_exp := 1.0
+var map_vis: Node3D
+var _cams_i := 0
+
+## CS2-style baked contact shading: tools/bake_ao.py bakes an ambient-occlusion atlas (UV2) per map with Cycles;
+## here it goes into the AO slot of every map material. Corners, under eaves, between crates, inside the
+## building: all get the soft darkening that real light bounce produces, at zero per-frame cost.
+func _apply_baked_ao(vis: Node3D) -> void:
+	var path := "res://assets/maps/%s_ao.png" % map_id
+	if GS.has_meta("noao") or not ResourceLoader.exists(path):
+		return
+	var tex: Texture2D = load(path)
+	if tex == null:
+		return
+	var done := {}
+	for mi in vis.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if not String(m.name).begins_with("chunk"):
+			continue
+		for si in m.mesh.get_surface_count():
+			var mat := m.get_active_material(si)
+			if mat is StandardMaterial3D:
+				var key := mat.get_instance_id()
+				if not done.has(key):
+					var m2: StandardMaterial3D = (mat as StandardMaterial3D).duplicate()
+					m2.ao_enabled = true
+					m2.ao_texture = tex
+					m2.ao_on_uv2 = true
+					m2.ao_light_affect = 0.25
+					m2.ao_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
+					done[key] = m2
+				m.set_surface_override_material(si, done[key])
 
 func _setup_env(env_cfg: Dictionary) -> void:
 	Engine.max_fps = GS.fps_limit()   # menu caps at 144, the match uses the player's setting
@@ -709,7 +779,7 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	e.volumetric_fog_albedo = Color(1, 0.97, 0.92)
 	e.volumetric_fog_length = 80.0
 	e.volumetric_fog_anisotropy = 0.35
-	e.volumetric_fog_sky_affect = 0.0
+	e.volumetric_fog_sky_affect = 1.0   # smoke grenades must also hide the sky behind them
 	e.adjustment_enabled = true
 	e.adjustment_brightness = 1.0
 	e.adjustment_contrast = 1.1
@@ -1048,10 +1118,17 @@ func set_paused(p: bool) -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if p else Input.MOUSE_MODE_CAPTURED
 
 # ---------------------------------------------------------------- combat
+var smokes: Array = []
+
 func los(a: Vector3, b: Vector3, exclude: Array = []) -> bool:
 	var q := PhysicsRayQueryParameters3D.create(a, b, 1)
 	q.exclude = exclude
-	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+	if not get_world_3d().direct_space_state.intersect_ray(q).is_empty():
+		return false
+	for sm in smokes:
+		if is_instance_valid(sm) and sm.blocks(a, b):
+			return false
+	return true
 
 func hitscan(shooter, origin: Vector3, dir: Vector3, wid: String, dmg: float, rng: float, head_mult: float, wd: Dictionary = {}, depth: int = 0) -> Dictionary:
 	var to := origin + dir * rng
@@ -1147,19 +1224,35 @@ func melee(attacker, origin: Vector3, dir: Vector3, dmg: float, wid: String) -> 
 			SFX.play3d("knife_wall", r["position"], -4)
 			fx.impact(r["position"], r["normal"], surface)
 
-func throw_grenade(thrower, pos: Vector3, vel: Vector3) -> void:
+func throw_grenade(thrower, pos: Vector3, vel: Vector3, smoke: bool = false) -> void:
 	var g := preload("res://scripts/grenade.gd").new()
 	g.match_node = self
 	g.thrower = thrower
+	g.is_smoke = smoke
 	add_child(g)
 	g.global_position = pos
 	g.linear_velocity = vel
+	if net and thrower == player and not smoke:
+		net.send_nade(pos, vel)
 
-func explode(pos: Vector3, thrower) -> void:
+## CS2-style volumetric smoke: a FogVolume raymarched by the engine's volumetric fog (Forward+), so it fills the
+## space, is lit by the sun and blocks sight properly; a particle cloud stands in on low / no-volumetric settings.
+func spawn_smoke(pos: Vector3, thrower) -> void:
+	if net and thrower == player:
+		net.send_smoke(pos)
+	SFX.play3d("smoke_pop", pos, 2, 1.0, 120.0, 10.0)
+	var sm := preload("res://scripts/smoke.gd").new()
+	sm.match_node = self
+	add_child(sm)
+	sm.global_position = pos
+
+func explode(pos: Vector3, thrower, visual_only: bool = false) -> void:
 	fx.explosion(pos)
 	SFX.play3d("explosion", pos, 6, 1.0, 200.0, 20.0)
 	var pd: float = player.global_position.distance_to(pos)
 	player.shake = max(player.shake, clamp(1.6 - pd / 15.0, 0.0, 1.6))
+	if visual_only:
+		return
 	for c in combatants:
 		var n = c["node"]
 		if not n.alive:
@@ -1584,9 +1677,18 @@ func test_hook(i: int) -> void:
 		c.current = true
 		if player: player.vm_rect.visible = false
 	elif i == 12:
-		# free camera: CAM="x,y,z,tx,ty,tz" (Godot coordinates)
-		var v: PackedFloat64Array = OS.get_environment("CAM").split_floats(",")
+		# free camera: CAM="x,y,z,tx,ty,tz" (Godot coordinates); CAMS="a;b;c" = one per shot
+		var cs: String = OS.get_environment("CAM")
+		if OS.get_environment("CAMS") != "":
+			var lst := OS.get_environment("CAMS").split(";")
+			cs = lst[mini(_cams_i, lst.size() - 1)]
+			_cams_i += 1
+			for ch in get_children():
+				if ch is Camera3D and ch.name.begins_with("TestCam"):
+					ch.queue_free()
+		var v: PackedFloat64Array = cs.split_floats(",")
 		var c := Camera3D.new()
+		c.name = "TestCam"
 		c.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 		add_child(c)
 		c.global_position = Vector3(v[0], v[1], v[2])
@@ -1647,6 +1749,21 @@ func test_hook(i: int) -> void:
 			player._melee(i == 41)
 			player.test_freeze_kind = "melee"
 		player.test_freeze = fr
+	elif i == 52:
+		print("NADE before g=", player.grenades, " s=", player.smokes, " cur=", player.cur)
+		player.switch_to("smoke", true)
+		print("NADE switched cur=", player.cur)
+		player._start_throw()
+		await get_tree().create_timer(0.3).timeout
+		await get_tree().create_timer(2.5).timeout
+		print("NADE after g=", player.grenades, " s=", player.smokes, " cur=", player.cur, " smokes_in_world=", smokes.size())
+	elif i == 51:
+		var fwd: Vector3 = -player.cam.global_transform.basis.z
+		fwd.y = 0.0
+		spawn_smoke(player.global_position + fwd.normalized() * float(OS.get_environment("SMK_D") if OS.get_environment("SMK_D") != "" else "9"), player)
+		var sm = smokes.back()
+		if OS.get_environment("SMK_T") != "":
+			sm.t = float(OS.get_environment("SMK_T"))
 	elif i == 46:
 		hud.toggle_buy(true)
 	elif i == 47:

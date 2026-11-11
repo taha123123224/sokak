@@ -75,6 +75,7 @@ var arc_mesh: ImmediateMesh
 var arc_mark: MeshInstance3D
 const THROW_TIME := 0.17
 var grenades := 0
+var smokes := 0       # one smoke grenade per life; key 4 toggles frag <-> smoke
 var ads := false
 var ads_k := 0.0
 var shots_in_burst := 0
@@ -167,6 +168,7 @@ func setup_loadout(set: Dictionary, mode: String) -> void:
 		var st := GS.stats_for(id)
 		ammo[id] = [st["mag"], int(GS.WEAPONS[id].get("reserve", 0))]
 	grenades = 2 if slots.has("bomba") else 0
+	smokes = 1 if slots.has("bomba") else 0
 	cur = ""
 	var first = "ana" if slots.has("ana") else ("tabanca" if slots.has("tabanca") else slots.keys()[0])
 	switch_to(slots[first], true)
@@ -242,7 +244,12 @@ func _unhandled_input(e: InputEvent) -> void:
 	if e.is_action_pressed("slot1") and slots.has("ana"): switch_to(slots["ana"])
 	if e.is_action_pressed("slot2") and slots.has("tabanca"): switch_to(slots["tabanca"])
 	if e.is_action_pressed("slot3") and slots.has("bicak"): switch_to(slots["bicak"])
-	if (e.is_action_pressed("slot4") or e.is_action_pressed("grenade")) and slots.has("bomba") and grenades > 0: switch_to(slots["bomba"])
+	if (e.is_action_pressed("slot4") or e.is_action_pressed("grenade")) and slots.has("bomba"):
+		# 4: frag; 4 again: smoke (whichever is left)
+		if cur == "frag" and smokes > 0: switch_to("smoke")
+		elif cur == "smoke" and grenades > 0: switch_to("frag")
+		elif grenades > 0: switch_to("frag")
+		elif smokes > 0: switch_to("smoke")
 	if e.is_action_pressed("last_weapon") and last != "" and _has(last): switch_to(last)
 	if e.is_action_pressed("reload"): start_reload()
 	if e.is_action_pressed("inspect") and reload_t <= 0 and equip_t <= 0 and not ads:
@@ -270,10 +277,16 @@ func equip_from_menu(cat: String, id: String) -> void:
 	switch_to(id, true)
 
 func _has(id: String) -> bool:
+	if id == "smoke":
+		return slots.has("bomba") and smokes > 0
 	for c in slots.keys():
 		if slots[c] == id:
 			return true
 	return false
+
+## grenades left of the kind in hand
+func _nades_left() -> int:
+	return smokes if cur == "smoke" else grenades
 
 func _cycle(d: int) -> void:
 	var order: Array = []
@@ -519,7 +532,7 @@ func _try_fire() -> void:
 		_melee(false)
 		return
 	if wdata.get("throwable", false):
-		if trigger_released and grenades > 0 and not nade_primed:
+		if trigger_released and _nades_left() > 0 and not nade_primed:
 			_start_throw()
 		trigger_released = false
 		return
@@ -881,14 +894,17 @@ func _finish_throw() -> void:
 	if not alive:
 		return
 	SFX.play("throw", -4)
-	match_node.throw_grenade(self, _throw_origin(), _throw_velocity())
-	grenades -= 1
+	match_node.throw_grenade(self, _throw_origin(), _throw_velocity(), cur == "smoke")
+	if cur == "smoke":
+		smokes -= 1
+	else:
+		grenades -= 1
 	if vm_weapon and fp_anim == "throw":
 		var wv := vm_weapon
 		wv.visible = false
 		get_tree().create_timer(0.35).timeout.connect(func(): if is_instance_valid(wv): wv.visible = true)
 		get_tree().create_timer(0.55).timeout.connect(func(): if fp_anim == "throw": _fp_play("idle", 0.15))
-	if grenades <= 0:
+	if _nades_left() <= 0:
 		switch_to(last if last != "" and _has(last) and last != cur else slots.get("ana", slots.get("tabanca", slots.get("bicak", cur))))
 
 # ---------------------------------------------------------------- damage
