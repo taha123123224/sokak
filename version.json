@@ -1,43 +1,47 @@
 {
- "version": "3.3.0",
- "build": 42,
+ "version": "3.4.0",
+ "build": 43,
  "parts": [
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v42.pck.part00",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v43.pck.part00",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v42.pck.part01",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v43.pck.part01",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v42.pck.part02",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v43.pck.part02",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v42.pck.part03",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v43.pck.part03",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v42.pck.part04",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v43.pck.part04",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v42.pck.part05",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v43.pck.part05",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v42.pck.part06",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v43.pck.part06",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v42.pck.part07",
-   "size": 38908752
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v43.pck.part07",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v43.pck.part08",
+   "size": 21516292
   }
  ],
- "pck_size": 699511632,
+ "pck_size": 776491012,
  "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
- "notes": "v3.3.0: 18 yeni rütbe rozeti • Yeni MP5 ve UMP-45 modelleri, gerçekçi metal/polimer dokular (SCAR-H dahil) • CS2 tarzı öldürme kartları • Ejder Kasası: 4 hareketli efsanevi kaplama",
+ "notes": "v3.4.0: 3 yeni harita (Kum Kasabası, Hurda Sahası, Paslı Fabrika) • Tüm bıçaklarda yeni el tutuşu ve animasyonlar • Ragdoll ölümler + vuruş parlaması • Ölüm kartında mesafe, kalan can, kaplama ve eklentiler • Z ile takıma işaret • E-spor Sabotaj (tur afişleri, klaç, turun en iyisi) • Yeni skor tablosu ve madalyalar",
  "launcher": {
   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/baslatici.pck",
   "size": 1689664
