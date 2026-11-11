@@ -427,7 +427,7 @@ func _build_ui() -> void:
 	clip.offset_top = -40; clip.offset_left = 150; clip.offset_right = -260
 	ui.add_child(clip)
 	ui.add_child(bp)
-	ticker = UI.lbl("YENİ v2.9.9: Gerçek kayıt ses efektleri   •   Yeni oyun müzikleri   •   Haritaya özel ortam sesleri   •   CS2 tarzı sade HUD ve kare radar   •   Hacimsel SİS BOMBASI (4)   •   CS2 tarzı lobi", 19, Color(1, 1, 1, 0.9), "Rajdhani-SemiBold")
+	ticker = UI.lbl("YENİ v3.0: Gerçek kayıt silah sesleri   •   Kevin MacLeod sinematik müzikleri   •   CS2 tarzı öldürme akışı ve HUD   •   Yeni lobi duruşu ve karakter seçimi   •   Çözünürlük ve arayüz boyutu ayarları", 19, Color(1, 1, 1, 0.9), "Rajdhani-SemiBold")
 	ticker.position = Vector2(1400, 8)
 	clip.add_child(ticker)
 	var ver := UI.lbl("SOKAK: Operasyon  v%s   " % Updater.VERSION, 16, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_RIGHT)

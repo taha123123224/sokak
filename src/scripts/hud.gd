@@ -226,7 +226,7 @@ func setup(p) -> void:
 		minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		root.add_child(minimap)
 	# kill feed
-	feed = UI.vbox(4)
+	feed = UI.vbox(3)
 	feed.anchor_left = 1; feed.anchor_right = 1
 	feed.offset_left = -560; feed.offset_right = -24; feed.offset_top = 24
 	feed.alignment = BoxContainer.ALIGNMENT_BEGIN
@@ -563,9 +563,12 @@ var _kf_sb := {}
 func _kf_style(kind: String) -> StyleBoxFlat:
 	if not _kf_sb.has(kind):
 		match kind:
-			"me": _kf_sb[kind] = UI.sb(Color(0.35, 0.2, 0.05, 0.75), UI.ACCENT, 2, 8, 8)
-			"died": _kf_sb[kind] = UI.sb(Color(0.02, 0.03, 0.05, 0.65), UI.RED, 2, 8, 8)
-			_: _kf_sb[kind] = UI.sb(Color(0.02, 0.03, 0.05, 0.65), Color(1, 1, 1, 0.08), 2, 8, 8)
+			# CS2: dark translucent strips; your own kills get a red outline, your death a red fill
+			"me": _kf_sb[kind] = UI.sb(Color(0.0, 0.0, 0.0, 0.62), Color(0.88, 0.1, 0.12), 2, 3, 0)
+			"died": _kf_sb[kind] = UI.sb(Color(0.55, 0.04, 0.05, 0.72), Color(0, 0, 0, 0), 0, 3, 0)
+			_: _kf_sb[kind] = UI.sb(Color(0.0, 0.0, 0.0, 0.5), Color(0, 0, 0, 0), 0, 3, 0)
+		_kf_sb[kind].content_margin_left = 12; _kf_sb[kind].content_margin_right = 12
+		_kf_sb[kind].content_margin_top = 3; _kf_sb[kind].content_margin_bottom = 3
 	return _kf_sb[kind]
 
 func _kf_new_row() -> Dictionary:
@@ -576,7 +579,7 @@ func _kf_new_row() -> Dictionary:
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.add_child(h)
-	var kl := UI.lbl("", 20, Color.WHITE, "Rajdhani-Bold")
+	var kl := UI.lbl("", 19, Color.WHITE, "Rajdhani-Bold")
 	var tr := TextureRect.new()
 	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -587,8 +590,8 @@ func _kf_new_row() -> Dictionary:
 	hr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	hr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	hr.custom_minimum_size = Vector2(24, 24)
-	hr.modulate = Color(1, 0.84, 0.35)
-	var vl := UI.lbl("", 20, Color.WHITE, "Rajdhani-Bold")
+	hr.modulate = Color(1, 1, 1, 0.95)
+	var vl := UI.lbl("", 19, Color.WHITE, "Rajdhani-Bold")
 	for c in [kl, tr, wl, bh, hr, vl]:
 		h.add_child(c)
 	p.visible = false
@@ -609,8 +612,9 @@ func _sp_kill_feed(killer: String, victim: String, wid: String, head: bool, kt: 
 	if r["tw"] and (r["tw"] as Tween).is_valid():
 		(r["tw"] as Tween).kill()
 	p.add_theme_stylebox_override("panel", _kf_style("me" if by_player else ("died" if player_died else "n")))
-	var kc: Color = GS.TEAM_COLORS.get(kt, Color("ffcf5a")) if kt != "" else Color("ffcf5a")
-	var vc: Color = GS.TEAM_COLORS.get(vt, Color("ff6a5a")) if vt != "" else Color("ff6a5a")
+	# soft CS2 side colours (pale blue / pale gold) instead of saturated team colours
+	var kc: Color = GS.TEAM_COLORS.get(kt, Color("eed58f")).lerp(Color.WHITE, 0.45) if kt != "" else Color("eed58f")
+	var vc: Color = GS.TEAM_COLORS.get(vt, Color("eed58f")).lerp(Color.WHITE, 0.45) if vt != "" else Color("eed58f")
 	(r["kl"] as Label).text = killer
 	(r["kl"] as Label).add_theme_color_override("font_color", kc)
 	(r["vl"] as Label).text = victim
@@ -620,7 +624,7 @@ func _sp_kill_feed(killer: String, victim: String, wid: String, head: bool, kt: 
 	var wl: Label = r["wl"]
 	if icon:
 		tr.texture = icon
-		var ih := 26.0
+		var ih := 24.0
 		tr.custom_minimum_size = Vector2(min(ih * icon.get_width() / max(icon.get_height(), 1), 104.0), ih)
 		tr.modulate = Color(1, 1, 1, 0.95) if lvl <= 0 else Color(1, 1, 1).lerp(GS.lvl_color(lvl), 0.35)
 		tr.visible = true

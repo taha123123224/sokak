@@ -463,7 +463,7 @@ func _build() -> void:
 	for k in 8:
 		_process_loading_pct()
 		await get_tree().process_frame
-	SFX.play_music("music_match", -22)
+	SFX.play_music("music_match", -13, false)
 	SFX.play_amb(GS.MAPS.get(map_id, {}).get("amb", {"mahalle": "amb_city", "safranbolu": "amb_town", "gemi": "amb_ship", "liman": "amb_port", "insaat": "amb_wind", "canakkale": "amb_sea"}.get(map_id, "amb_town")))
 	var tw := create_tween()
 	tw.tween_property(loading, "modulate:a", 0.0, 0.5)

@@ -868,27 +868,52 @@ class FriendAvatar extends Control:
 		draw_rect(Rect2(c.x - r - 5, c.y - r, 3, r * 2), sc)
 
 ## narrow screens (4:3, 16:10, small laptops): drop the least important bits so nothing is cut off
+var _fit_busy := false
 func _topbar_fit() -> void:
-	if topbar == null or not is_instance_valid(topbar):
+	## adaptive: start roomy, then step down (tighter tabs, hide optional chips, smaller tabs, compact
+	## level badge) until the centred tabs no longer touch the left icons or the right currency block
+	if topbar == null or not is_instance_valid(topbar) or _fit_busy:
 		return
-	var w: float = get_viewport().get_visible_rect().size.x
-	var tight := w < 2100
-	var very := w < 1600
+	_fit_busy = true
+	for lvl in 5:
+		_topbar_apply(lvl)
+		await get_tree().process_frame
+		if not is_instance_valid(topbar):
+			break
+		var t: Rect2 = topbar.get_global_rect()
+		var r: Rect2 = cur_box.get_global_rect() if cur_box and is_instance_valid(cur_box) else Rect2()
+		var l_right: float = 0.0
+		var lh: Control = topbar.get_parent().get_child(1) if topbar.get_parent().get_child_count() > 1 else null
+		if lh and lh is HBoxContainer:
+			l_right = lh.get_global_rect().end.x
+		if t.position.x > l_right + 12 and (r.size.x <= 0 or t.end.x < r.position.x - 12):
+			break
+	_fit_busy = false
+
+func _topbar_apply(lvl: int) -> void:
+	var fs: int = [19, 18, 17, 15, 14][lvl]
+	var big_fs: int = [30, 28, 27, 24, 22][lvl]
+	var mg: int = [16, 12, 10, 7, 5][lvl]
 	for k in nav_btns.keys():
 		var b = nav_btns[k]
 		if not is_instance_valid(b) or not (b is Button) or b.get_parent() != topbar:
 			continue
 		var big: bool = k == "lobby"
-		b.add_theme_font_size_override("font_size", (24 if very else 30) if big else (15 if very else (18 if tight else 19)))
+		b.add_theme_font_size_override("font_size", big_fs if big else fs)
 		for st in ["normal", "hover", "pressed", "focus"]:
 			var sbx: StyleBox = b.get_theme_stylebox(st)
 			if sbx:
-				sbx.content_margin_left = (14 if big else 7) if very else ((20 if big else 12) if tight else (24 if big else 16))
+				sbx.content_margin_left = mg + (8 if big else 0)
 				sbx.content_margin_right = sbx.content_margin_left
 	if cur_box and is_instance_valid(cur_box):
+		cur_box.add_theme_constant_override("separation", 8 if lvl < 3 else 4)
 		for c in cur_box.get_children():
 			if c.has_meta("optional"):
-				(c as Control).visible = not tight
+				(c as Control).visible = lvl < 2
+			if c is LevelBadge:
+				(c as Control).custom_minimum_size.x = 180 if lvl < 4 else 56
+				c.set("compact", lvl >= 4)
+				c.queue_redraw()
 
 func _confirm_quit() -> void:
 	var dim := ColorRect.new()
@@ -951,6 +976,7 @@ func _refresh_currency() -> void:
 	mc.tooltip_text = tip
 	cur_box.add_child(mc)
 	cur_box.add_child(_cur("crate", str(int(p.get("crates", 0))), Color("ff8a1f"), "Kasa"))
+	_topbar_fit.call_deferred()
 
 func _cur(kind: String, v: String, c: Color, tip: String = "Altın") -> Control:
 	var chip := PanelContainer.new()
@@ -1006,6 +1032,7 @@ class LevelBadge extends Control:
 	var level := 1
 	var frac := 0.0
 	var pname := ""
+	var compact := false
 	func _draw() -> void:
 		var h := size.y
 		var c := Vector2(h * 0.5, h * 0.5)
@@ -1025,6 +1052,8 @@ class LevelBadge extends Control:
 		var tw := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, int(h * 0.62)).x
 		draw_string(f, Vector2(c.x - tw * 0.5, c.y + h * 0.22), t, HORIZONTAL_ALIGNMENT_LEFT, -1, int(h * 0.62), UI.ACCENT2)
 		var x0 := h + 8
+		if compact or size.x < x0 + 30:
+			return
 		var fb: Font = UI.font("Rajdhani-Bold")
 		draw_string(fb, Vector2(x0, h * 0.42), pname, HORIZONTAL_ALIGNMENT_LEFT, size.x - x0, 17, Color.WHITE)
 		draw_string(fb, Vector2(x0, h * 0.68), "SEVİYE %d" % level, HORIZONTAL_ALIGNMENT_LEFT, size.x - x0, 12, UI.DIM)
@@ -1229,7 +1258,31 @@ func _make_soldier(cid: String) -> Node3D:
 	b.set_meta("wid", wid)
 	if b.anim and b.anim.has_animation("Idle"):
 		b._play("Idle")
+	_lobby_left_hand(b)
 	return b
+
+## the lobby low-ready lowers both arms together; an IK pass (after the weapon follow) then puts the
+## support hand back on the handguard with curled fingers, so the gun is held with both hands
+func _lobby_left_hand(b) -> void:
+	if b.skel == null or b.gun == null or GS.WEAPONS[str(b.get_meta("wid"))]["cat"] == "tabanca":
+		return
+	var m := b.gun.find_child("lhand", true, false) as Node3D
+	if m == null:
+		return
+	var t: Node3D = b._wrist_target(m, "L")
+	var ik := SkeletonIK3D.new()
+	ik.root_bone = b._bone("LeftArm")
+	ik.tip_bone = b._bone("LeftHand")
+	ik.override_tip_basis = false
+	ik.use_magnet = true
+	ik.magnet = Vector3(-1.5, -1.0, 0.5)
+	b.skel.add_child(ik)
+	ik.target_node = ik.get_path_to(t)
+	ik.start()
+	var gr = preload("res://scripts/hand_grip.gd").new()
+	b.skel.add_child(gr)
+	gr.setup(b.skel, b.gun, false)
+	gr.active = true
 
 func _swap_soldier(c: String) -> void:
 	var old_vis := soldier.visible
@@ -1382,8 +1435,8 @@ func _page_lobby() -> void:
 	nv.alignment = BoxContainer.ALIGNMENT_END
 	nm2.add_child(nv)
 	nv.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, UI.ACCENT2, "Rajdhani-Bold"))
-	nv.add_child(UI.lbl("GERÇEK SESLER", 26, Color.WHITE, "RussoOne-Regular"))
-	nv.add_child(_wrap("Stüdyo kaydı adım, çarpma ve ortam sesleri, yeni müzikler ve CS2 tarzı sade HUD!", 15))
+	nv.add_child(UI.lbl("SOKAK 3.0", 26, Color.WHITE, "RussoOne-Regular"))
+	nv.add_child(_wrap("Gerçek silah kayıtları, sinematik müzikler, CS2 tarzı öldürme akışı ve yeni lobi duruşu!", 15))
 	var mp := UI.glass(12, 4)
 	right.add_child(mp)
 	var mv := UI.vbox(7)
