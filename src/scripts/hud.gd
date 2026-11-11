@@ -809,73 +809,101 @@ func chat_line(who: String, t: String, team: bool, col: Color) -> void:
 var kb: Control
 ## modern kill banner under the crosshair: slanted plate, weapon silhouette, points, streak pips
 func _kill_banner(head: bool, wid: String, streak: int) -> void:
+	## CS2-style kill feedback: a row of skull cards (kills this life) above the bottom HUD, the newest one
+	## slams in with a flash; a slim plate above it names the kill type, weapon and score
 	if kb and is_instance_valid(kb):
 		kb.queue_free()
-	var col: Color = UI.GOLD if head else Color(1.0, 0.36, 0.28)
+	var col: Color = Color(1.0, 0.82, 0.35) if head else Color(1.0, 0.32, 0.26)
+	var n := clampi(streak, 1, 8)
+	var cw := 46.0
+	var gap := 8.0
+	var w := n * cw + (n - 1) * gap
 	kb = Control.new()
-	kb.set_anchors_preset(Control.PRESET_CENTER)
-	kb.position = Vector2(-230, 120)
-	kb.size = Vector2(460, 74)
+	kb.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	kb.size = Vector2(maxf(w, 420.0), 128)
+	kb.position = Vector2(-kb.size.x * 0.5, -186)
 	kb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	kb.pivot_offset = Vector2(230, 37)
 	root.add_child(kb)
-	var plate := Panel.new()
-	var sbx := StyleBoxFlat.new()
-	sbx.bg_color = Color(0.03, 0.035, 0.05, 0.78)
-	sbx.skew = Vector2(-0.35, 0)
-	sbx.border_width_bottom = 3; sbx.border_color = col
-	sbx.corner_radius_top_left = 3; sbx.corner_radius_bottom_right = 3
-	plate.add_theme_stylebox_override("panel", sbx)
-	plate.set_anchors_preset(Control.PRESET_FULL_RECT)
-	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# plate: "KAFADAN VURUŞ  •  AK-47  •  +150"
+	var plate := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0, 0, 0, 0.55)
+	sb.content_margin_left = 14; sb.content_margin_right = 14; sb.content_margin_top = 2; sb.content_margin_bottom = 2
+	sb.border_width_bottom = 2; sb.border_color = col
+	sb.corner_radius_top_left = 3; sb.corner_radius_top_right = 3
+	plate.add_theme_stylebox_override("panel", sb)
+	var ph := UI.hbox(10)
+	plate.add_child(ph)
+	var hs := _kf_icon("_head")
+	if head and hs:
+		var hi := TextureRect.new()
+		hi.texture = hs; hi.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; hi.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		hi.custom_minimum_size = Vector2(24, 24); hi.modulate = col
+		ph.add_child(hi)
+	ph.add_child(UI.lbl("KAFADAN VURUŞ" if head else "ETKİSİZ HALE GETİRİLDİ", 19, col, "Rajdhani-Bold"))
+	var wi := _kf_icon(wid)
+	if wi:
+		var wt := TextureRect.new()
+		wt.texture = wi; wt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; wt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		wt.custom_minimum_size = Vector2(64, 22); wt.modulate = Color(1, 1, 1, 0.85)
+		ph.add_child(wt)
+	ph.add_child(UI.lbl("+150" if head else "+100", 19, Color(1, 1, 1, 0.9), "Rajdhani-Bold"))
 	kb.add_child(plate)
-	var glow := ColorRect.new()
-	glow.color = Color(col.r, col.g, col.b, 0.35)
-	glow.position = Vector2(0, 0); glow.size = Vector2(6, 74)
-	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	kb.add_child(glow)
-	var h := UI.hbox(14)
-	h.position = Vector2(26, 6); h.size = Vector2(420, 62)
-	h.alignment = BoxContainer.ALIGNMENT_CENTER
-	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	kb.add_child(h)
-	var hs := _kf_icon("_head") if head else null
-	var ic := TextureRect.new()
-	ic.texture = hs if hs else _kf_icon(wid)
-	ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	ic.custom_minimum_size = Vector2(48 if head else 120, 44)
-	ic.modulate = col
-	h.add_child(ic)
-	var tv := UI.vbox(-4)
-	h.add_child(tv)
-	tv.add_child(UI.lbl("KAFADAN VURUŞ" if head else "DÜŞMAN ETKİSİZ", 26, col, "RussoOne-Regular"))
-	var wl := UI.hbox(8)
-	tv.add_child(wl)
-	wl.add_child(UI.lbl(("+150" if head else "+100") + "   •", 17, Color(1, 1, 1, 0.8), "Rajdhani-Bold"))
-	var blv := GS.wlvl(wid)
-	if blv > 0:
-		wl.add_child(lvl_badge(blv, 15))
-	wl.add_child(UI.lbl(str(GS.WEAPONS.get(wid, {}).get("name", "")).to_upper(), 17, Color(1, 1, 1, 0.8) if blv <= 0 else Color(1, 1, 1).lerp(GS.lvl_color(blv), 0.4), "Rajdhani-Bold"))
-	var pips := UI.hbox(3)
-	pips.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	h.add_child(pips)
-	for i in mini(streak, 10):
-		var pp := ColorRect.new()
-		pp.custom_minimum_size = Vector2(6, 22)
-		pp.color = col if i == streak - 1 else Color(1, 1, 1, 0.55)
-		pips.add_child(pp)
+	plate.position = Vector2(0, 0)
+	plate.resized.connect(func(): plate.position.x = (kb.size.x - plate.size.x) * 0.5)
+	# skull cards
+	var x0 := (kb.size.x - w) * 0.5
+	var sk := _skull_tex()
+	for i in n:
+		var c := Panel.new()
+		var cs := StyleBoxFlat.new()
+		var last := i == n - 1
+		cs.bg_color = Color(col.r * 0.25, col.g * 0.12, col.b * 0.1, 0.85) if last else Color(0, 0, 0, 0.55)
+		cs.border_width_bottom = 3; cs.border_color = col if last else Color(1, 1, 1, 0.35)
+		cs.set_corner_radius_all(3)
+		c.add_theme_stylebox_override("panel", cs)
+		c.position = Vector2(x0 + i * (cw + gap), 44); c.size = Vector2(cw, 58)
+		c.pivot_offset = c.size * 0.5
+		c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		kb.add_child(c)
+		if sk:
+			var t := TextureRect.new()
+			t.texture = sk; t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			t.set_anchors_preset(Control.PRESET_FULL_RECT); t.offset_left = 6; t.offset_right = -6; t.offset_top = 8; t.offset_bottom = -8
+			t.modulate = col if last else Color(1, 1, 1, 0.75)
+			t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			c.add_child(t)
+		if last:
+			c.scale = Vector2(1.9, 1.9)
+			c.modulate = Color(3, 3, 3, 0)
+			var t2 := c.create_tween().set_parallel(true)
+			t2.tween_property(c, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			t2.tween_property(c, "modulate", Color.WHITE, 0.25)
+			var fl := ColorRect.new()
+			fl.color = Color(col.r, col.g, col.b, 0.55)
+			fl.size = c.size; fl.position = c.position; fl.pivot_offset = c.size * 0.5
+			fl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			kb.add_child(fl)
+			var t3 := fl.create_tween().set_parallel(true)
+			t3.tween_property(fl, "scale", Vector2(2.6, 2.0), 0.35).set_ease(Tween.EASE_OUT)
+			t3.tween_property(fl, "color:a", 0.0, 0.35)
+			t3.chain().tween_callback(fl.queue_free)
 	_ignore_mouse(kb)
-	kb.scale = Vector2(1.35, 1.35)
-	kb.modulate = Color(2.2, 2.2, 2.2, 0.0)
-	var tw := kb.create_tween().set_parallel(true)
-	tw.tween_property(kb, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(kb, "modulate", Color(1, 1, 1, 1), 0.2)
-	tw.tween_property(glow, "size:x", 460.0, 0.25).set_ease(Tween.EASE_OUT)
-	tw.tween_property(glow, "color:a", 0.0, 0.45).set_delay(0.05)
-	tw.chain().tween_interval(1.5)
-	tw.chain().tween_property(kb, "modulate:a", 0.0, 0.35)
-	tw.chain().tween_callback(kb.queue_free)
+	plate.modulate.a = 0.0
+	var tw := kb.create_tween()
+	tw.tween_property(plate, "modulate:a", 1.0, 0.15)
+	tw.tween_interval(2.2)
+	tw.tween_property(kb, "modulate:a", 0.0, 0.4)
+	tw.tween_callback(kb.queue_free)
+
+var _skull: Texture2D
+func _skull_tex() -> Texture2D:
+	if _skull == null:
+		for pth in ["res://assets/ui/icons/skull.png", "res://assets/ui/kf/_head.png"]:
+			if ResourceLoader.exists(pth):
+				_skull = load(pth)
+				break
+	return _skull
 
 func kill_confirm(head: bool, big: String, multi: int = 1, wid: String = "", streak: int = 1) -> void:
 	center2.text = ""

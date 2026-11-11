@@ -1757,7 +1757,7 @@ func test_hook(i: int) -> void:
 			player.test_freeze_kind = "melee"
 		player.test_freeze = fr
 	elif i >= 65 and i <= 79:
-		var lst := ["m4a1", "awm", "uzi", "akm", "rpk16", "vityaz", "spas", "deagle", "usp", "karambit", "m4k", "kuzgun", "aug", "awp", "scar"]
+		var lst := ["m4a1", "awm", "uzi", "akm", "rpk16", "vityaz", "spas", "deagle", "usp", "karambit", "m4k", "kuzgun", "mp5", "ump45", "scar"]
 		var w2: String = lst[i - 65]
 		var c3: String = GS.WEAPONS[w2]["cat"]
 		player.slots[c3] = w2

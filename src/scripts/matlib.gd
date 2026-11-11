@@ -640,12 +640,57 @@ func apply(node: Node, skin: String = "") -> void:
 					mi.set_surface_override_material(i, ext_skin_mat(sm as BaseMaterial3D, skin))
 				elif skin != "" and skin != "std" and n.begins_with("gun_paint"):
 					mi.set_surface_override_material(i, skin_mat(skin))
+				elif _is_flat_gun(n) and sm is BaseMaterial3D:
+					mi.set_surface_override_material(i, _flat_pbr(n, sm as BaseMaterial3D))
 				elif EXT_FALLBACK.has(n):
 					mi.set_surface_override_material(i, _ext_fallback(n, sm))
 				else:
 					mi.set_surface_override_material(i, get_mat(n))
 	for c in node.get_children():
 		apply(c, skin)
+
+## flat-colour CC0 guns (fps-asset-kit): keep their colour layout, add real gunmetal/polymer surface detail
+const FLAT_GUNS := ["scar", "mp5", "ump45"]
+func _is_flat_gun(n: String) -> bool:
+	for g in FLAT_GUNS:
+		if n.begins_with("gun_paint_ext_%s_" % g) or n.begins_with("ext_%s_" % g):
+			return true
+	return false
+
+func _flat_pbr(n: String, orig: BaseMaterial3D) -> Material:
+	var key := "flat:" + n
+	if cache.has(key):
+		return cache[key]
+	var c := orig.albedo_color
+	var m := StandardMaterial3D.new()
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	m.uv1_triplanar = true
+	var sat := maxf(c.r, maxf(c.g, c.b)) - minf(c.r, minf(c.g, c.b))
+	var lum := (c.r + c.g + c.b) / 3.0
+	if sat > 0.08 and lum < 0.5:
+		# tan / brown furniture: textured polymer
+		m.albedo_texture = tex("polymer_albedo.png")
+		m.albedo_color = Color(c.r * 1.9, c.g * 1.9, c.b * 1.9)
+		m.normal_enabled = true; m.normal_texture = tex("polymer_normal.png"); m.normal_scale = 0.8
+		m.metallic = 0.0; m.roughness = 0.62
+		m.uv1_scale = Vector3(5, 5, 5)
+	elif lum > 0.5:
+		m.albedo_color = c
+		m.metallic = 0.7 if sat > 0.2 else 0.2; m.roughness = 0.35
+	else:
+		# black/grey receiver parts: worn gunmetal with micro detail and edge sheen
+		m.albedo_texture = tex("gunmetal_albedo.png")
+		var k := 0.35 + lum * 5.0
+		m.albedo_color = Color(0.45 * k, 0.46 * k, 0.49 * k)
+		m.normal_enabled = true; m.normal_texture = tex("gunmetal_normal.png"); m.normal_scale = 0.55
+		m.roughness_texture = tex("gunmetal_orm.png")
+		m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_GREEN
+		m.metallic = 0.75 if lum < 0.02 else 0.35
+		m.roughness = 1.0
+		m.uv1_scale = Vector3(6, 6, 6)
+	m.rim_enabled = true; m.rim = 0.15; m.rim_tint = 0.6
+	cache[key] = m
+	return m
 
 ## imported models whose archive came without textures: give them real wood / steel detail
 const EXT_FALLBACK := {"gun_paint_ext_r870_2": "wood", "gun_paint_ext_r870_1": "metal", "gun_paint_ext_m4a1_UltimateLowPolyGuns": "metal",

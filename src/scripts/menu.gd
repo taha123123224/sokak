@@ -1508,8 +1508,8 @@ func _page_lobby() -> void:
 	nv.alignment = BoxContainer.ALIGNMENT_END
 	nm2.add_child(nv)
 	nv.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, UI.ACCENT2, "Rajdhani-Bold"))
-	nv.add_child(UI.lbl("EJDER KASASI", 26, Color.WHITE, "RussoOne-Regular"))
-	nv.add_child(_wrap("4 yeni HAREKETLİ efsanevi kaplama: Kara Ejderha, Anka Alevi, Kuantum Devresi, Yıldırım Fırtınası!", 15))
+	nv.add_child(UI.lbl("YENİ RÜTBELER", 26, Color.WHITE, "RussoOne-Regular"))
+	nv.add_child(_wrap("18 yeni rütbe rozeti, yenilenen MP5 ve UMP-45, CS2 tarzı öldürme kartları. Ejder Kasası mağazada!", 15))
 	var mp := UI.glass(12, 4)
 	right.add_child(mp)
 	var mv := UI.vbox(7)

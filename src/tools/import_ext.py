@@ -54,6 +54,14 @@ SPECS['scar'] = dict(file=FG + 'flat_guns_west/Flat Guns West/GLB/Rifle_Battle_W
                      zones=[((0.30, 0.41), (0.0, 0.035), ((0.03, 0.03, 0.032), 0.7, 0.4))],
                      split_mag=((-0.035, 0.05), (-0.16, -0.045)))
 
+FLATM = {'M_PCL_Flat_Grey_Darker': (0.5, 0.2), 'M_PCL_Flat_Black_Lighter': (0.55, 0.0), 'M_PCL_Flat_Black': (0.4, 0.6), 'M_PCL_Flat_Grey_Dark': (0.45, 0.5)}
+SPECS['mp5'] = dict(file=FG + 'flat_guns_east/Flat Guns East/GLB/SMG_Full_East.glb', axis='Y', real=0.66,
+                    rhand=(-0.12, -0.055), muzzle=(0.22, 0.015), sight=(0.0, 0.06), lhand=(0.12, -0.005), eject=(0.005, 0.026),
+                    drop=['Icosphere'], keep_mats=True, flat_shade=True, mat_pbr=FLATM, split_mag=((0.0, 0.07), (-0.32, -0.04)))
+SPECS['ump45'] = dict(file=FG + 'flat_guns_west/Flat Guns West/GLB/SMG_Full_West.glb', axis='Y', real=0.69,
+                      rhand=(-0.095, -0.045), muzzle=(0.22, 0.02), sight=(0.0, 0.05), lhand=(0.13, -0.002), eject=(0.043, 0.014),
+                      drop=['Icosphere'], keep_mats=True, flat_shade=True, mat_pbr=FLATM, split_mag=((0.0, 0.055), (-0.33, -0.05)))
+
 M19 = '/home/claude/ext3d/new/m1911/tex2k/m1911_'
 NEW = '/home/claude/ext3d/new'
 SPECS.update({

@@ -443,7 +443,7 @@ func _build_ui() -> void:
 	clip.offset_top = -40; clip.offset_left = 150; clip.offset_right = -260
 	ui.add_child(clip)
 	ui.add_child(bp)
-	ticker = UI.lbl("YENİ v3.2: EJDER KASASI   •   4 HAREKETLİ efsanevi kaplama: Kara Ejderha, Anka Alevi, Kuantum Devresi, Yıldırım Fırtınası   •   Yeni kasa açılış ekranı ve ejderha animasyonu   •   Tüm kasalara yeni tasarım", 19, Color(1, 1, 1, 0.9), "Rajdhani-SemiBold")
+	ticker = UI.lbl("YENİ v3.3: 18 yeni rütbe rozeti   •   Yeni MP5 ve UMP-45 modelleri, gerçekçi metal ve polimer dokular   •   CS2 tarzı öldürme kartları   •   EJDER KASASI: 4 hareketli efsanevi kaplama", 19, Color(1, 1, 1, 0.9), "Rajdhani-SemiBold")
 	ticker.position = Vector2(1400, 8)
 	clip.add_child(ticker)
 	var ver := UI.lbl("SOKAK: Operasyon  v%s   " % Updater.VERSION, 16, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_RIGHT)

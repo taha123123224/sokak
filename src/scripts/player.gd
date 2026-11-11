@@ -1160,7 +1160,7 @@ const HIP := {
 }
 
 ## per-weapon hip framing fixes for guns whose proportions differ from their kind (compact SMGs)
-const HIP_ADJ := {"uzi": Vector3(0.03, -0.035, -0.13), "scar": Vector3(0.025, -0.025, -0.15)}
+const HIP_ADJ := {"uzi": Vector3(0.03, -0.035, -0.13), "scar": Vector3(0.025, -0.025, -0.15), "mp5": Vector3(0.025, -0.02, -0.17), "ump45": Vector3(0.025, -0.02, -0.17)}
 
 func _vm_kind(id: String) -> String:
 	var w: Dictionary = GS.WEAPONS[id]
