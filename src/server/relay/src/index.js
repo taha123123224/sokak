@@ -20,7 +20,7 @@ export default {
     const url = new URL(req.url);
     const m = url.pathname.match(/^\/room\/([A-Za-z0-9_-]{3,24})$/);
     if (url.pathname === "/" || url.pathname === "/health") {
-      return new Response(JSON.stringify({ ok: true, service: "sokak-relay", version: 1 }), { headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({ ok: true, service: "sokak-relay", version: 2 }), { headers: { "content-type": "application/json" } });
     }
     if (!m) return new Response("not found", { status: 404 });
     if (req.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
@@ -114,13 +114,17 @@ export class Room {
   async webSocketMessage(ws, msg) {
     const me = ws.deserializeAttachment();
     if (!me) return;
-    // ---- flood guard: more than 90 messages in one second = disconnect
+    // ---- flood guard: more than 90 game messages in one second = disconnect.
+    // v2: voice packets have their own budget (≈17/s while talking) so talking during a firefight
+    // can no longer push a player over the limit and drop the connection
     const now = Date.now();
-    const f = this.flood.get(ws) || { t: now, n: 0 };
-    if (now - f.t > 1000) { f.t = now; f.n = 0; }
-    f.n += 1;
+    const f = this.flood.get(ws) || { t: now, n: 0, v: 0 };
+    if (now - f.t > 1000) { f.t = now; f.n = 0; f.v = 0; }
+    const isVoice = typeof msg !== "string";
+    if (isVoice) f.v += 1; else f.n += 1;
     this.flood.set(ws, f);
     if (f.n > 90) { try { ws.close(4004, "flood"); } catch (e) {} return; }
+    if (isVoice && f.v > 45) return;
     if (typeof msg !== "string") {
       // binary = voice only: 'V', id length, id, samples. The id inside must be the sender's own id.
       const b = new Uint8Array(msg);

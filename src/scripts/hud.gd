@@ -1018,7 +1018,7 @@ func _show_medal(key: String, title: String, sub: String, col: Color, multi: int
 	UI.clear(medal_skulls)
 	for i in clamp(multi, 1, 6):
 		var t := TextureRect.new()
-		t.texture = medals.get("head" if (i == multi - 1 and key == "head") else "kill")
+		t.texture = _skull_tex()
 		t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		t.custom_minimum_size = Vector2(34, 34)
 		t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -1043,6 +1043,56 @@ func _show_medal(key: String, title: String, sub: String, col: Color, multi: int
 	medal_tw.tween_property(medal_title, "modulate:a", 1.0, 0.15).set_delay(0.1)
 	medal_tw.chain().tween_interval(1.5)
 	medal_tw.chain().tween_property(medal_box, "modulate:a", 0.0, 0.45)
+
+## e-sports round banner (v3.4): full-width stripe that slides in, team-coloured wedge, big title + sub line
+var _rb: Control
+func round_banner(title: String, sub: String, col: Color, score_a: int = -1, score_b: int = -1) -> void:
+	if _rb and is_instance_valid(_rb):
+		_rb.queue_free()
+	var rb := Control.new()
+	rb.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	rb.offset_top = 236; rb.offset_bottom = 348
+	rb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rb.pivot_offset = Vector2(640, 56)
+	root.add_child(rb)
+	_rb = rb
+	var bg := ColorRect.new()
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var gm := ShaderMaterial.new()
+	var sh := Shader.new()
+	sh.code = "shader_type canvas_item; uniform vec4 col : source_color; void fragment(){ float e = 1.0 - abs(UV.x - 0.5) * 2.0; float a = smoothstep(0.0, 0.55, e); float band = step(0.06, UV.y) * step(UV.y, 0.94); vec3 c = mix(vec3(0.02,0.024,0.034), col.rgb * 0.45, smoothstep(0.2, 1.0, e) * 0.6); float edge = (step(UV.y, 0.035) + step(0.965, UV.y)) * a; COLOR = vec4(mix(c, col.rgb, edge), max(a * 0.9 * band, edge)); }"
+	gm.shader = sh
+	gm.set_shader_parameter("col", col)
+	bg.material = gm
+	rb.add_child(bg)
+	var v := UI.vbox(0)
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rb.add_child(v)
+	var h := UI.hbox(22)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(h)
+	if score_a >= 0:
+		h.add_child(UI.lbl(str(score_a), 46, GS.TEAM_COLORS.get("a", Color.WHITE), "Teko"))
+	var tl := UI.lbl(title, 40, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
+	tl.add_theme_constant_override("outline_size", 6)
+	tl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	h.add_child(tl)
+	if score_b >= 0:
+		h.add_child(UI.lbl(str(score_b), 46, GS.TEAM_COLORS.get("b", Color.WHITE), "Teko"))
+	if sub != "":
+		v.add_child(UI.lbl(sub, 17, col.lightened(0.45), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+	rb.modulate.a = 0.0
+	rb.scale = Vector2(1.0, 0.2)
+	var tw := rb.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(rb, "modulate:a", 1.0, 0.18)
+	tw.tween_property(rb, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_interval(2.4)
+	tw.chain().tween_property(rb, "modulate:a", 0.0, 0.45)
+	tw.chain().tween_callback(rb.queue_free)
 
 func center_msg(t: String, c: Color) -> void:
 	center.text = t
@@ -1089,7 +1139,13 @@ func show_death(killer: String, wid: String, head: bool, info: Dictionary = {}) 
 	v.add_child(hs)
 	var hh := UI.hbox(10)
 	hs.add_child(hh)
-	hh.add_child(UI.lbl("✖  ÖLDÜRÜLDÜN", 20, accent.lightened(0.15), "RussoOne-Regular"))
+	var skt := _skull_tex()
+	if skt:
+		var sk := TextureRect.new()
+		sk.texture = skt; sk.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; sk.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		sk.custom_minimum_size = Vector2(24, 24); sk.modulate = accent; sk.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		hh.add_child(sk)
+	hh.add_child(UI.lbl("ÖLDÜRÜLDÜN", 22, accent.lightened(0.15), "RussoOne-Regular"))
 	hh.add_child(UI.spacer())
 	if head:
 		hh.add_child(_death_chip("KAFADAN", UI.GOLD))
@@ -1105,16 +1161,34 @@ func show_death(killer: String, wid: String, head: bool, info: Dictionary = {}) 
 	bm.add_child(bv)
 	var top := UI.hbox(14)
 	bv.add_child(top)
-	# avatar: team-coloured disc with the initial
+	# avatar: the killer's agent portrait (v3.4) framed in team colour, rank emblem beside it
 	var av := PanelContainer.new()
-	var asb := UI.sb(Color(tc.r * 0.3, tc.g * 0.3, tc.b * 0.3, 1), tc, 2, 30, 0)
+	var asb := UI.sb(Color(tc.r * 0.3, tc.g * 0.3, tc.b * 0.3, 1), tc, 2, 4, 0)
 	av.add_theme_stylebox_override("panel", asb)
-	av.custom_minimum_size = Vector2(60, 60)
+	av.custom_minimum_size = Vector2(84, 84)
 	av.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var al := UI.lbl(killer.substr(0, 1).to_upper(), 28, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
-	al.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	av.add_child(al)
+	var tm := str(info.get("team", ""))
+	var pool: Array = GS.team_chars(tm) if tm != "" else GS.CHARACTERS.keys()
+	var cid: String = str(pool[abs(hash(killer)) % pool.size()]) if pool.size() > 0 else ""
+	var ap := "res://assets/ui/agents/%s.jpg" % cid
+	if cid != "" and ResourceLoader.exists(ap):
+		var at := AtlasTexture.new()
+		at.atlas = load(ap)
+		var aw: float = at.atlas.get_width()
+		at.region = Rect2(aw * 0.2, aw * 0.02, aw * 0.6, aw * 0.6)
+		var pr := TextureRect.new()
+		pr.texture = at; pr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; pr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		av.add_child(pr)
+	else:
+		var al := UI.lbl(killer.substr(0, 1).to_upper(), 28, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
+		al.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		av.add_child(al)
 	top.add_child(av)
+	var rk := TextureRect.new()
+	rk.texture = GS.rank_info((int(info.get("lvl", 1)) * 37) % 3000)["icon"]
+	rk.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; rk.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rk.custom_minimum_size = Vector2(56, 56); rk.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(rk)
 	var nv := UI.vbox(-2)
 	nv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(nv)
@@ -1144,6 +1218,40 @@ func show_death(killer: String, wid: String, head: bool, info: Dictionary = {}) 
 	if wl > 0:
 		wh.add_child(lvl_badge(wl, 14))
 	wh.add_child(UI.lbl(str(GS.WEAPONS.get(wid, {}).get("name", "")).to_upper(), 17, Color.WHITE, "Rajdhani-Bold"))
+	# v3.4: the killer's skin (rarity colour) and attachments
+	var skn := str(info.get("skin", ""))
+	if skn != "" and GS.SKINS.has(skn):
+		var rr: int = clampi(int(GS.SKINS[skn].get("rarity", 0)), 0, GS.RARITY_COLORS.size() - 1)
+		var sh2 := UI.hbox(6)
+		sh2.alignment = BoxContainer.ALIGNMENT_END
+		sh2.add_child(_death_chip(("KAPLAMA  •  " + str(GS.SKINS[skn]["name"])).to_upper(), GS.RARITY_COLORS[rr]))
+		wv.add_child(sh2)
+	var pts: Array = info.get("parts", []) if info.get("parts", []) is Array else []
+	if not pts.is_empty():
+		var ph := UI.hbox(4)
+		ph.alignment = BoxContainer.ALIGNMENT_END
+		for pid in pts:
+			var pid_s := str(pid)
+			if not GS.PARTS.has(pid_s):
+				continue
+			var pb := PanelContainer.new()
+			pb.add_theme_stylebox_override("panel", UI.sb(Color(1, 1, 1, 0.05), Color(1, 1, 1, 0.12), 1, 5, 2))
+			pb.tooltip_text = str(GS.PARTS[pid_s]["name"])
+			var pth := "res://assets/ui/parts/%s.png" % pid_s
+			if ResourceLoader.exists(pth):
+				var pi := TextureRect.new()
+				pi.texture = load(pth)
+				pi.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; pi.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				pi.custom_minimum_size = Vector2(30, 30)
+				pb.add_child(pi)
+			else:
+				pb.add_child(UI.lbl(str(GS.PARTS[pid_s]["name"]).substr(0, 3).to_upper(), 11, UI.DIM, "Rajdhani-Bold"))
+			ph.add_child(pb)
+		var pl2 := UI.lbl("EKLENTİ", 11, UI.DIM, "Rajdhani-Bold")
+		pl2.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		ph.add_child(pl2)
+		ph.move_child(pl2, 0)
+		wv.add_child(ph)
 	# stat tiles
 	var tiles := UI.hbox(10)
 	bv.add_child(tiles)
@@ -1223,37 +1331,49 @@ func _sbx(bg: Color, border: Color = Color(0, 0, 0, 0), rad: int = 8, pad: int =
 	return sb
 
 func _build_board() -> void:
-	## Tab: modern scoreboard — header strip, one card per team with big score, column header, rows with
-	## avatar initial, rank emblem, K / Ö / KAFA / K/Ö / SKOR / PING; you are highlighted, MVP gets a star
+	## CS2 scoreboard: a wide dark sheet, header with map / mode / clock and the big "12 : 7" score,
+	## teams stacked (each with its colour bar), rows: avatar, rank emblem, name, K / A / Ö / KAFA% / K/Ö / SKOR / PING
 	if board:
 		board.queue_free()
 	var m = match_node
 	board = PanelContainer.new()
-	board.add_theme_stylebox_override("panel", _sbx(Color(0.012, 0.016, 0.024, 0.9), Color(1, 1, 1, 0.08), 14, 18))
+	var bsb := _sbx(Color(0.02, 0.022, 0.028, 0.94), Color(1, 1, 1, 0.06), 4, 0)
+	bsb.shadow_color = Color(0, 0, 0, 0.5); bsb.shadow_size = 24
+	board.add_theme_stylebox_override("panel", bsb)
 	board.set_anchors_preset(Control.PRESET_CENTER)
-	board.custom_minimum_size = Vector2(1320 if m.teams else 900, 0)
+	board.custom_minimum_size = Vector2(1180, 0)
 	root.add_child(board)
-	var v := UI.vbox(12)
+	var v := UI.vbox(0)
 	board.add_child(v)
-	# header
-	var top := UI.hbox(14)
-	v.add_child(top)
-	var tv := UI.vbox(-6)
+	# ---- header
+	var hdr := PanelContainer.new()
+	var hsb := _sbx(Color(1, 1, 1, 0.035), Color(0, 0, 0, 0), 4, 0)
+	hsb.content_margin_left = 24; hsb.content_margin_right = 24; hsb.content_margin_top = 12; hsb.content_margin_bottom = 12
+	hsb.corner_radius_bottom_left = 0; hsb.corner_radius_bottom_right = 0
+	hdr.add_theme_stylebox_override("panel", hsb)
+	v.add_child(hdr)
+	var top := UI.hbox(16)
+	hdr.add_child(top)
+	var tv := UI.vbox(-4)
+	tv.custom_minimum_size = Vector2(360, 0)
 	top.add_child(tv)
-	tv.add_child(UI.lbl(GS.MAPS[m.map_id]["name"].to_upper(), 34, Color.WHITE, "RussoOne-Regular"))
-	tv.add_child(UI.lbl(GS.MODES[m.mode]["name"].to_upper() + ("   •   HEDEF %d" % int(m.target_score) if m.mode != "gungame" else ""), 16, UI.DIM, "Rajdhani-Bold"))
-	top.add_child(UI.spacer())
-	var tl := int(m.time_left)
-	var tp := PanelContainer.new()
-	tp.add_theme_stylebox_override("panel", _sbx(Color(1, 1, 1, 0.06), Color(1, 1, 1, 0.12), 8, 10))
-	tp.add_child(UI.lbl("⏱  %d:%02d" % [tl / 60, tl % 60], 26, Color.WHITE, "Teko"))
-	tp.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	top.add_child(tp)
-	var groups: Array = []
+	tv.add_child(UI.lbl(GS.MAPS[m.map_id]["name"].to_upper(), 30, Color.WHITE, "Teko"))
+	tv.add_child(UI.lbl(GS.MODES[m.mode]["name"].to_upper() + ("   •   HEDEF %d" % int(m.target_score) if m.mode != "gungame" else ""), 14, Color(1, 1, 1, 0.5), "Rajdhani-Bold"))
+	var mid := UI.hbox(18)
+	mid.alignment = BoxContainer.ALIGNMENT_CENTER
+	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(mid)
 	if m.teams:
-		groups = [["a", GS.TEAMS["a"]], ["b", GS.TEAMS["b"]]]
-	else:
-		groups = [["", "OYUNCULAR"]]
+		var ca: Color = GS.TEAM_COLORS["a"]; var cb: Color = GS.TEAM_COLORS["b"]
+		mid.add_child(UI.lbl(GS.TEAMS["a"], 20, ca.lightened(0.3), "Rajdhani-Bold"))
+		mid.add_child(UI.lbl(str(m.team_score["a"]), 52, ca.lightened(0.2), "Teko"))
+		mid.add_child(UI.lbl(":", 40, Color(1, 1, 1, 0.4), "Teko"))
+		mid.add_child(UI.lbl(str(m.team_score["b"]), 52, cb.lightened(0.2), "Teko"))
+		mid.add_child(UI.lbl(GS.TEAMS["b"], 20, cb.lightened(0.3), "Rajdhani-Bold"))
+	var tl := int(m.time_left)
+	var tr := UI.lbl("%d:%02d" % [tl / 60, tl % 60], 34, Color.WHITE, "Teko", HORIZONTAL_ALIGNMENT_RIGHT)
+	tr.custom_minimum_size = Vector2(360, 0)
+	top.add_child(tr)
 	# MVP = highest score overall
 	var mvp = null
 	var best := -1
@@ -1261,119 +1381,128 @@ func _build_board() -> void:
 		var sc: int = int(e["score"]) if m.mode != "gungame" else int(e["gg"])
 		if sc > best:
 			best = sc; mvp = e
-	var hb := UI.hbox(16)
-	v.add_child(hb)
+	var cols := [["", 46], ["OYUNCU", 384], ["SV", 52], ["L", 60], ["Ö", 60], ["KAFA %", 76], ["K/Ö", 72], ["SKOR" if m.mode != "gungame" else "SİLAH", 110], ["PİNG", 64]]
+	var groups: Array = [["a", GS.TEAMS["a"]], ["b", GS.TEAMS["b"]]] if m.teams else [["", "OYUNCULAR"]]
+	var body := MarginContainer.new()
+	for side in ["left", "right"]:
+		body.add_theme_constant_override("margin_" + side, 16)
+	body.add_theme_constant_override("margin_top", 8); body.add_theme_constant_override("margin_bottom", 10)
+	v.add_child(body)
+	var bv := UI.vbox(10)
+	body.add_child(bv)
 	for gtuple in groups:
 		var t: String = gtuple[0]
 		var tc: Color = GS.TEAM_COLORS.get(t, UI.ACCENT)
-		var card := PanelContainer.new()
-		card.add_theme_stylebox_override("panel", _sbx(Color(0.03, 0.04, 0.06, 0.92), Color(tc.r, tc.g, tc.b, 0.35), 10, 0))
-		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hb.add_child(card)
-		var gv := UI.vbox(2)
-		card.add_child(gv)
-		# team head: colour strip, name, big score
-		var head := PanelContainer.new()
-		var hs := _sbx(Color(tc.r * 0.35, tc.g * 0.35, tc.b * 0.35, 0.9), Color(0, 0, 0, 0), 10, 0)
-		hs.corner_radius_bottom_left = 0; hs.corner_radius_bottom_right = 0
-		hs.content_margin_left = 16; hs.content_margin_right = 16; hs.content_margin_top = 6; hs.content_margin_bottom = 6
-		head.add_theme_stylebox_override("panel", hs)
-		gv.add_child(head)
-		var hh := UI.hbox(10)
-		head.add_child(hh)
-		var bar := ColorRect.new(); bar.color = tc; bar.custom_minimum_size = Vector2(5, 0)
-		hh.add_child(bar)
 		var list = m.combatants.filter(func(e): return t == "" or e["team"] == t)
+		list.sort_custom(func(a, b): return (a["score"] > b["score"]) if m.mode != "gungame" else (a["gg"] > b["gg"]))
 		var alive_n := 0
 		for e in list:
 			if e["node"].alive: alive_n += 1
-		var hv := UI.vbox(-6)
-		hh.add_child(hv)
-		hv.add_child(UI.lbl(str(gtuple[1]), 24, Color.WHITE, "RussoOne-Regular"))
-		hv.add_child(UI.lbl("%d / %d hayatta" % [alive_n, list.size()], 14, Color(1, 1, 1, 0.6), "Rajdhani-Bold"))
-		hh.add_child(UI.spacer())
-		if t != "":
-			hh.add_child(UI.lbl(str(m.team_score[t]), 54, Color.WHITE, "Teko"))
-		# column header
-		var cols := [["OYUNCU", 330], ["SV", 50], ["LEŞ", 56], ["ÖLÜM", 56], ["KAFA", 60], ["K/Ö", 64], ["SKOR", 76], ["PİNG", 60]]
-		if m.mode == "gungame":
-			cols[6] = ["SİLAH", 90]
-		var ch := UI.hbox(0)
-		var chm := MarginContainer.new()
-		chm.add_theme_constant_override("margin_left", 16); chm.add_theme_constant_override("margin_right", 12)
-		chm.add_theme_constant_override("margin_top", 4)
-		chm.add_child(ch)
-		gv.add_child(chm)
-		for c in cols:
-			var l := UI.lbl(c[0], 13, Color(1, 1, 1, 0.45), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_LEFT if c[0] == "OYUNCU" else HORIZONTAL_ALIGNMENT_CENTER)
+		# team bar + column header in one line
+		var th := UI.hbox(0)
+		bv.add_child(th)
+		var tb := ColorRect.new(); tb.color = tc; tb.custom_minimum_size = Vector2(4, 24)
+		th.add_child(tb)
+		var tn := UI.lbl("  " + str(gtuple[1]) + ("   %d/%d" % [alive_n, list.size()] if t != "" else ""), 16, tc.lightened(0.35), "Rajdhani-Bold")
+		tn.custom_minimum_size = Vector2(cols[0][1] + cols[1][1] - 4, 0)
+		th.add_child(tn)
+		for c in cols.slice(2):
+			var l := UI.lbl(c[0], 13, Color(1, 1, 1, 0.42), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
 			l.custom_minimum_size = Vector2(c[1], 0)
-			ch.add_child(l)
-		list.sort_custom(func(a, b): return (a["score"] > b["score"]) if m.mode != "gungame" else (a["gg"] > b["gg"]))
-		var rows := MarginContainer.new()
-		rows.add_theme_constant_override("margin_left", 8); rows.add_theme_constant_override("margin_right", 8); rows.add_theme_constant_override("margin_bottom", 8)
-		gv.add_child(rows)
-		var rv := UI.vbox(3)
-		rows.add_child(rv)
+			l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			th.add_child(l)
+		var rv := UI.vbox(2)
+		bv.add_child(rv)
 		for i in list.size():
 			var e: Dictionary = list[i]
 			var alive: bool = e["node"].alive
 			var me: bool = e["is_player"]
 			var rp := PanelContainer.new()
-			var rbg := Color(1, 0.6, 0.15, 0.2) if me else (Color(1, 1, 1, 0.045) if i % 2 == 0 else Color(1, 1, 1, 0.02))
-			rp.add_theme_stylebox_override("panel", _sbx(rbg, Color(1, 0.6, 0.15, 0.6) if me else Color(0, 0, 0, 0), 6, 0))
-			rp.custom_minimum_size = Vector2(0, 38)
+			var rbg := Color(tc.r * 0.3, tc.g * 0.3, tc.b * 0.3, 0.55) if me else (Color(1, 1, 1, 0.05) if i % 2 == 0 else Color(1, 1, 1, 0.025))
+			var rsb := _sbx(rbg, Color(0, 0, 0, 0), 2, 0)
+			rsb.border_width_left = 3; rsb.border_color = tc if alive else Color(tc.r, tc.g, tc.b, 0.3)
+			if me:
+				rsb.border_width_top = 1; rsb.border_width_bottom = 1; rsb.border_color = tc.lightened(0.2)
+			rp.add_theme_stylebox_override("panel", rsb)
+			rp.custom_minimum_size = Vector2(0, 40)
+			rp.modulate.a = 1.0 if alive else 0.55
 			rv.add_child(rp)
 			var row := UI.hbox(0)
-			var rm := MarginContainer.new()
-			rm.add_theme_constant_override("margin_left", 8); rm.add_theme_constant_override("margin_right", 4)
-			rm.add_child(row)
-			rp.add_child(rm)
-			var fc := Color.WHITE if alive else Color(1, 1, 1, 0.4)
-			if me: fc = Color("ffd08a")
-			# player cell: avatar + name + mvp/dead marks
+			rp.add_child(row)
+			var fc := Color.WHITE
+			if me: fc = Color("ffe2a8")
+			# avatar: the agent portrait for you, a coloured initial for others
+			var avc := Control.new()
+			avc.custom_minimum_size = Vector2(cols[0][1], 40)
+			row.add_child(avc)
+			var art_p := "res://assets/ui/agents/%s.jpg" % GS.cur_char()
+			if me and ResourceLoader.exists(art_p):
+				var at := AtlasTexture.new()
+				at.atlas = load(art_p)
+				var aw: float = at.atlas.get_width()
+				at.region = Rect2(aw * 0.25, aw * 0.05, aw * 0.5, aw * 0.5)
+				var ar := TextureRect.new()
+				ar.texture = at; ar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; ar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+				ar.position = Vector2(7, 3); ar.size = Vector2(34, 34)
+				avc.add_child(ar)
+			else:
+				var av := PanelContainer.new()
+				var hue := float(abs(hash(str(e["name"]))) % 360) / 360.0
+				av.add_theme_stylebox_override("panel", _sbx(Color.from_hsv(hue, 0.45, 0.42), Color(0, 0, 0, 0), 2, 0))
+				av.position = Vector2(7, 3); av.size = Vector2(34, 34)
+				var al := UI.lbl(str(e["name"]).substr(0, 1).to_upper(), 17, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
+				al.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				av.add_child(al)
+				avc.add_child(av)
 			var pc := UI.hbox(8)
-			pc.custom_minimum_size = Vector2(330, 0)
+			pc.custom_minimum_size = Vector2(cols[1][1], 0)
 			row.add_child(pc)
-			var av := PanelContainer.new()
-			var hue := float(abs(hash(str(e["name"]))) % 360) / 360.0
-			av.add_theme_stylebox_override("panel", _sbx(Color.from_hsv(hue, 0.5, 0.45 if alive else 0.2), tc if alive else Color(0, 0, 0, 0), 14, 0))
-			av.custom_minimum_size = Vector2(28, 28)
-			av.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-			var al := UI.lbl(str(e["name"]).substr(0, 1).to_upper(), 15, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
-			al.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			av.add_child(al)
-			pc.add_child(av)
 			var ri: Dictionary = GS.rank_info(int(GS.profile.get("rp", 0)) if me else (int(e["lvl"]) * 37) % 3000)
 			var rk := TextureRect.new()
 			rk.texture = ri["icon"]
 			rk.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			rk.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			rk.custom_minimum_size = Vector2(26, 26)
+			rk.custom_minimum_size = Vector2(32, 32)
 			rk.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-			rk.modulate.a = 1.0 if alive else 0.4
+			rk.tooltip_text = str(ri["name"])
 			pc.add_child(rk)
-			var nl := UI.lbl(str(e["name"]), 19, fc, "Rajdhani-Bold")
+			var nl := UI.lbl(str(e["name"]), 20, fc, "Rajdhani-Bold")
 			nl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			nl.clip_text = true
 			nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			pc.add_child(nl)
 			if mvp != null and e == mvp and best > 0:
-				pc.add_child(UI.lbl("★ MVP", 14, UI.GOLD, "Rajdhani-Bold"))
+				var mv := UI.lbl("★ MVP", 14, UI.GOLD, "Rajdhani-Bold")
+				mv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+				pc.add_child(mv)
 			if not alive:
-				pc.add_child(UI.lbl("☠", 16, UI.RED, "Rajdhani-Bold"))
-			var kd: float = float(e["kills"]) / max(1.0, float(e["deaths"]))
-			var vals := [str(e["lvl"]), str(e["kills"]), str(e["deaths"]), str(e["head"]), "%.2f" % kd,
+				var sk := _skull_tex()
+				if sk:
+					var si := TextureRect.new()
+					si.texture = sk; si.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; si.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+					si.custom_minimum_size = Vector2(20, 20); si.modulate = Color(1, 0.4, 0.35)
+					si.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+					pc.add_child(si)
+			var kills := int(e["kills"])
+			var kd: float = float(kills) / max(1.0, float(e["deaths"]))
+			var hsp := int(round(100.0 * float(e["head"]) / max(1.0, float(kills))))
+			var assists := int(e.get("assists", 0))
+			var vals := [str(e["lvl"]), str(kills), str(assists), str(e["deaths"]), ("%d%%" % hsp) if kills > 0 else "-", "%.2f" % kd,
 				str(e["score"]) if m.mode != "gungame" else GS.WEAPONS[GS.GUNGAME_ORDER[min(e["gg"], GS.GUNGAME_ORDER.size() - 1)]]["name"],
 				str(12 if me else 18 + (abs(hash(str(e["name"]))) % 30))]
+			# columns: SV L Ö KAFA K/Ö SKOR PİNG (assists shown only when tracked)
+			vals = [vals[0], vals[1], vals[3], vals[4], vals[5], vals[6], vals[7]]
 			for k in vals.size():
 				var vc := fc
-				if k == 4: vc = Color("7dffa8") if kd >= 1.0 else Color("ff8a7a")
-				if k == 4 and not alive: vc.a = 0.5
-				var l := UI.lbl(vals[k], 19 if k != 5 else 21, vc, "Teko" if k in [1, 2, 5] else "Rajdhani-SemiBold", HORIZONTAL_ALIGNMENT_CENTER)
-				l.custom_minimum_size = Vector2(cols[k + 1][1], 0)
+				if k == 4: vc = Color("8dffb5") if kd >= 1.0 else Color("ff8f80")
+				var big := k in [1, 2, 5]
+				var l := UI.lbl(vals[k], 24 if big else 18, vc, "Teko" if big else "Rajdhani-SemiBold", HORIZONTAL_ALIGNMENT_CENTER)
+				l.custom_minimum_size = Vector2(cols[k + 2][1], 0)
 				l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 				row.add_child(l)
-	v.add_child(UI.lbl("TAB bırakınca kapanır   •   Enter: sohbet   •   Y: takım sohbeti", 14, Color(1, 1, 1, 0.35), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+	var foot := UI.lbl("TAB bırakınca kapanır   •   Enter: sohbet   •   Y: takım sohbeti   •   V: sesli konuş", 13, Color(1, 1, 1, 0.32), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(foot)
+	v.add_child(UI.spacer(false, 0, 8))
 	board.position = (root.size - board.get_combined_minimum_size()) / 2
 	_ignore_mouse(board)
 

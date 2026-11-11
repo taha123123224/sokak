@@ -102,7 +102,7 @@ class LoadFx extends Control:
 		draw_arc(c0, 26.0, t * 3.0, t * 3.0 + 1.8, 24, col, 3.0, true)
 		draw_arc(c0, 26.0, t * 3.0 + PI, t * 3.0 + PI + 0.9, 24, Color(1, 1, 1, 0.6), 3.0, true)
 
-var _load_tips := ["Eğilerek ateş etmek isabeti artırır.", "Nişancı tüfeklerinde nefesini tut: hareket etme!", "Tab tuşu ile skor tablosunu aç.",
+var _load_tips := ["Z tuşu ile nişangahın altını takımına işaretle.", "Eğilerek ateş etmek isabeti artırır.", "Nişancı tüfeklerinde nefesini tut: hareket etme!", "Tab tuşu ile skor tablosunu aç.",
 	"F tuşu ile silahını incele.", "Kafadan vuruşlar 2.5 kat hasar verir.", "Shift ile yürürsen adım sesin duyulmaz.",
 	"Enter ile sohbet et, V tuşu ile takımınla konuş.", "Silahını yükselttikçe hasar artar ve parıltısı değişir.",
 	"Sabotajda öldükten sonra takım arkadaşlarını izleyebilirsin.", "Eklentiler (dürbün, susturucu) Çanta > ÖZELLEŞTİR menüsünde."]
@@ -328,9 +328,11 @@ func _progress(p: float, t: String) -> void:
 	var st := loading.find_child("st", true, false) as Label
 	if st: st.text = t.to_upper()
 	# give the bar a few frames to glide (also keeps the window responsive)
+	if OS.has_environment("DBGLOAD"): print("PROG ", p, " ", t)
 	for k in 3:
 		_process_loading_pct()
 		await get_tree().process_frame
+		if OS.has_environment("DBGLOAD"): print("  frame ok ", k)
 
 func _build() -> void:
 	fx = preload("res://scripts/fx.gd").new()
@@ -353,6 +355,8 @@ func _build() -> void:
 	add_child(vis)
 	await _progress(30, "Malzemeler ve dokular hazırlanıyor...")
 	MatLib.apply(vis)
+	if map_data.get("mesh_collision", false):
+		_fix_imported_mats(vis)
 	_apply_baked_ao(vis)
 	var dd := float(GS.settings["draw_distance"])
 	for mi in vis.find_children("*", "MeshInstance3D", true, false):
@@ -385,6 +389,55 @@ func _build() -> void:
 		statics.add_child(sb)
 		sb.position = Vector3(c["c"][0], c["c"][1], c["c"][2])
 		sb.rotation = Vector3(c["r"][0], c["r"][1], c["r"][2])
+	# v3.4 imported maps: their own meshes are the collision (trimesh, world layer)
+	if map_data.get("mesh_collision", false):
+		var nocol: Array = map_data.get("nocol", [])
+		for mi in vis.find_children("*", "MeshInstance3D", true, false):
+			var m3 := mi as MeshInstance3D
+			if m3.mesh == null:
+				continue
+			var skip := false
+			for nc in nocol:
+				if str(nc) in String(m3.name):
+					skip = true
+			for si in m3.mesh.get_surface_count():
+				var sm := m3.mesh.surface_get_material(si)
+				if sm and str(sm.resource_name).to_lower().contains("decal"):
+					skip = true
+			if skip:
+				continue
+			var shp := m3.mesh.create_trimesh_shape()
+			if shp == null:
+				continue
+			var msb := StaticBody3D.new()
+			msb.collision_layer = 1
+			var mcs := CollisionShape3D.new()
+			mcs.shape = shp
+			msb.add_child(mcs)
+			statics.add_child(msb)
+			msb.global_transform = m3.global_transform
+	# v3.4 imported maps that end in the void: a wide textured ground plane out to the horizon
+	if map_data.has("ground"):
+		var gd: Dictionary = map_data["ground"]
+		var gm := MeshInstance3D.new()
+		var pm := PlaneMesh.new()
+		pm.size = Vector2(1600, 1600)
+		gm.mesh = pm
+		var gmat := StandardMaterial3D.new()
+		var gt := str(gd.get("tex", "dirt"))
+		if ResourceLoader.exists("res://assets/tex/%s_albedo.png" % gt):
+			gmat.albedo_texture = load("res://assets/tex/%s_albedo.png" % gt)
+		if ResourceLoader.exists("res://assets/tex/%s_normal.png" % gt):
+			gmat.normal_enabled = true
+			gmat.normal_texture = load("res://assets/tex/%s_normal.png" % gt)
+		var tn: Array = gd.get("tint", [1, 1, 1])
+		gmat.albedo_color = Color(float(tn[0]), float(tn[1]), float(tn[2]))
+		gmat.roughness = 0.95
+		gmat.uv1_scale = Vector3(400, 400, 1)
+		gm.material_override = gmat
+		gm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		gm.position = Vector3(0, float(gd.get("y", -0.03)), 0)
+		vis.add_child(gm)
 	# floor safety
 	var fl := StaticBody3D.new()
 	var fcs := CollisionShape3D.new()
@@ -458,6 +511,7 @@ func _build() -> void:
 		combatants.append({"node": b, "name": bn, "team": bt, "kills": 0, "deaths": 0, "score": 0, "head": 0, "is_player": false, "gg": 0, "lvl": randi_range(5, 80)})
 	for c in combatants:
 		_spawn(c, true)
+	if OS.has_environment("DBGLOAD"): print("SPAWNED")
 	_fill_gun_pool()
 	_loading_roster()
 	await _progress(92, "Efektler ve gölgelendiriciler hazırlanıyor...")
@@ -492,23 +546,32 @@ func _prewarm() -> void:
 	## draw every effect once behind the loading screen so shaders/pipelines are compiled now,
 	## not in the middle of a fight (prevents first-shot / first-kill stutters)
 	var cam: Camera3D = player.cam
+	var _pw := OS.get_environment("PWSKIP")
+	if _pw == "all": return
 	var p: Vector3 = cam.global_position - cam.global_transform.basis.z * 3.0
 	var n: Vector3 = cam.global_transform.basis.z
 	SFX.silent = true
-	fx.impact(p, n, "concrete")
-	fx.impact(p, n, "metal")
-	fx.blood(p, n)
-	fx.death_burst(p, n, true)
-	fx.blood_decal(p, n, 0.5)
-	fx.tracer(p - Vector3(1, 0, 0), p + Vector3(1, 0, 0))
-	fx.muzzle_light(p, 1.0)
-	fx.explosion(p + n * -8.0)
+	if _pw != "fx":
+		fx.impact(p, n, "concrete")
+		fx.impact(p, n, "metal")
+		fx.blood(p, n)
+		fx.death_burst(p, n, true)
+		fx.blood_decal(p, n, 0.5)
+		fx.tracer(p - Vector3(1, 0, 0), p + Vector3(1, 0, 0))
+		fx.muzzle_light(p, 1.0)
+		fx.explosion(p + n * -8.0)
+	if OS.has_environment("DBGLOAD"): print("PW fx done")
+	if _pw == "guns":
+		SFX.silent = false
+		return
 	# weapon models that can actually appear in this match (bot pool + player loadout), drawn a few per frame:
 	# drawing all 33 weapons in one frame overflowed the D3D12 sampler-descriptor heap on AMD (device lost -> crash)
 	var ids: Array = gun_pool.keys().duplicate()
 	for c in player.slots.keys():
 		if not player.slots[c] in ids:
 			ids.append(player.slots[c])
+	if OS.has_environment("PWONLY"):
+		ids = Array(OS.get_environment("PWONLY").split(","))
 	var tmp := Node3D.new()
 	add_child(tmp)
 	tmp.global_position = p
@@ -521,10 +584,12 @@ func _prewarm() -> void:
 		MatLib.apply(w, GS.wskin(wid))
 		tmp.add_child(w)
 		batch += 1
+		if OS.has_environment("DBGLOAD"): print("PW gun ", wid)
 		if batch >= 4:
 			batch = 0
 			for i in 2:
 				await _frame_drawn()
+				if OS.has_environment("DBGLOAD"): print("PW drawn")
 			for ch in tmp.get_children():
 				ch.queue_free()
 	for i in 2:
@@ -1339,6 +1404,14 @@ func _sp_on_death(victim, attacker, wid: String, head: bool) -> void:
 			dinfo["my_dmg"] = float(attacker.get("dmg_from_player")) if "dmg_from_player" in attacker else 0.0
 			if not bool(attacker.get("puppet")):
 				dinfo["hp"] = maxf(float(attacker.health), 0.0)
+				var ag = attacker.get("gun")
+				if ag and is_instance_valid(ag):
+					dinfo["skin"] = str((ag as Node).get_meta("skin", "std"))
+			else:
+				if float(attacker.get("net_hp")) >= 0.0:
+					dinfo["hp"] = float(attacker.get("net_hp"))
+				dinfo["skin"] = str(attacker.get("net_skin"))
+				dinfo["parts"] = attacker.get("net_parts")
 		hud.show_death(ae.get("name", "Kendini"), wid, head, dinfo)
 		if attacker != null and is_instance_valid(attacker) and attacker != player:
 			_killcam(attacker)
@@ -1759,6 +1832,7 @@ func test_hook(i: int) -> void:
 	elif i >= 65 and i <= 79:
 		var lst := ["m4a1", "awm", "uzi", "akm", "rpk16", "vityaz", "spas", "deagle", "usp", "karambit", "m4k", "kuzgun", "mp5", "ump45", "scar"]
 		var w2: String = lst[i - 65]
+		if OS.has_environment("TESTW"): w2 = OS.get_environment("TESTW")
 		var c3: String = GS.WEAPONS[w2]["cat"]
 		player.slots[c3] = w2
 		player.ammo[w2] = [10, 90]
@@ -1802,7 +1876,7 @@ func test_hook(i: int) -> void:
 		hud.show_pause(true)
 	elif i == 45:
 		# death card check
-		hud.show_death("GeceKurdu", "m4a1", true, {"team": "b", "lvl": 37, "wlvl": 5, "self": false, "dmg": 100, "hits": 3, "heads": 1, "my_dmg": 64, "dist": 23.4, "hp": 36.0})
+		hud.show_death("GeceKurdu", "m4a1", true, {"team": "b", "lvl": 37, "wlvl": 5, "self": false, "dmg": 100, "hits": 3, "heads": 1, "my_dmg": 64, "dist": 23.4, "hp": 36.0, "skin": "ejderha", "parts": ["sus", "optik", "sarjor"]})
 	elif i == 22:
 		# HUD check: kill feed with weapon icons + inspect card + inspect pose
 		hud.kill_feed("Oyuncu", "Kartal07", "ak47", true, "a", "b", true, false, GS.wlvl("ak47"))
@@ -2020,3 +2094,108 @@ func test_hook(i: int) -> void:
 		var stuck := 0
 		print("NAV audit ", map_id, ": ", spawn_points.size(), " spawns, unreachable ", bad)
 		get_tree().quit()
+
+# ---------------------------------------------------------------- v3.4 tactical ping
+var _ping_cd := 0.0
+var _pings: Array = []
+func place_ping(pos: Vector3, who: String, tm: String, mine: bool) -> void:
+	if mine:
+		if Time.get_ticks_msec() / 1000.0 < _ping_cd:
+			return
+		_ping_cd = Time.get_ticks_msec() / 1000.0 + 0.8
+		if net != null:
+			Net.send({"t": "ping", "p": [snappedf(pos.x, 0.01), snappedf(pos.y, 0.01), snappedf(pos.z, 0.01)], "team": tm if teams else "", "n": who})
+	while _pings.size() >= 4:
+		var old = _pings.pop_front()
+		if is_instance_valid(old): old.queue_free()
+	var col: Color = GS.TEAM_COLORS.get(tm, UI.ACCENT) if teams else UI.ACCENT
+	var root := Node3D.new()
+	add_child(root)
+	root.global_position = pos
+	_pings.append(root)
+	var lb := Label3D.new()
+	lb.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lb.no_depth_test = true
+	lb.fixed_size = true
+	lb.pixel_size = 0.0011
+	lb.font = UI.font("RussoOne-Regular")
+	lb.font_size = 26
+	lb.outline_size = 8
+	lb.modulate = col.lightened(0.2)
+	lb.outline_modulate = Color(0, 0, 0, 0.8)
+	lb.position = Vector3(0, 0.35, 0)
+	lb.render_priority = 10
+	root.add_child(lb)
+	var dot := Label3D.new()
+	dot.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	dot.no_depth_test = true
+	dot.fixed_size = true
+	dot.pixel_size = 0.0016
+	dot.font_size = 40
+	dot.text = "◆"
+	dot.modulate = col
+	dot.outline_size = 10
+	dot.outline_modulate = Color(0, 0, 0, 0.7)
+	dot.render_priority = 10
+	root.add_child(dot)
+	var ring := MeshInstance3D.new()
+	var tm2 := TorusMesh.new(); tm2.inner_radius = 0.45; tm2.outer_radius = 0.55; tm2.rings = 24; tm2.ring_segments = 6
+	ring.mesh = tm2
+	var rm := StandardMaterial3D.new()
+	rm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	rm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	rm.albedo_color = Color(col.r, col.g, col.b, 0.8)
+	rm.no_depth_test = true
+	ring.material_override = rm
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(ring)
+	SFX.play("tick", -2, 1.6)
+	if hud:
+		if hud.has_method("chat_line"): hud.chat_line("◆ " + who, "burayı işaretledi", true, col)
+	var life := 4.0
+	var t0 := Time.get_ticks_msec() / 1000.0
+	while is_instance_valid(root):
+		var age := Time.get_ticks_msec() / 1000.0 - t0
+		if age > life:
+			break
+		var k := clampf(age * 4.0, 0.0, 1.0)
+		ring.scale = Vector3.ONE * (0.3 + 1.2 * fmod(age, 1.0))
+		rm.albedo_color.a = 0.8 * (1.0 - fmod(age, 1.0))
+		dot.position.y = 0.12 + 0.05 * sin(age * 6.0)
+		var fade := 1.0 - smoothstep(life - 0.6, life, age)
+		dot.modulate.a = k * fade
+		lb.modulate.a = k * fade
+		if player and is_instance_valid(player):
+			lb.text = "%s  •  %dm" % [who.to_upper(), int(player.global_position.distance_to(pos))]
+		await get_tree().process_frame
+	if is_instance_valid(root):
+		_pings.erase(root)
+		root.queue_free()
+
+## v3.4 imported (Sketchfab) maps: their exporter marks everything fully metallic and some packs keep the
+## colour in the emissive slot (baked / unlit atlases) -> plain lit dielectric surfaces, cut-out alpha
+func _fix_imported_mats(vis: Node) -> void:
+	var done := {}
+	for mi in vis.find_children("*", "MeshInstance3D", true, false):
+		var m3 := mi as MeshInstance3D
+		if m3.mesh == null:
+			continue
+		for si in m3.mesh.get_surface_count():
+			var mt = m3.get_active_material(si)
+			if not (mt is StandardMaterial3D) or done.has(mt):
+				continue
+			done[mt] = true
+			var sm := mt as StandardMaterial3D
+			sm.metallic = 0.0
+			sm.metallic_specular = 0.35
+			sm.roughness = maxf(sm.roughness, 0.82)
+			if sm.albedo_texture == null and sm.emission_enabled and sm.emission_texture:
+				sm.albedo_texture = sm.emission_texture
+				sm.albedo_color = Color.WHITE
+				sm.emission_enabled = false
+			elif sm.emission_enabled and sm.emission_texture == null:
+				sm.emission_enabled = false
+			if sm.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA:
+				sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+				sm.alpha_scissor_threshold = 0.45
+				sm.cull_mode = BaseMaterial3D.CULL_DISABLED

@@ -166,7 +166,9 @@ func _sp_set_weapon(w: String) -> void:
 		var ps: PackedScene = GS.weapon_scene(w)
 		gun = ps.instantiate()
 		gun.set_meta("wid", w)
-		MatLib.apply(gun, "std" if randf() < 0.6 else GS.SKINS.keys()[randi() % GS.SKINS.size()])
+		var bsk: String = "std" if randf() < 0.6 else GS.SKINS.keys()[randi() % GS.SKINS.size()]
+		gun.set_meta("skin", bsk)
+		MatLib.apply(gun, bsk)
 	gun.transform = Transform3D.IDENTITY
 	var kind := "pistol" if wdata["cat"] == "tabanca" else ("knife" if wdata.get("melee", false) or wdata.get("throwable", false) else "rifle")
 	muzzle = gun.find_child("muzzle", true, false)
@@ -800,6 +802,9 @@ var net_t := 0.0
 var _net_force := false
 
 var dmg_from_player := 0.0
+var net_skin := ""     # online: skin / attachments / health of the remote player's weapon (death card)
+var net_parts: Array = []
+var net_hp := -1.0
 var net_wlvl := 0      # online: the remote player's upgrade level of the held weapon (kill feed badge)
 var net_use := false     # online: the remote player is holding E (sabotage plant / defuse)
 
@@ -817,6 +822,10 @@ func net_state(d: Dictionary) -> void:
 	crouching = bool(d.get("c", false))
 	net_use = bool(d.get("u", false))
 	net_wlvl = clampi(int(d.get("wl", 0)), 0, 7)
+	net_skin = str(d.get("sk", ""))
+	var pa = d.get("pa", [])
+	net_parts = (pa as Array).slice(0, 6) if pa is Array else []
+	net_hp = float(d.get("hp", -1))
 	net_t = Time.get_ticks_msec() / 1000.0
 	var w := str(d.get("w", wid))
 	if w != wid and GS.WEAPONS.has(w):
@@ -888,6 +897,7 @@ func _sp_take_damage(amount: float, attacker, pos: Vector3, headshot: bool, w: S
 	health -= amount
 	if attacker == match_node.player:
 		dmg_from_player += amount
+		_hit_flash(headshot)
 	if GS.ball(w).get("abil", "") == "slow":
 		slow_t = 0.9
 	# hit reaction: torso jerks, head snaps on headshots, small stagger away from the shot
@@ -933,6 +943,7 @@ func _sp_take_damage(amount: float, attacker, pos: Vector3, headshot: bool, w: S
 		if ik_l: ik_l.stop()
 		if pose: pose.weight = 0.0
 		if anim: anim.pause()
+		_ragdoll_on((global_position - pos).normalized() * (5.5 if headshot else 4.0) + Vector3.UP * 1.2, pos, headshot)
 		_drop_gun()
 		match_node.on_death(self, attacker, w, headshot)
 
@@ -954,8 +965,71 @@ func _drop_gun() -> void:
 	gun = null
 	get_tree().create_timer(6.0).timeout.connect(rb.queue_free)
 
+## v3.4 hit flash: the body flashes briefly when YOUR bullet lands (clear hit confirmation)
+static var _flash_mat: StandardMaterial3D
+func _hit_flash(head: bool) -> void:
+	if model == null:
+		return
+	if _flash_mat == null:
+		_flash_mat = StandardMaterial3D.new()
+		_flash_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_flash_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_flash_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		_flash_mat.albedo_color = Color(1.0, 0.55, 0.45, 0.35)
+	var ms: Array = model.get_meta("flash_ms") if model.has_meta("flash_ms") else []
+	if ms.is_empty():
+		ms = model.find_children("*", "MeshInstance3D", true, false)
+		model.set_meta("flash_ms", ms)
+	for mi in ms:
+		if is_instance_valid(mi):
+			(mi as MeshInstance3D).material_overlay = _flash_mat
+	var tk: int = int(get_meta("flash_tk", 0)) + 1
+	set_meta("flash_tk", tk)
+	await get_tree().create_timer(0.07 if not head else 0.1).timeout
+	if not is_instance_valid(self) or int(get_meta("flash_tk", 0)) != tk:
+		return
+	for mi in ms:
+		if is_instance_valid(mi):
+			(mi as MeshInstance3D).material_overlay = null
+
+const RagdollLib = preload("res://scripts/ragdoll.gd")
+## v3.4 ragdoll deaths (falls back to the old topple when off / not possible)
+var rd_sim: PhysicalBoneSimulator3D
+var rd_on := false
+static var rd_live: Array = []
+func _ragdoll_on(impulse: Vector3, at: Vector3, head: bool) -> void:
+	rd_on = false
+	if skel == null or not bool(GS.settings.get("ragdoll", true)) or str(GS.settings.get("quality", "high")) == "low":
+		return
+	if rd_sim == null or not is_instance_valid(rd_sim):
+		rd_sim = RagdollLib.build(skel)
+	if rd_sim == null:
+		return
+	# at most 6 live ragdolls: the oldest corpse goes back to the plain topple pose
+	rd_live = rd_live.filter(func(b): return is_instance_valid(b) and b.rd_on)
+	while rd_live.size() >= 6:
+		var old = rd_live.pop_front()
+		old._ragdoll_off()
+	rd_on = true
+	rd_live.append(self)
+	RagdollLib.start(skel, rd_sim, impulse, at, head)
+
+func _ragdoll_off() -> void:
+	if rd_on and skel:
+		RagdollLib.stop(skel, rd_sim)
+	rd_on = false
+
 func _death_anim(delta: float) -> void:
 	death_t += delta
+	if rd_on:
+		if death_t > 0.7 and not death_fx_done:
+			death_fx_done = true
+			SFX.play3d("bodyfall", global_position, -4, randf_range(0.9, 1.1), 30.0, 4.0)
+			var hip := global_position
+			if rd_sim and rd_sim.get_child_count() > 0:
+				hip = (rd_sim.get_child(0) as Node3D).global_position
+			match_node.fx.blood_pool(hip)
+		return
 	if model:
 		# knees buckle first, then the body topples away from the shooter
 		var buckle: float = clamp(death_t / 0.18, 0.0, 1.0)
@@ -987,6 +1061,7 @@ func respawn(pos: Vector3, yaw_: float, weapon: String) -> void:
 	alive = true
 	collision_layer = 2
 	collision_mask = 1 | 2
+	_ragdoll_off()
 	model.transform = Transform3D(Basis(Vector3.UP, PI), Vector3.ZERO)
 	target = null
 	target_visible = false

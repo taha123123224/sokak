@@ -412,6 +412,9 @@ var MAPS := {
 	"liman": {"name": "Liman Deposu", "desc": "Sisli sabah, konteyner sahası ve depo. Nişancı dostu.", "size": "Büyük"},
 	"insaat": {"name": "İnşaat", "desc": "Yarım kalmış 3 katlı beton bina, vinç ve şantiye. Küçük ve hızlı, yakın çatışma.", "size": "Küçük"},
 	"canakkale": {"name": "Çanakkale", "desc": "Boğaz kıyısında taş tabya, top mevzileri ve siper hattı. Gün batımında destansı çatışma.", "size": "Büyük"},
+	"kum": {"name": "Kum Kasabası", "desc": "Çöl kasabasında kemerli dar geçit, kerpiç duvarlar ve köşe kapışmaları.", "size": "Küçük", "amb": "amb_wind"},
+	"hurda": {"name": "Hurda Sahası", "desc": "Çukurdaki konteyner sahası: hesco bariyerleri, lastikler, sürekli çatışma.", "size": "Küçük", "amb": "amb_site"},
+	"fabrika": {"name": "Paslı Fabrika", "desc": "Terk edilmiş tuğla fabrika kompleksi, avlular, depolar ve bacalar.", "size": "Büyük", "amb": "amb_city"},
 }
 var MODES := {
 	"ffa": {"name": "Ölüm Maçı", "desc": "Herkes herkese karşı. En çok öldüren kazanır.", "teams": false},
@@ -436,6 +439,10 @@ const CREDITS := [
 	["Oculus Audio Pack 01 (adım, bıçak, ortam sesleri)", "Oculus VR, LLC", "CC BY 4.0 · developers.meta.com/vr/downloads/package/oculus-audio-pack-1"],
 	["SCAR-H, MP5, UMP-45 modelleri: Flat Guns West/East", "fps-asset-kit", "CC0 · github.com/petroulacl/fps-asset-kit"],
 	["Impact Sounds (mermi çarpma)", "Kenney", "CC0 · kenney.nl"],
+	["knife Animated (tüm bıçaklarda birinci şahıs kollar ve animasyonlar)", "DJMaesen", "CC-BY 4.0 · sketchfab.com/bumstrum"],
+	["Dust2-short (Kum Kasabası haritası)", "frostychaos144", "CC-BY 4.0 · sketchfab.com/frostychaos144"],
+	["Maps (Hurda Sahası haritası)", "frostychaos144", "CC-BY 4.0 · sketchfab.com/frostychaos144"],
+	["Rust (Paslı Fabrika haritası)", "frostychaos144", "CC-BY 4.0 · sketchfab.com/frostychaos144"],
 	["Interface Sounds / UI Audio (menü sesleri)", "Kenney", "CC0 · kenney.nl"],
 ]
 const TEAMS := {"a": "KARTAL", "b": "AKREP"}
@@ -924,12 +931,12 @@ const DEFAULT_BINDS := {
 	"move_forward": [KEY_W], "move_back": [KEY_S], "move_left": [KEY_A], "move_right": [KEY_D],
 	"jump": [KEY_SPACE], "crouch": [KEY_CTRL, KEY_C], "walk": [KEY_SHIFT], "reload": [KEY_R], "use": [KEY_E],
 	"slot1": [KEY_1], "slot2": [KEY_2], "slot3": [KEY_3], "slot4": [KEY_4], "grenade": [KEY_G], "inspect": [KEY_F], "voice": [KEY_V], "team_chat": [KEY_Y],
-	"scoreboard": [KEY_TAB], "pause": [KEY_ESCAPE], "chat": [KEY_T], "last_weapon": [KEY_Q], "buy_menu": [KEY_B],
+	"scoreboard": [KEY_TAB], "pause": [KEY_ESCAPE], "chat": [KEY_T], "last_weapon": [KEY_Q], "buy_menu": [KEY_B], "ping": [KEY_Z],
 }
 const BIND_NAMES := {
 	"move_forward": "İleri", "move_back": "Geri", "move_left": "Sol", "move_right": "Sağ", "jump": "Zıpla", "crouch": "Eğil",
 	"walk": "Yürü (sessiz)", "reload": "Şarjör Değiştir", "use": "Kullan", "slot1": "Ana Silah", "slot2": "Tabanca", "slot3": "Bıçak",
-	"slot4": "Bomba", "grenade": "Hızlı Bomba", "inspect": "Silahı İncele", "voice": "Sesli Konuş (bas-konuş)", "team_chat": "Takım Sohbeti", "chat": "Sohbet", "scoreboard": "Skor Tablosu", "last_weapon": "Son Silah", "buy_menu": "Silah Menüsü",
+	"slot4": "Bomba", "grenade": "Hızlı Bomba", "inspect": "Silahı İncele", "voice": "Sesli Konuş (bas-konuş)", "team_chat": "Takım Sohbeti", "chat": "Sohbet", "scoreboard": "Skor Tablosu", "last_weapon": "Son Silah", "buy_menu": "Silah Menüsü", "ping": "İşaret Koy (takıma göster)",
 }
 
 func setup_input() -> void:

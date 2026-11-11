@@ -252,6 +252,13 @@ func _unhandled_input(e: InputEvent) -> void:
 		elif smokes > 0: switch_to("smoke")
 	if e.is_action_pressed("last_weapon") and last != "" and _has(last): switch_to(last)
 	if e.is_action_pressed("reload"): start_reload()
+	if e.is_action_pressed("ping") and alive and match_node and match_node.has_method("place_ping"):
+		# v3.4 tactical ping: mark the spot under the crosshair for the whole team
+		var pq := PhysicsRayQueryParameters3D.create(cam.global_position, cam.global_position - cam.global_transform.basis.z * 150.0)
+		pq.exclude = [get_rid()]
+		var pr: Dictionary = get_world_3d().direct_space_state.intersect_ray(pq)
+		if not pr.is_empty():
+			match_node.place_ping(pr["position"], GS.profile.get("name", "Sen"), str(team) if "team" in self else "", true)
 	if e.is_action_pressed("inspect") and reload_t <= 0 and equip_t <= 0 and not ads:
 		inspect_t = 3.2
 		if _fp_has("inspect"):
@@ -769,12 +776,16 @@ func _inspect_pose(kind: String, t: float) -> Array:
 			return [(a[1] as Vector3).lerp(b[1], u), r]
 	return [Vector3.ZERO, Vector3.ZERO]
 
+var _swing_alt := false
 func _melee(heavy: bool) -> void:
 	melee_heavy = heavy
 	melee_t = 0.75 if heavy else 0.45
 	fire_cd = 1.0 if heavy else 60.0 / float(wdata["rpm"])
 	SFX.play("knife_swing", -4, randf_range(0.9, 1.1))
 	var ma := "stab" if heavy else "slash"
+	_swing_alt = not _swing_alt
+	if _swing_alt and _fp_has(ma + "2"):
+		ma += "2"
 	if _fp_has(ma):
 		_fp_play(ma, 0.05, _fp_len(ma) / melee_t)
 		get_tree().create_timer(melee_t + 0.02).timeout.connect(func(): if fp_anim == ma: _fp_play("idle", 0.15))
@@ -1209,8 +1220,12 @@ func _load_vm_weapon(id: String) -> void:
 		pass
 	if fp_root and is_instance_valid(fp_root):
 		fp_root.queue_free()
-	fp_ap = null; fp_skel = null; fp_meta = {}; fp_anim = ""; mag_att = null; held_att = null
-	var fp_path := "res://assets/models/fp_%s.glb" % GS.weapon_base(id)
+	fp_ap = null; fp_skel = null; fp_meta = {}; fp_anim = ""; mag_att = null; held_att = null; melee_rig = false
+	var fp_key := GS.weapon_base(id)
+	# v3.4: every knife uses the same animated arms rig (one grip, one set of swings for all of them)
+	if wdata.get("melee", false) and ResourceLoader.exists("res://assets/models/fp_melee.glb"):
+		fp_key = "melee"
+	var fp_path := "res://assets/models/fp_%s.glb" % fp_key
 	if ResourceLoader.exists(fp_path):
 		var fp: Node3D = _fp_scene(fp_path).instantiate()
 		MatLib.apply(fp)
@@ -1220,10 +1235,12 @@ func _load_vm_weapon(id: String) -> void:
 		vm_parts["arms"] = fp
 		fp_ap = fp.find_child("AnimationPlayer", true, false) as AnimationPlayer
 		fp_skel = fp.find_child("Skeleton3D", true, false) as Skeleton3D
-		var mp := "res://assets/models/fp_%s.json" % GS.weapon_base(id)
+		var mp := "res://assets/models/fp_%s.json" % fp_key
 		if FileAccess.file_exists(mp):
 			fp_meta = JSON.parse_string(FileAccess.get_file_as_string(mp))
-		if fp_meta.get("rig", 0):
+		if fp_meta.get("rig", 0) and fp_key == "melee":
+			_rig_setup_melee(id, fp_path)
+		elif fp_meta.get("rig", 0):
 			_rig_setup(id, fp_path)
 		if fp_ap:
 			if _fp_has("idle"):
@@ -1231,10 +1248,10 @@ func _load_vm_weapon(id: String) -> void:
 			_fp_play("idle", 0.0)
 			fp_ap.advance(0.0)
 		# knives and grenades live in the right hand and follow every swing/throw
-		if fp_skel and (wdata.get("melee", false) or wdata.get("throwable", false)):
+		if fp_key != "melee" and fp_skel and (wdata.get("melee", false) or wdata.get("throwable", false)):
 			held_att = _attach_to_bone(vm_weapon, "RightHand")
 		# CS:GO knife view: the free left arm is not shown (it floated open-handed beside the knife)
-		if fp_skel and wdata.get("melee", false):
+		if fp_key != "melee" and fp_skel and wdata.get("melee", false):
 			var hb = preload("res://scripts/hide_bone_mod.gd").new()
 			for bn in ["Bip01 L UpperArm", "mixamorig_LeftArm", "LeftArm", "upperarm_l"]:
 				var bi := fp_skel.find_bone(bn)
@@ -1290,6 +1307,62 @@ func _rig_setup(id: String, path: String) -> void:
 	fp_ap.add_animation_library("rig", lib)
 	# play by plain name ("idle") through the "rig/" library
 	fp_meta["prefix"] = "rig/"
+
+## v3.4 shared knife rig: cut its clips like any rig, then put the game's own knife model (with its skin) in the
+## rig's animated knife socket. The rig was fitted onto w_knife at frame `melee_ref`, so at that pose the
+## socket and the static w_knife coincide; other knives are lined up on their grip (rhand) point.
+## models whose blade flat faces sideways in the fist get turned so the flat shows to the camera
+const MELEE_ROLL := {"knife": 90.0, "karambit": 90.0}
+var melee_rig := false
+func _rig_setup_melee(id: String, path: String) -> void:
+	_rig_setup(id, path)
+	melee_rig = true
+	for mi in vm_weapon.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).visible = true
+	for mi in fp_root.find_children("gun_*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).visible = false
+	# the pack's own first-person framing: its camera sits at the origin looking down glTF +Z
+	var cpos: Vector3 = _v3(fp_meta.get("cam", [0, 0, 0]))
+	var pa := deg_to_rad(float(fp_meta.get("cam_pitch", 0.0)))
+	var cb := Basis(Vector3(-1, 0, 0), Vector3(0, cos(pa), sin(pa)), Vector3(0, sin(pa), -cos(pa)))
+	fp_root.transform = Transform3D(cb, cpos).affine_inverse()
+	var sock := fp_root.find_child("knife", true, false) as Node3D
+	var sk: Dictionary = fp_meta.get("socket", {})
+	if sock == null or fp_ap == null or sk.is_empty():
+		return
+	fp_ap.play(_fp_name("idle"), 0.0)
+	fp_ap.seek(float(fp_meta.get("melee_ref", 0.0)), true)
+	var gb: Basis = sock.global_transform.basis
+	var o: Vector3 = sock.global_transform * _v3(sk["o"])
+	var y: Vector3 = (gb * _v3(sk["y"])).normalized()
+	var z: Vector3 = (gb * _v3(sk["z"])).normalized()
+	z = (z - y * z.dot(y)).normalized()
+	var holder := Node3D.new()
+	sock.add_child(holder)
+	# game knife models: blade along -Z, edge/spine along Y, grip at the origin
+	holder.global_transform = Transform3D(Basis(y.cross(z), z * float(fp_meta.get("edge_sign", 1.0)), -y), o)
+	# the knife's grip point (rhand marker) goes into the fist
+	var rh := Vector3.ZERO
+	var rr := vm_weapon.find_child("rhand", true, false) as Node3D
+	if rr:
+		rh = _local_in(vm_weapon, rr).origin
+	var wb: Basis = vm_weapon.transform.basis * Basis(Vector3(0, 0, 1), deg_to_rad(float(MELEE_ROLL.get(id, 0.0))))
+	vm_weapon.reparent(holder, false)
+	vm_weapon.transform = Transform3D(wb, -(wb * rh))
+	held_att = holder
+	fp_ap.play(_fp_name("idle"), 0.0)
+
+static func _v3(a) -> Vector3:
+	return Vector3(float(a[0]), float(a[1]), float(a[2]))
+
+static func _local_in(root: Node3D, n: Node3D) -> Transform3D:
+	var t := Transform3D()
+	var c: Node = n
+	while c and c != root:
+		if c is Node3D:
+			t = (c as Node3D).transform * t
+		c = c.get_parent()
+	return t
 
 static func _rig_cut(src: Animation, s: float, e: float) -> Animation:
 	var a := Animation.new()
@@ -1437,6 +1510,8 @@ func _update_viewmodel(delta: float) -> void:
 	vm_cam.fov = lerp(56.0, 40.0, ads_k * (0.0 if wdata.get("scope", false) else 1.0) * 0.5)
 	var kind := _vm_kind(cur)
 	var hip: Vector3 = HIP[kind] + HIP_ADJ.get(cur, Vector3.ZERO)
+	if melee_rig:
+		hip = Vector3.ZERO     # the knife rig carries its own camera framing
 	# sway & bob
 	sway = sway.lerp(mouse_delta * 0.0006, min(delta * 10.0, 1.0))
 	mouse_delta = Vector2.ZERO
@@ -1610,7 +1685,7 @@ func _update_viewmodel(delta: float) -> void:
 		var sw := smoothstep(0.0, 0.55, tt)
 		pos += Vector3(0.05, 0.1, 0.16) * (1.0 - sw) + Vector3(-0.08, -0.05, -0.38) * sin(sw * PI * 0.5) - Vector3(0, 0.25, 0) * smoothstep(0.6, 1.0, tt)
 		rot += Vector3(0.75, -0.15, 0.2) * (1.0 - sw) + Vector3(-1.1, 0.25, -0.3) * sin(sw * PI * 0.5) * (1.0 - smoothstep(0.7, 1.0, tt))
-	if kind == "knife":
+	if kind == "knife" and not melee_rig:
 		# CS:GO-style framing (blade up-left, knuckles to the camera, free left hand low on the left);
 		# must match tools/fp_hands.py KNIFE_VIEW, the arms are baked for exactly this view
 		var kv: Array = KNIFE_VIEW.get(cur, KNIFE_VIEW["default"])

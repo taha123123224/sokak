@@ -25,6 +25,10 @@ SPECS = {
                  rear=None, top=None, ref=239, sight_dy=0.011, credit="M4 - FPS Weapon Animations Pack v.1 — BarcodeGames (CC-BY 4.0)",
                  sections={'draw': {'anim': 'Draw'}, 'fire': {'anim': 'Fire'}, 'reload': {'anim': 'Reload'},
                            'reload_empty': {'anim': 'Reload_Empty'}, 'idle': {'anim': 'Draw', 's': -0.05}}),
+    # v3.4: one shared knife rig for every melee weapon (the game's own knife model is attached to its 'knife' node)
+    'melee': dict(usd='/home/claude/usdz/7516b757-knife_Animated/scene.usdc', gun=['knife_knife'], wref='knife', step=2,
+                  native=True, rear=None, top=None, ref=80, credit="knife Animated — DJMaesen (CC-BY 4.0)",
+                  sections={'idle': (0, 160), 'slash': (160, 240), 'slash2': (240, 320), 'stab': (320, 408), 'stab2': (408, 496), 'draw': (532, 580)}),
 }
 
 def evpts(objs):
@@ -86,7 +90,7 @@ def run(wid):
     lo, hi = A.min(0), A.max(0)
     # game weapon box
     keep = set(bpy.data.objects)
-    bpy.ops.import_scene.gltf(filepath=M + 'w_%s.glb' % wid)
+    bpy.ops.import_scene.gltf(filepath=M + 'w_%s.glb' % sp.get('wref', wid))
     wobj = [o for o in bpy.data.objects if o not in keep]
     WP = evpts([o for o in wobj if o.type == 'MESH'])
     wlo, whi = WP.min(0), WP.max(0)
@@ -97,6 +101,21 @@ def run(wid):
     wcen = (wlo + whi) / 2
     Rm = Matrix(R.tolist()).to_4x4()
     T = Matrix.Translation(Vector(wcen - acen)) @ Matrix.Scale(s, 4) @ Rm @ Matrix.Translation(Vector(-c))
+    sock = None
+    if sp.get('native'):
+        # keep the pack's own first-person camera framing (camera at the origin), only real-size it;
+        # the game puts its knife model in the 'knife' socket: grip = socket origin, blade = y, flat = z
+        T = Matrix.Scale(s, 4)
+        ke = bpy.data.objects['knife']
+        mi = ke.matrix_world.inverted()
+        o = mi @ ke.matrix_world.translation
+        L = Vector(long.tolist()); V1 = Vector(np.linalg.eigh(np.cov((P - c).T))[1][:, 1].tolist())
+        # blade = the thin end, far from the grip
+        proj = (P - c) @ long
+        tip = -L if np.mean(proj < 0) and abs(proj.min()) > abs(proj.max()) else L
+        yl = (mi.to_3x3() @ tip).normalized(); zl = (mi.to_3x3() @ V1).normalized()
+        cv = lambda v: [v.x, v.z, -v.y]
+        sock = {"o": cv(o), "y": cv(yl), "z": cv(zl)}
     print("scale", s, "len", hi[1] - lo[1], "wlen", whi[1] - wlo[1])
     root = bpy.data.objects.new('rig', None)
     sc.collection.objects.link(root)
@@ -126,6 +145,11 @@ def run(wid):
                                   export_force_sampling=False, export_yup=True, export_apply=False)
         fps = 120.0
         meta = {"rig": 1, "credit": sp['credit'], "sections": {k: [a / fps, b / fps] for k, (a, b) in sp['sections'].items()}}
+        if sock:
+            meta["socket"] = sock; meta["native"] = 1; meta["melee_ref"] = sp['ref'] / fps
+            # where the pack's viewer camera sits (native units, found by test renders), real-sized
+            meta["cam"] = [0.0, 0.35 * s, -0.9 * s]; meta["cam_pitch"] = 12.0
+            meta["sections"]["inspect"] = meta["sections"]["idle"]
     json.dump(meta, open(M + 'fp_%s.json' % wid, 'w'), indent=1)
     print("WROTE", out)
 

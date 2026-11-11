@@ -1488,7 +1488,7 @@ func _page_lobby() -> void:
 	news.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
 	right.add_child(news)
 	var nimg := TextureRect.new()
-	var nimg_p := "res://assets/ui/load_insaat.jpg"
+	var nimg_p := "res://assets/ui/load_fabrika.jpg"
 	nimg.texture = load(nimg_p) if ResourceLoader.exists(nimg_p) else load("res://assets/ui/map_liman.jpg")
 	nimg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	nimg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -1508,8 +1508,8 @@ func _page_lobby() -> void:
 	nv.alignment = BoxContainer.ALIGNMENT_END
 	nm2.add_child(nv)
 	nv.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, UI.ACCENT2, "Rajdhani-Bold"))
-	nv.add_child(UI.lbl("YENİ RÜTBELER", 26, Color.WHITE, "RussoOne-Regular"))
-	nv.add_child(_wrap("18 yeni rütbe rozeti, yenilenen MP5 ve UMP-45, CS2 tarzı öldürme kartları. Ejder Kasası mağazada!", 15))
+	nv.add_child(UI.lbl("3 YENİ HARİTA", 26, Color.WHITE, "RussoOne-Regular"))
+	nv.add_child(_wrap("Kum Kasabası, Hurda Sahası ve Paslı Fabrika! Yeni bıçak animasyonları, ragdoll ölümler, işaret (Z) sistemi ve e-spor Sabotaj.", 15))
 	var mp := UI.glass(12, 4)
 	right.add_child(mp)
 	var mv := UI.vbox(7)
@@ -2535,45 +2535,11 @@ func _page_market() -> void:
 				grid.add_child(_agent_card(c))
 		"kasa":
 			for t in GS.CRATES.keys():
-				var cd: Dictionary = GS.CRATES[t]
-				var card := UI.panel(Color(0.07, 0.085, 0.11, 0.96), cd["color"], 12)
-				card.custom_minimum_size = Vector2(300, 190)
-				var cv := UI.vbox(6)
-				card.add_child(cv)
-				var hh := UI.hbox(8)
-				cv.add_child(hh)
-				var ic := CrateIcon.new(); ic.col = cd["color"]; ic.custom_minimum_size = Vector2(50, 50)
-				hh.add_child(ic)
-				hh.add_child(UI.lbl(cd["name"], 22, Color.WHITE, "RussoOne-Regular"))
-				var dl := UI.lbl(cd["desc"], 15, UI.DIM, "Rajdhani-SemiBold")
-				dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-				cv.add_child(dl)
-				cv.add_child(UI.lbl("Sende: %d" % _crate_count(t), 16, Color.WHITE, "Rajdhani-Bold"))
-				cv.add_child(UI.btn("◉ " + UI.money(int(cd["price"])) + "  SATIN AL", func():
-					var r: Dictionary = await _act("buy_crate", {"id": t})
-					if not r["ok"]: return
-					SFX.play("buy"); show_page("market"), 18, true, 0, 38))
-				grid.add_child(card)
+				grid.add_child(_store_crate_tile(t))
 		"eklenti":
 			set_showcase(GS.active_set().get("ana", "ak47"))
 			for pid in GS.PARTS.keys():
-				var pd: Dictionary = GS.PARTS[pid]
-				var card := UI.panel(Color(0.07, 0.085, 0.11, 0.96), Color("7dff6a").darkened(0.35), 12)
-				card.custom_minimum_size = Vector2(300, 220)
-				var cv := UI.vbox(6)
-				card.add_child(cv)
-				var ic := PartIcon.new(); ic.pid = pid; ic.custom_minimum_size = Vector2(0, 76)
-				cv.add_child(ic)
-				cv.add_child(UI.lbl(pd["name"], 21, Color.WHITE, "RussoOne-Regular"))
-				var dl := UI.lbl(pd["desc"], 15, UI.DIM, "Rajdhani-SemiBold")
-				dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-				cv.add_child(dl)
-				cv.add_child(UI.lbl("Sende: %d   •   Yuva: %s" % [GS.parts_owned(pid), str(pd["slot"]).to_upper()], 15, Color.WHITE, "Rajdhani-Bold"))
-				cv.add_child(UI.btn("◉ " + UI.money(int(pd["price"])) + "  SATIN AL", func():
-					var r: Dictionary = await _act("buy_part", {"id": pid})
-					if not r["ok"]: return
-					SFX.play("buy"); _toast(pd["name"] + " alındı! Çanta > Özelleştir ile tak.", UI.GREEN); show_page("market"), 18, true, 0, 38))
-				grid.add_child(card)
+				grid.add_child(_store_part_tile(pid))
 		"malzeme":
 			set_showcase("frag")
 			for pi in GS.Econ.PACKS.size():
@@ -2719,6 +2685,93 @@ func _store_tile(id: String) -> Control:
 	b.add_child(pr)
 	b.pressed.connect(func(): SFX.play("ui_click", -6); _store_detail(id))
 	return b
+
+func _store_crate_tile(t: String) -> Control:
+	var cd: Dictionary = GS.CRATES[t]
+	var c: Color = cd["color"]
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(0, 330)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var n := _store_bg(c)
+	b.add_theme_stylebox_override("normal", n)
+	var h := n.duplicate(); h.bg_color = Color(0.09, 0.1, 0.12, 1.0); h.border_color = c.lightened(0.25)
+	b.add_theme_stylebox_override("hover", h)
+	b.add_theme_stylebox_override("pressed", h)
+	var glow := TextureRect.new()
+	var gt := GradientTexture2D.new(); var g := Gradient.new()
+	g.set_color(0, Color(c, 0.28)); g.set_color(1, Color(c, 0.0))
+	gt.gradient = g; gt.fill = GradientTexture2D.FILL_RADIAL; gt.fill_from = Vector2(0.5, 0.4); gt.fill_to = Vector2(1.0, 0.9)
+	glow.texture = gt; glow.set_anchors_preset(Control.PRESET_FULL_RECT); glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(glow)
+	var tx := _crate_tex(t)
+	if tx:
+		var art := CrateBox.new()
+		art.col = c; art.tex = tx; art.glow = 0.15
+		art.set_anchors_preset(Control.PRESET_TOP_WIDE); art.offset_top = 12; art.offset_bottom = 200; art.offset_left = 30; art.offset_right = -30
+		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(art)
+	var v := UI.vbox(2)
+	v.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	v.offset_left = 16; v.offset_right = -16; v.offset_top = -124; v.offset_bottom = -14
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(v)
+	v.add_child(UI.lbl(str(cd["name"]).to_upper(), 28, Color.WHITE, "Teko"))
+	var dl := UI.lbl(str(cd["desc"]), 14, UI.DIM, "Rajdhani-SemiBold")
+	dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	dl.max_lines_visible = 2
+	v.add_child(dl)
+	var ph := UI.hbox(8)
+	v.add_child(ph)
+	ph.add_child(UI.lbl("◉ " + UI.money(int(cd["price"])), 20, UI.GOLD, "Rajdhani-Bold"))
+	ph.add_child(UI.spacer())
+	var cnt := _crate_count(t)
+	if cnt > 0:
+		ph.add_child(UI.lbl("SENDE x%d" % cnt, 16, UI.GREEN, "Rajdhani-Bold"))
+	for cc in b.find_children("*", "Control", true, false):
+		(cc as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.pressed.connect(func(): SFX.play("ui_click", -6); crate_type = t; show_page("crate"))
+	return b
+
+func _store_part_tile(pid: String) -> Control:
+	var pd: Dictionary = GS.PARTS[pid]
+	var c := Color("7dff6a")
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", _store_bg(c.darkened(0.3)))
+	p.custom_minimum_size = Vector2(0, 330)
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var v := UI.vbox(6)
+	p.add_child(v)
+	var top := MarginContainer.new()
+	top.add_theme_constant_override("margin_top", 12)
+	v.add_child(top)
+	var ic := PartIcon.new(); ic.pid = pid; ic.custom_minimum_size = Vector2(0, 150)
+	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(ic)
+	var m := MarginContainer.new()
+	for side in ["left", "right"]:
+		m.add_theme_constant_override("margin_" + side, 16)
+	m.add_theme_constant_override("margin_bottom", 14)
+	v.add_child(m)
+	var iv := UI.vbox(4)
+	m.add_child(iv)
+	iv.add_child(UI.lbl(str(pd["slot"]).to_upper() + " EKLENTİSİ", 13, c, "Rajdhani-Bold"))
+	iv.add_child(UI.lbl(str(pd["name"]), 22, Color.WHITE, "Rajdhani-Bold"))
+	var dl := UI.lbl(str(pd["desc"]), 14, UI.DIM, "Rajdhani-SemiBold")
+	dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	iv.add_child(dl)
+	var bh := UI.hbox(8)
+	iv.add_child(bh)
+	bh.add_child(UI.lbl("Sende: %d" % GS.parts_owned(pid), 15, Color.WHITE, "Rajdhani-Bold"))
+	bh.add_child(UI.spacer())
+	var bb := UI.btn("◉ " + UI.money(int(pd["price"])), func():
+		var r: Dictionary = await _act("buy_part", {"id": pid})
+		if not r["ok"]: return
+		SFX.play("buy"); _toast(pd["name"] + " alındı! Çanta > Özelleştir ile tak.", UI.GREEN); show_page("market"), 17, true, 130, 38)
+	bb.disabled = int(GS.profile["gold"]) < int(pd["price"])
+	bh.add_child(bb)
+	return p
 
 func _store_hero() -> Control:
 	var feat := ""
@@ -4478,9 +4531,18 @@ func _page_settings() -> void:
 class PartIcon extends Control:
 	## vector icons for weapon attachments
 	var pid := "sus"
+	static var _tx := {}
 	func _draw() -> void:
 		var c := size * 0.5
 		var s: float = min(size.x, size.y) * 0.42
+		# v3.4 painted attachment renders
+		if not _tx.has(pid):
+			var pth := "res://assets/ui/parts/%s.png" % pid
+			_tx[pid] = load(pth) if ResourceLoader.exists(pth) else null
+		if _tx[pid]:
+			var sz: float = min(size.x, size.y) * 1.1
+			draw_texture_rect(_tx[pid], Rect2(c - Vector2(sz, sz) * 0.5, Vector2(sz, sz)), false)
+			return
 		var col := Color("7dff6a")
 		var dk := Color(0.12, 0.14, 0.16)
 		match pid:

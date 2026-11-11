@@ -74,6 +74,7 @@ func _process(delta: float) -> void:
 	var gp: Vector3 = p.global_position
 	Net.send({"t": "s", "p": [snappedf(gp.x, 0.01), snappedf(gp.y, 0.01), snappedf(gp.z, 0.01)], "v": [snappedf(p.velocity.x, 0.01), snappedf(p.velocity.z, 0.01)],
 		"yw": snappedf(p.yaw, 0.001), "pt": snappedf(p.pitch, 0.001), "w": p.cur, "c": p.crouching, "a": p.alive, "r": p.reload_t > 0, "wl": GS.wlvl(p.cur),
+		"sk": GS.wskin(p.cur), "pa": GS.wparts(p.cur), "hp": int(ceil(p.health)),
 		"u": Input.is_action_pressed("use") and p.alive and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED})
 
 # ---------------------------------------------------------------- outgoing events
@@ -139,6 +140,12 @@ func _on_msg(d: Dictionary) -> void:
 		"sys":
 			if mt.hud:
 				mt.hud.center_msg(str(d.get("msg", "")), UI.RED)
+		"ping":
+			var tp := str(d.get("team", ""))
+			var mine2: String = mt.player.team if mt.player and "team" in mt.player else ""
+			if tp == "" or tp == mine2:
+				var pp: Array = d.get("p", [0, 0, 0])
+				mt.place_ping(Vector3(float(pp[0]), float(pp[1]), float(pp[2])), str(d.get("n", "?")), tp, false)
 		"chat":
 			if mt.hud:
 				var tm := str(d.get("team", ""))

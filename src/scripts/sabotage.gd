@@ -97,13 +97,16 @@ func _on_net(d: Dictionary) -> void:
 			m.countdown = 0.0 if int(d.get("rn", 1)) <= 1 else 3.0
 			if m.countdown > 0:
 				m.hud.show_countdown()
-			m.hud.center_msg("TUR %d   •   %s %d - %d %s" % [int(d.get("rn", 1)), GS.TEAMS["a"], int(d.get("sa", 0)), int(d.get("sb", 0)), GS.TEAMS["b"]], UI.ACCENT2)
+			_snap_kills()
+			m.hud.round_banner("TUR %d" % int(d.get("rn", 1)), "%s  •  İLK %d TURU ALAN KAZANIR" % [("SALDIRI — BOMBAYI KUR" if m.player and m.player.team == "a" else "SAVUNMA — NOKTALARI KORU"), WIN_ROUNDS], UI.ACCENT2, int(d.get("sa", 0)), int(d.get("sb", 0)))
 			if str(d.get("ca", "")) == Net.my_id:
 				m.hud.center_msg("BOMBA SENDE!  A ya da B noktasına götür, E ile kur.", UI.ACCENT)
 		"sabe":
 			var w := str(d.get("w", "a"))
 			var mine: bool = m.player and m.player.team == w
-			m.hud.center_msg("%s  —  TURU %s KAZANDI" % [str(d.get("why", "")), GS.TEAMS.get(w, "")], UI.GREEN if mine else UI.RED)
+			round_hist.append({"w": w, "why": str(d.get("why", ""))})
+			var mvp2 := _round_mvp()
+			m.hud.round_banner("TURU %s KAZANDI" % GS.TEAMS.get(w, ""), str(d.get("why", "")) + ("   •   " + mvp2 if mvp2 != "" else ""), GS.TEAM_COLORS.get(w, UI.ACCENT2))
 			SFX.play("success" if mine else "fail", -4)
 		"sabx":
 			var bp := _v(d.get("p", []))
@@ -357,7 +360,32 @@ func alive_count(t: String) -> int:
 			n += 1
 	return n
 
+var round_hist: Array = []      # v3.4: [{"w": team, "why": text}] for the score-bar strip
+var _kill_snap := {}
+var _clutch_said := false
+func _snap_kills() -> void:
+	_kill_snap.clear()
+	for c in m.combatants:
+		_kill_snap[c["name"]] = int(c["kills"])
+	_clutch_said = false
+
+func _round_mvp() -> String:
+	var best := ""
+	var bk := 0
+	for c in m.combatants:
+		var d: int = int(c["kills"]) - int(_kill_snap.get(c["name"], int(c["kills"])))
+		if d > bk:
+			bk = d; best = c["name"]
+	return ("TURUN EN İYİSİ: %s  •  %d öldürme" % [best, bk]) if best != "" else ""
+
+static func why_icon(why: String) -> String:
+	if "PATLADI" in why: return "✹"
+	if "ÇÖZÜLDÜ" in why: return "✂"
+	if "SÜRE" in why: return "⏱"
+	return "✖"
+
 func _new_round(first: bool = false) -> void:
+	_snap_kills()
 	round_no += 1
 	planted = false
 	bomb_drop = Vector3.INF
@@ -386,7 +414,7 @@ func _new_round(first: bool = false) -> void:
 	if online:
 		Net.send({"t": "sabr", "rn": round_no, "ca": _id_of(carrier), "sa": int(m.team_score["a"]), "sb": int(m.team_score["b"])})
 		_send_state()
-	m.hud.center_msg("TUR %d   •   %s %d - %d %s" % [round_no, GS.TEAMS["a"], m.team_score["a"], m.team_score["b"], GS.TEAMS["b"]], UI.ACCENT2)
+	m.hud.round_banner("TUR %d" % round_no, "%s  •  İLK %d TURU ALAN KAZANIR" % [("SALDIRI — BOMBAYI KUR" if m.player and m.player.team == "a" else "SAVUNMA — NOKTALARI KORU"), WIN_ROUNDS], UI.ACCENT2, int(m.team_score["a"]), int(m.team_score["b"]))
 	if carrier == m.player:
 		m.hud.center_msg("BOMBA SENDE!  A ya da B noktasına götür, E ile kur.", UI.ACCENT)
 
@@ -429,7 +457,9 @@ func _end_round(winner: String, why: String) -> void:
 		Net.send({"t": "sabe", "w": winner, "why": why})
 		_send_state()
 	var mine: bool = m.player and m.player.team == winner
-	m.hud.center_msg("%s  —  TURU %s KAZANDI" % [why, GS.TEAMS[winner]], UI.GREEN if mine else UI.RED)
+	round_hist.append({"w": winner, "why": why})
+	var mvp := _round_mvp()
+	m.hud.round_banner("TURU %s KAZANDI" % GS.TEAMS[winner], why + ("   •   " + mvp if mvp != "" else ""), GS.TEAM_COLORS.get(winner, UI.ACCENT2), int(m.team_score["a"]), int(m.team_score["b"]))
 	SFX.play("success" if mine else "fail", -4)
 	for c in m.combatants:
 		if "obj_goal" in c["node"]:
@@ -525,6 +555,14 @@ func _process(delta: float) -> void:
 	_update_markers(delta)
 	if m.ended or (m.paused and not online):
 		return
+	# v3.4 clutch call-out: last one standing against two or more
+	if not _clutch_said and phase != "post" and m.player and m.player.alive and m.hud:
+		var mine: String = m.player.team
+		var foes := alive_count("b" if mine == "a" else "a")
+		if alive_count(mine) == 1 and foes >= 2:
+			_clutch_said = true
+			m.hud.round_banner("1 v %d" % foes, "KLAÇ ZAMANI  •  TAKIM SANA GÜVENİYOR", Color(1.0, 0.72, 0.25))
+			SFX.play("heartbeat", -6)
 	if not is_host:
 		_client_tick(delta)
 		return
@@ -734,12 +772,35 @@ class SabUI extends Control:
 		var rw := f.get_string_size(rs, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x + 28
 		_box(Rect2(c.x - rw / 2, 96, rw, 24), Color(0.02, 0.025, 0.035, 0.75), Color(1, 1, 1, 0.12), 12)
 		draw_string(f, Vector2(c.x - rw / 2, 113), rs, HORIZONTAL_ALIGNMENT_CENTER, rw, 15, Color(1, 1, 1, 0.8))
+		# round history strip (v3.4): one tile per played round, winner colour + how it ended
+		var hn: int = sab.round_hist.size()
+		if hn > 0:
+			var tw2 := 20.0
+			var hx0: float = c.x - hn * tw2 / 2.0
+			for hi in hn:
+				var hr: Dictionary = sab.round_hist[hi]
+				var hc: Color = GS.TEAM_COLORS.get(str(hr["w"]), Color.WHITE)
+				var rr2 := Rect2(hx0 + hi * tw2 + 1, 124, tw2 - 2, 16)
+				_box(rr2, Color(hc.r * 0.35, hc.g * 0.35, hc.b * 0.35, 0.85), Color(hc.r, hc.g, hc.b, 0.8), 3)
+				draw_string(f, Vector2(rr2.position.x, rr2.position.y + 13), sab.why_icon(str(hr["why"])), HORIZONTAL_ALIGNMENT_CENTER, rr2.size.x, 12, Color.WHITE)
+		# alive pips (CS2 style): one tile per player, dimmed when dead
+		for tm in ["a", "b"]:
+			var tot := 0
+			for cb in sab.m.combatants:
+				if str(cb.get("team", "")) == tm:
+					tot += 1
+			var al_n: int = sab.alive_count(tm)
+			var tcol: Color = GS.TEAM_COLORS.get(tm, Color.WHITE)
+			for i in tot:
+				var px: float = (c.x - rw / 2 - 14 - i * 14) if tm == "a" else (c.x + rw / 2 + 4 + i * 14)
+				var on := i < al_n
+				_box(Rect2(px, 100, 10, 16), Color(tcol.r, tcol.g, tcol.b, 0.95) if on else Color(1, 1, 1, 0.08), Color(0, 0, 0, 0.5), 2)
 		# ---- planted: bomb pill with countdown bar
 		if sab.phase == "planted":
 			var tl: float = sab.m.time_left
 			var k := clampf(tl / sab.BOMB_TIME, 0.0, 1.0)
 			var blink := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 1000.0 * (5.0 + 12.0 * (1.0 - k)))
-			var pr := Rect2(c.x - 150, 128, 300, 46)
+			var pr := Rect2(c.x - 150, 146, 300, 46)
 			_box(pr, Color(0.12, 0.02, 0.02, 0.85), Color(red.r, red.g, red.b, 0.5 + 0.5 * blink), 10)
 			_c4_icon(Vector2(pr.position.x + 28, pr.position.y + 23), 11, red.lerp(Color.WHITE, blink * 0.4))
 			draw_string(fr, Vector2(pr.position.x + 52, pr.position.y + 30), "BOMBA  •  %s" % sab.planted_site, HORIZONTAL_ALIGNMENT_LEFT, 150, 17, Color.WHITE)
@@ -747,7 +808,7 @@ class SabUI extends Control:
 			draw_rect(Rect2(pr.position.x + 10, pr.end.y - 6, (pr.size.x - 20), 3), Color(1, 1, 1, 0.1))
 			draw_rect(Rect2(pr.position.x + 10, pr.end.y - 6, (pr.size.x - 20) * k, 3), red)
 		elif sab.bomb_drop != Vector3.INF and pl.team == "a":
-			var dr := Rect2(c.x - 110, 128, 220, 30)
+			var dr := Rect2(c.x - 110, 146, 220, 30)
 			_box(dr, Color(0.12, 0.06, 0.02, 0.85), Color(gold.r, gold.g, gold.b, 0.6), 10)
 			draw_string(f, Vector2(dr.position.x, dr.position.y + 21), "⚠ BOMBA YERDE  •  %dm" % int(pl.global_position.distance_to(sab.bomb_drop)), HORIZONTAL_ALIGNMENT_CENTER, 220, 16, gold)
 		# ---- big banner right after the plant
@@ -804,5 +865,5 @@ class SabUI extends Control:
 		# ---- alive counter (dead players see who is left)
 		if not pl.alive and sab.phase != "post":
 			var s2 := "%s %d   —   %d %s" % [GS.TEAMS["a"], sab.alive_count("a"), sab.alive_count("b"), GS.TEAMS["b"]]
-			_box(Rect2(c.x - 150, 186, 300, 28), Color(0.02, 0.025, 0.035, 0.75), Color(1, 1, 1, 0.1), 14)
-			draw_string(f, Vector2(c.x - 150, 206), "HAYATTA:  " + s2, HORIZONTAL_ALIGNMENT_CENTER, 300, 15, Color(1, 1, 1, 0.85))
+			_box(Rect2(c.x - 150, 200, 300, 28), Color(0.02, 0.025, 0.035, 0.75), Color(1, 1, 1, 0.1), 14)
+			draw_string(f, Vector2(c.x - 150, 220), "HAYATTA:  " + s2, HORIZONTAL_ALIGNMENT_CENTER, 300, 15, Color(1, 1, 1, 0.85))
