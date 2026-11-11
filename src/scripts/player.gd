@@ -1268,6 +1268,7 @@ func _rig_setup(id: String, path: String) -> void:
 		(mi as MeshInstance3D).visible = false
 	for k in ["mag", "bolt", "slide"]:
 		vm_parts.erase(k)
+	_unify_rig_arms()
 	var skin := GS.wskin(id)
 	for mi in fp_root.find_children("gun_*", "MeshInstance3D", true, false):
 		MatLib.apply(mi, skin)
@@ -1363,6 +1364,32 @@ static func _local_in(root: Node3D, n: Node3D) -> Transform3D:
 			t = (c as Node3D).transform * t
 		c = c.get_parent()
 	return t
+
+## v3.4.1 one look for every weapon: the rig packs' arms (bare skin, different gloves) get the game's
+## dark sleeve + glove colours through arm_unify.gdshader (their own UVs / normal maps are kept)
+static var _arm_mats := {}
+func _unify_rig_arms() -> void:
+	for mi in fp_root.find_children("*", "MeshInstance3D", true, false):
+		var m3 := mi as MeshInstance3D
+		if String(m3.name).begins_with("gun_") or m3.mesh == null:
+			continue
+		for si in m3.mesh.get_surface_count():
+			var mt = m3.get_active_material(si)
+			if not (mt is StandardMaterial3D):
+				continue
+			var sm := mt as StandardMaterial3D
+			if not _arm_mats.has(sm):
+				var sh := ShaderMaterial.new()
+				sh.shader = preload("res://shaders/arm_unify.gdshader")
+				sh.set_shader_parameter("albedo_tex", sm.albedo_texture)
+				sh.set_shader_parameter("base_color", sm.albedo_color)
+				if sm.normal_enabled and sm.normal_texture:
+					sh.set_shader_parameter("normal_tex", sm.normal_texture)
+					sh.set_shader_parameter("has_normal", true)
+				sh.set_shader_parameter("camo_tex", load("res://assets/tex/arm_acu.png"))
+				sh.set_shader_parameter("sleeve_v", float(fp_meta.get("sleeve_v", -1.0)))
+				_arm_mats[sm] = sh
+			m3.set_surface_override_material(si, _arm_mats[sm])
 
 static func _rig_cut(src: Animation, s: float, e: float) -> Animation:
 	var a := Animation.new()

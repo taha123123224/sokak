@@ -12,8 +12,8 @@ from mathutils.bvhtree import BVHTree
 U = '/home/claude/usdz/'
 OUT = '/home/claude/sokak/assets/maps/'
 SPECS = {
-    'kum': dict(usd=U + '731dc94a-Dust2-short/scene.usdc', S=26.0, env={"preset": "golden", "fog": 0.004, "sky": "day"},
-                credit="Dust2-short — frostychaos144 (CC-BY 4.0)", floor_obj='ShortDust2', nocol=[], prune=10.0, ground={'tex': 'dryground', 'y': -0.03, 'tint': [1.0, 0.93, 0.8]}),
+    'kum': dict(usd=U + '731dc94a-Dust2-short/scene.usdc', S=40.0, env={"preset": "golden", "fog": 0.004, "sky": "day"},
+                credit="Dust2-short — frostychaos144 (CC-BY 4.0)", floor_obj='ShortDust2', nocol=[], prune=15.0, ground={'tex': 'dryground', 'y': -0.03, 'tint': [1.0, 0.93, 0.8]}),
     'hurda': dict(usd=U + '65f9ca94-Maps/scene.usdc', S=10.5, env={"preset": "day", "fog": 0.006, "sky": "day"},
                   credit="Maps — frostychaos144 (CC-BY 4.0)", floor_obj='Floor_Concrete', nocol=['Decals', 'Clothes', 'Wood', 'plane1']),
     'fabrika': dict(usd=U + 'd89bc40a-Rust/scene.usdc', S=6.0, env={"preset": "overcast", "fog": 0.005, "sky": "day"},

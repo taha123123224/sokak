@@ -1508,8 +1508,8 @@ func _page_lobby() -> void:
 	nv.alignment = BoxContainer.ALIGNMENT_END
 	nm2.add_child(nv)
 	nv.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, UI.ACCENT2, "Rajdhani-Bold"))
-	nv.add_child(UI.lbl("3 YENİ HARİTA", 26, Color.WHITE, "RussoOne-Regular"))
-	nv.add_child(_wrap("Kum Kasabası, Hurda Sahası ve Paslı Fabrika! Yeni bıçak animasyonları, ragdoll ölümler, işaret (Z) sistemi ve e-spor Sabotaj.", 15))
+	nv.add_child(UI.lbl("KOZMİK KASA", 26, Color.WHITE, "RussoOne-Regular"))
+	nv.add_child(_wrap("4 yeni hareketli efsanevi kaplama: Hologram, Plazma Fırtınası, Kozmik Nebula, Magma Çekirdeği! Yenilenen yükseltme ekranı ve malzeme kutuları.", 15))
 	var mp := UI.glass(12, 4)
 	right.add_child(mp)
 	var mv := UI.vbox(7)
@@ -2101,6 +2101,8 @@ class UpgStage extends Control:
 	var flash := 0.0
 	var spin := 0.25
 	var t := 0.0
+	var bg: Texture2D = preload("res://assets/ui/upgrade/bg.jpg")
+	var ring: Texture2D = preload("res://assets/ui/upgrade/ring.png")
 	func _process(d: float) -> void:
 		t += d
 		if burst >= 0.0:
@@ -2112,6 +2114,20 @@ class UpgStage extends Control:
 		var c := size * 0.5
 		var r := minf(size.y * 0.46, 170.0)
 		var p := 0.6 + charge * 0.9 + flash
+		# v3.4.1 painted workshop behind the stage (cover fit, darkened) + rotating holo ring
+		if bg:
+			var ts := bg.get_size()
+			var k0: float = maxf(size.x / ts.x, size.y / ts.y)
+			var ds := ts * k0
+			draw_texture_rect(bg, Rect2((size - ds) * 0.5 + Vector2(0, ds.y * 0.06), ds), false, Color(0.55 + flash * 0.4, 0.58 + flash * 0.4, 0.62 + flash * 0.4, 1))
+			draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.025, 0.035, 0.35))
+		if ring:
+			var rr := r * (2.05 + charge * 0.25 + flash * 0.3)
+			draw_set_transform(c, -t * (0.15 + charge * 2.5), Vector2.ONE)
+			draw_texture_rect(ring, Rect2(-Vector2(rr, rr) * 0.5, Vector2(rr, rr)), false, Color(col.r * 1.4, col.g * 1.4, col.b * 1.4, 0.35 + charge * 0.5 + flash * 0.5))
+			draw_set_transform(c, t * 0.08, Vector2.ONE * 0.62)
+			draw_texture_rect(ring, Rect2(-Vector2(rr, rr) * 0.5, Vector2(rr, rr)), false, Color(col.r, col.g, col.b, 0.18 + charge * 0.4))
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		for k in 12:
 			draw_circle(c, r * 2.2 - k * r * 0.16, Color(col.r, col.g, col.b, 0.012 * p * (k + 1) * 0.5))
 		for i in 18:
@@ -2189,12 +2205,27 @@ class UpgTrack extends Control:
 				var w2 := f.get_string_size(tn, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
 				draw_string(f, Vector2(x - w2 / 2, y + 34), tn, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(c.r, c.g, c.b, 0.85 if reached else 0.4))
 
+const UPG_ICON := {"HASAR": "dmg", "ŞARJÖR": "mag", "GERİ TEPME": "recoil", "PARILTI": "glow"}
 func _upg_stat(title: String, a: String, b: String, better: bool) -> Control:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UI.sb(Color(1, 1, 1, 0.035), Color(1, 1, 1, 0.08), 1, 10, 10))
+	p.add_theme_stylebox_override("panel", UI.sb(Color(1, 1, 1, 0.035), Color(1, 0.62, 0.2, 0.25) if better else Color(1, 1, 1, 0.08), 1, 10, 8))
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var row := UI.hbox(6)
+	p.add_child(row)
+	var ip := "res://assets/ui/upgrade/%s.png" % str(UPG_ICON.get(title, ""))
+	if ResourceLoader.exists(ip):
+		var ic := TextureRect.new()
+		ic.texture = load(ip)
+		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		ic.custom_minimum_size = Vector2(40, 40); ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(ic)
+		if better:
+			var itw := ic.create_tween().set_loops()
+			itw.tween_property(ic, "modulate", Color(1.35, 1.25, 1.1), 0.7).set_trans(Tween.TRANS_SINE)
+			itw.tween_property(ic, "modulate", Color.WHITE, 0.7).set_trans(Tween.TRANS_SINE)
 	var v := UI.vbox(0)
-	p.add_child(v)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(v)
 	v.add_child(UI.lbl(title, 13, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
 	var h := UI.hbox(8)
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -2207,7 +2238,7 @@ func _upg_stat(title: String, a: String, b: String, better: bool) -> Control:
 func _upgrade_dialog(id: String) -> void:
 	var lvl := GS.wlvl(id)
 	var cost := GS.upgrade_cost(lvl)
-	var v := _modal(900, 640)
+	var v := _modal(940, 700)
 	var top := UI.hbox(10)
 	v.add_child(top)
 	var tv0 := UI.vbox(-4)
@@ -2294,6 +2325,14 @@ func _upgrade_dialog(id: String) -> void:
 		var p := UI.panel(Color(1, 1, 1, 0.04), (r[2] as Color).darkened(0.4) if have >= need else UI.RED.darkened(0.3), 10)
 		var pv := UI.vbox(-2)
 		p.add_child(pv)
+		var ci := CurIcon.new()
+		if r[0] == "gold":
+			ci.kind = "gold"
+		else:
+			ci.kind = "gem"; ci.mat = str(r[0])
+		ci.custom_minimum_size = Vector2(34, 34)
+		ci.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		pv.add_child(ci)
 		pv.add_child(UI.lbl(UI.money(need), 24, Color.WHITE if have >= need else UI.RED, "Teko", HORIZONTAL_ALIGNMENT_CENTER))
 		pv.add_child(UI.lbl("%s · %s" % [r[1], UI.money(have)], 13, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
 		p.custom_minimum_size = Vector2(118, 0)
@@ -2320,6 +2359,9 @@ func _upgrade_dialog(id: String) -> void:
 	var res := UI.lbl("", 22, UI.GOLD, "RussoOne-Regular")
 	cv.add_child(res)
 	var go := UI.btn("YÜKSELT  ➜  +%d" % (lvl + 1), Callable(), 24, true, 280, 64)
+	go.icon = preload("res://assets/ui/upgrade/hammer.png")
+	go.expand_icon = false
+	go.add_theme_constant_override("icon_max_width", 40)
 	go.disabled = not GS.can_afford(cost) or lvl >= GS.MAX_LVL
 	bh.add_child(go)
 	go.pressed.connect(func():
@@ -2543,15 +2585,7 @@ func _page_market() -> void:
 		"malzeme":
 			set_showcase("frag")
 			for pi in GS.Econ.PACKS.size():
-				var pack: Array = GS.Econ.PACKS[pi]
-				var card := UI.panel(Color(0.07, 0.085, 0.11, 0.96), UI.LINE, 14)
-				card.custom_minimum_size = Vector2(300, 170)
-				var cv := UI.vbox(8)
-				card.add_child(cv)
-				cv.add_child(UI.lbl(pack[0], 24, Color.WHITE, "RussoOne-Regular"))
-				cv.add_child(UI.lbl("x%d" % pack[2], 40, Color("c8d2dc"), "Teko"))
-				cv.add_child(UI.btn("◉ " + UI.money(pack[3]) + "  SATIN AL", func(): _buy_pack(pi), 18, true, 0, 40))
-				grid.add_child(card)
+				grid.add_child(_store_pack_tile(pi))
 
 var mk_info: PanelContainer
 func _mk_preview(id: String, skin: String) -> void:
@@ -2733,6 +2767,99 @@ func _store_crate_tile(t: String) -> Control:
 		(cc as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.pressed.connect(func(): SFX.play("ui_click", -6); crate_type = t; show_page("crate"))
 	return b
+
+## v3.4.1 material supply boxes: painted crate art (Higgsfield) floating over a spinning ray burst
+const PACK_COL := {"demir": Color("d0783a"), "krom": Color("49e3ff"), "titanyum": Color("b46bff"), "kobalt": Color("3d7bff"), "crate": Color("ffb02e")}
+const PACK_TIER := {"demir": "SIRADAN", "krom": "NADİR", "titanyum": "EPİK", "kobalt": "EFSANEVİ", "crate": "ÖZEL"}
+func _store_pack_tile(pi: int) -> Control:
+	var pack: Array = GS.Econ.PACKS[pi]
+	var kind := str(pack[1])
+	var c: Color = PACK_COL.get(kind, UI.ACCENT)
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", _store_bg(c.darkened(0.15)))
+	p.custom_minimum_size = Vector2(0, 360)
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var v := UI.vbox(4)
+	p.add_child(v)
+	var art := PackArt.new()
+	art.col = c
+	var tp := "res://assets/ui/packs/%s.png" % kind
+	if not ResourceLoader.exists(tp):
+		tp = "res://assets/ui/icons/%s.png" % kind
+	art.tex = load(tp) if ResourceLoader.exists(tp) else null
+	art.custom_minimum_size = Vector2(0, 200)
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art.phase = pi * 1.3
+	v.add_child(art)
+	var m := MarginContainer.new()
+	for sd in ["left", "right", "bottom"]:
+		m.add_theme_constant_override("margin_" + sd, 14)
+	v.add_child(m)
+	var iv := UI.vbox(4)
+	m.add_child(iv)
+	var th := UI.hbox(8)
+	iv.add_child(th)
+	th.add_child(_store_grade_chip(str(PACK_TIER.get(kind, "")), c))
+	th.add_child(UI.spacer())
+	var have := _crate_count("sokak") if kind == "crate" else int(GS.profile["mats"].get(kind, 0))
+	th.add_child(UI.lbl("SENDE: %s" % UI.money(have), 14, UI.DIM, "Rajdhani-Bold"))
+	var nh := UI.hbox(8)
+	iv.add_child(nh)
+	nh.add_child(UI.lbl(str(pack[0]).to_upper(), 26, Color.WHITE, "Teko"))
+	nh.add_child(UI.spacer())
+	nh.add_child(UI.lbl("x%d" % int(pack[2]), 34, c.lightened(0.25), "Teko"))
+	iv.add_child(UI.lbl("Silah yükseltmede kullanılır" if kind != "crate" else "Bir kasayı açar", 13, UI.DIM, "Rajdhani-SemiBold"))
+	var bb := UI.btn("◉ " + UI.money(int(pack[3])) + "  SATIN AL", func():
+		art.burst = 1.0
+		_buy_pack(pi), 18, true, 0, 42)
+	iv.add_child(bb)
+	p.mouse_entered.connect(func(): art.hover = true)
+	p.mouse_exited.connect(func(): art.hover = false)
+	return p
+
+func _store_grade_chip(t: String, c: Color) -> Control:
+	var pc := PanelContainer.new()
+	var sb := UI.sb(Color(c.r, c.g, c.b, 0.16), Color(c.r, c.g, c.b, 0.7), 1, 4, 0)
+	sb.content_margin_left = 8; sb.content_margin_right = 8
+	pc.add_theme_stylebox_override("panel", sb)
+	pc.add_child(UI.lbl(t, 12, c.lightened(0.3), "Rajdhani-Bold"))
+	return pc
+
+class PackArt extends Control:
+	var col := Color.WHITE
+	var tex: Texture2D
+	var phase := 0.0
+	var hover := false
+	var burst := 0.0
+	var _hk := 0.0
+	func _process(d: float) -> void:
+		_hk = move_toward(_hk, 1.0 if hover else 0.0, d * 4.0)
+		burst = maxf(burst - d * 1.2, 0.0)
+		queue_redraw()
+	func _draw() -> void:
+		var t := Time.get_ticks_msec() / 1000.0 + phase
+		var c0 := size * Vector2(0.5, 0.52)
+		var r := minf(size.x, size.y) * 0.5
+		# slow ray burst
+		for i in 14:
+			var a := i * TAU / 14.0 + t * 0.25
+			var ln := r * (1.1 + 0.25 * _hk + burst * 0.8)
+			draw_colored_polygon(PackedVector2Array([c0, c0 + Vector2.from_angle(a - 0.07) * ln, c0 + Vector2.from_angle(a + 0.07) * ln]), Color(col.r, col.g, col.b, 0.05 + 0.05 * _hk + 0.15 * burst))
+		# pulsing glow
+		var pul := 0.5 + 0.5 * sin(t * 2.2)
+		for k in 9:
+			draw_circle(c0, r * (0.25 + k * 0.08), Color(col.r, col.g, col.b, (0.025 + 0.015 * pul) * (1.0 + _hk + burst * 3.0)))
+		# rising sparkles
+		for i in 10:
+			var u := fmod(t * 0.35 + i * 0.137, 1.0)
+			var x := c0.x + sin(i * 12.9898) * r * 0.75
+			var y := c0.y + r * 0.6 - u * r * 1.3
+			draw_circle(Vector2(x, y), 1.5 + 1.5 * (1.0 - u), Color(col.r, col.g, col.b, (1.0 - u) * 0.8))
+		if tex:
+			var bob := sin(t * 1.6) * 6.0 - _hk * 6.0
+			var sc := 1.0 + 0.06 * _hk + 0.12 * burst
+			var sz := Vector2(r, r) * 1.7 * sc
+			draw_texture_rect(tex, Rect2(c0 - sz * 0.5 + Vector2(0, bob), sz), false, Color(1 + burst, 1 + burst, 1 + burst, 1))
 
 func _store_part_tile(pid: String) -> Control:
 	var pd: Dictionary = GS.PARTS[pid]
@@ -4658,11 +4785,15 @@ func test_hook(i: int) -> void:
 			_store_detail("scar")
 		61:
 			market_tab = "karakter"; show_page("market")
+		67:
+			market_tab = "malzeme"; show_page("market")
 		66:
 			crate_type = "ejder"
 			_crate_reveal({"type": "skin", "id": "ejderha", "wid": "ak47", "label": "AK-47 | Kara Ejderha", "color": Color("ffb02e"), "rarity": 3}, "AK-47 | Kara Ejderha")
 		62, 63, 64, 65:
-			_inspect(["ak47", "scar", "awm", "m4a1"][i - 62], ["ejderha", "kuantum", "anka", "yildirim"][i - 62])
+			var isk: Array = ["ejderha", "kuantum", "anka", "yildirim"]
+			if OS.has_environment("INSKINS"): isk = Array(OS.get_environment("INSKINS").split(","))
+			_inspect(["ak47", "scar", "awm", "m4a1"][i - 62], isk[i - 62])
 		38, 39:
 			if not GS.owned("m4a1"):
 				GS.profile["owned"]["m4a1"] = {"lvl": 0, "skins": ["std"], "skin": "std"}

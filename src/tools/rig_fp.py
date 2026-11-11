@@ -148,7 +148,7 @@ def run(wid):
         if sock:
             meta["socket"] = sock; meta["native"] = 1; meta["melee_ref"] = sp['ref'] / fps
             # where the pack's viewer camera sits (native units, found by test renders), real-sized
-            meta["cam"] = [0.0, 0.35 * s, -0.9 * s]; meta["cam_pitch"] = 12.0
+            meta["cam"] = [0.0, 0.55 * s, -1.5 * s]; meta["cam_pitch"] = 15.0
             meta["sections"]["inspect"] = meta["sections"]["idle"]
     json.dump(meta, open(M + 'fp_%s.json' % wid, 'w'), indent=1)
     print("WROTE", out)

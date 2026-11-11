@@ -535,6 +535,12 @@ uniform int anim = 0;       // 1 dragon lava pulse, 2 phoenix flames, 3 quantum 
 varying vec3 opos;
 varying vec3 onrm;
 void vertex() { opos = VERTEX; onrm = NORMAL; }
+vec3 hue_rot(vec3 c, float a) {
+	const vec3 k = vec3(0.57735);
+	float ca = cos(a);
+	return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
+}
+float hsh(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
 vec3 tri(vec3 p, vec3 n) {
 	vec3 w = pow(abs(n), vec3(4.0));
 	w /= max(w.x + w.y + w.z, 1e-4);
@@ -545,7 +551,12 @@ void fragment() {
 	float lum = dot(base, vec3(0.299, 0.587, 0.114));
 	vec3 pp = opos * tri_scale;
 	if (anim == 2) { pp += vec3(0.0, TIME * 0.09, TIME * 0.03); }
+	if (anim == 6) { pp += 0.05 * vec3(sin(TIME * 1.3 + pp.y * 9.0), cos(TIME * 1.1 + pp.z * 9.0), sin(TIME * 0.9 + pp.x * 9.0)); }
+	if (anim == 7) { pp += vec3(TIME * 0.012, TIME * 0.006, 0.0); }
+	if (anim == 8) { pp += vec3(0.0, TIME * 0.02, 0.0) + 0.012 * sin(TIME * 0.7 + pp.zxy * 6.0); }
 	vec3 sk = (has_skin_tex ? tri(pp, normalize(onrm)) : vec3(1.0)) * skin_tint.rgb;
+	if (anim == 5) { sk = hue_rot(sk, TIME * 0.8 + dot(opos, vec3(4.0, 7.0, 2.0))); }
+	if (anim == 7) { sk = hue_rot(sk, sin(TIME * 0.35) * 0.9); }
 	// keep the model's painted detail (edge wear, grime, engravings) under the skin
 	float det = clamp(lum / 0.32, 0.3, 1.7);
 	ALBEDO = sk * mix(1.0, det, detail_mix);
@@ -567,6 +578,19 @@ void fragment() {
 		else if (anim == 2) { k = 1.0 + 0.5 * sin(TIME * 7.0 + opos.y * 40.0) * sin(TIME * 3.1 + opos.z * 25.0); }
 		else if (anim == 3) { float band = sin(dot(opos, vec3(9.0, 4.0, 16.0)) - TIME * 4.5) * 0.5 + 0.5; k = 0.45 + 3.2 * pow(band, 14.0); }
 		else if (anim == 4) { float f = step(0.82, fract(sin(floor(TIME * 13.0) * 12.9898) * 43758.5453)); k = 0.5 + 3.5 * f + 0.25 * sin(TIME * 40.0); }
+		else if (anim == 5) {
+			// hologram: bright scanline sweeping along the gun + digital glitch flashes
+			float sl = pow(sin(opos.z * 30.0 - TIME * 5.0) * 0.5 + 0.5, 10.0);
+			float gl = step(0.9, hsh(vec3(floor(TIME * 9.0), floor(opos.z * 20.0), 0.0)));
+			k = 0.8 + 2.6 * sl + 1.5 * gl + 0.15 * sin(opos.y * 400.0 + TIME * 20.0);
+		}
+		else if (anim == 6) { k = 1.2 + 1.4 * pow(sin(TIME * 5.0 + dot(opos, vec3(30.0, 12.0, 20.0))) * 0.5 + 0.5, 3.0); }
+		else if (anim == 7) {
+			// nebula: stars twinkle one by one
+			float tw = sin(TIME * 3.0 + hsh(floor(opos * 90.0)) * 6.283) * 0.5 + 0.5;
+			k = 0.7 + 2.4 * pow(tw, 6.0) * smoothstep(0.75, 0.95, l);
+		}
+		else if (anim == 8) { k = 1.4 + 1.1 * sin(TIME * 1.8 - opos.z * 22.0) + 0.3 * sin(TIME * 7.0 + opos.y * 50.0); mask = smoothstep(0.42, 0.85, sk.r); }
 		EMISSION += sk * mask * k * 1.6;
 		ROUGHNESS = min(ROUGHNESS, 0.3);
 	}
@@ -574,7 +598,7 @@ void fragment() {
 """
 
 ## v3.2 animated legendary skins -> shader animation mode
-const ANIM_SKINS := {"ejderha": 1, "anka": 2, "kuantum": 3, "yildirim": 4}
+const ANIM_SKINS := {"ejderha": 1, "anka": 2, "kuantum": 3, "yildirim": 4, "hologram": 5, "plazma": 6, "nebula": 7, "magma": 8}
 
 const _CH := [Vector4(1, 0, 0, 0), Vector4(0, 1, 0, 0), Vector4(0, 0, 1, 0), Vector4(0, 0, 0, 1), Vector4(0.333, 0.333, 0.333, 0)]
 

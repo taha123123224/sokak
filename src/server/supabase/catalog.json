@@ -117,6 +117,32 @@
 			"wchance": 0.0,
 			"weapons": []
 		},
+		"kozmik": {
+			"chars": [],
+			"parts": [],
+			"price": 7000,
+			"skins": [
+				"hologram",
+				"plazma",
+				"nebula",
+				"magma",
+				"kuantum",
+				"yildirim",
+				"galaksi",
+				"aurora",
+				"siber",
+				"neon"
+			],
+			"wchance": 0.2,
+			"weapons": [
+				"awm",
+				"scar",
+				"m4a1",
+				"ak47",
+				"vector",
+				"deagle"
+			]
+		},
 		"operasyon": {
 			"chars": [
 				"asker2",
@@ -691,6 +717,10 @@
 			"price": 1200,
 			"rarity": 1
 		},
+		"hologram": {
+			"price": 8800,
+			"rarity": 3
+		},
 		"kamuflaj": {
 			"price": 600,
 			"rarity": 0
@@ -727,6 +757,10 @@
 			"price": 4800,
 			"rarity": 3
 		},
+		"magma": {
+			"price": 9000,
+			"rarity": 3
+		},
 		"mermer": {
 			"price": 4600,
 			"rarity": 3
@@ -735,6 +769,10 @@
 			"price": 2900,
 			"rarity": 2
 		},
+		"nebula": {
+			"price": 9500,
+			"rarity": 3
+		},
 		"neon": {
 			"price": 1400,
 			"rarity": 2
@@ -742,6 +780,10 @@
 		"okyanus": {
 			"price": 2100,
 			"rarity": 1
+		},
+		"plazma": {
+			"price": 9200,
+			"rarity": 3
 		},
 		"siber": {
 			"price": 2800,

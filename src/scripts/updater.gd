@@ -7,8 +7,8 @@ signal update_available(info: Dictionary)
 signal progress(frac: float, text: String)
 signal failed(msg: String)
 
-const VERSION := "3.4.0"
-const BUILD := 43
+const VERSION := "3.5.0"
+const BUILD := 44
 var latest := {}
 var _dl: HTTPRequest
 var _total := 0

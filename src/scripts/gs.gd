@@ -81,6 +81,11 @@ var SKINS := {
 	"anka": {"name": "Anka Alevi", "price": 8500, "rarity": 3, "anim": true},
 	"kuantum": {"name": "Kuantum Devresi", "price": 7500, "rarity": 3, "anim": true},
 	"yildirim": {"name": "Yıldırım Fırtınası", "price": 8000, "rarity": 3, "anim": true},
+	# v3.4.1 animated legendaries, each with its own motion
+	"hologram": {"name": "Hologram", "price": 8800, "rarity": 3, "anim": true},
+	"plazma": {"name": "Plazma Fırtınası", "price": 9200, "rarity": 3, "anim": true},
+	"nebula": {"name": "Kozmik Nebula", "price": 9500, "rarity": 3, "anim": true},
+	"magma": {"name": "Magma Çekirdeği", "price": 9000, "rarity": 3, "anim": true},
 }
 var CRATES := {
 	"sokak": {"name": "Sokak Kasası", "price": 1000, "color": Color("ff8a1f"), "desc": "Her şeyden biraz: malzeme, altın, stiller.",
@@ -95,6 +100,8 @@ var CRATES := {
 		"skins": ["cini", "turkuaz", "altin", "kizil", "neon", "lale", "nazar", "mermer", "ayyildiz", "kehribar"], "weapons": ["revolver", "kartal", "deagle", "karambit", "hancer", "m1911"], "wchance": 0.32, "chars": ["patron", "kapson"]},
 	"ejder": {"name": "Ejder Kasası", "price": 6500, "color": Color("ff3b1f"), "desc": "HAREKETLİ efsanevi kaplamalar: Kara Ejderha, Anka Alevi, Kuantum Devresi, Yıldırım Fırtınası!",
 		"skins": ["ejderha", "anka", "kuantum", "yildirim", "lav", "galaksi", "aurora", "buz", "ejder", "kizil"], "weapons": ["awm", "awp", "scar", "rpk16", "m4a1", "ak47"], "wchance": 0.2, "chars": [], "parts": []},
+	"kozmik": {"name": "Kozmik Kasa", "price": 7000, "color": Color("b84bff"), "desc": "YENİ hareketli efsaneviler: Hologram, Plazma Fırtınası, Kozmik Nebula, Magma Çekirdeği!",
+		"skins": ["hologram", "plazma", "nebula", "magma", "kuantum", "yildirim", "galaksi", "aurora", "siber", "neon"], "weapons": ["awm", "scar", "m4a1", "ak47", "vector", "deagle"], "wchance": 0.2, "chars": [], "parts": []},
 	"efsane": {"name": "Efsane Kasası", "price": 5000, "color": Color("ffb02e"), "desc": "En az Epik garantili! Lav, Buz, Galaksi, Altın.",
 		"skins": ["lav", "buz", "galaksi", "altin", "cini", "turkuaz", "zumrut", "mermer", "aurora", "ayyildiz", "ejder", "kehribar"], "weapons": ["awp", "awm", "scar", "m249", "rpk16", "kuzgun"], "wchance": 0.4, "chars": ["kot", "patron", "asker2"], "parts": ["sus", "optik", "durbun", "sarjor"]},
 }

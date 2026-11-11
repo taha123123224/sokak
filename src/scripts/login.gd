@@ -443,7 +443,7 @@ func _build_ui() -> void:
 	clip.offset_top = -40; clip.offset_left = 150; clip.offset_right = -260
 	ui.add_child(clip)
 	ui.add_child(bp)
-	ticker = UI.lbl("YENİ v3.4: 3 yeni harita — Kum Kasabası, Hurda Sahası, Paslı Fabrika   •   Tüm bıçaklarda yeni el tutuşu ve animasyonlar   •   Ragdoll ölümler   •   Z ile takıma işaret koy   •   E-spor Sabotaj: tur afişleri, klaç, turun en iyisi   •   Yeni skor tablosu ve madalyalar", 19, Color(1, 1, 1, 0.9), "Rajdhani-SemiBold")
+	ticker = UI.lbl("YENİ v3.5: KOZMİK KASA — Hologram, Plazma Fırtınası, Kozmik Nebula, Magma Çekirdeği hareketli kaplamaları   •   Yeni yükseltme atölyesi ve malzeme kutuları   •   Tüm silahlarda aynı asker kolları   •   Kum Kasabası büyütüldü", 19, Color(1, 1, 1, 0.9), "Rajdhani-SemiBold")
 	ticker.position = Vector2(1400, 8)
 	clip.add_child(ticker)
 	var ver := UI.lbl("SOKAK: Operasyon  v%s   " % Updater.VERSION, 16, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_RIGHT)
