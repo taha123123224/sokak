@@ -76,6 +76,27 @@ func _options(key: String, label: String, opts: Array, hint: String = "") -> voi
 		h.add_child(b)
 	_row(label, h, hint)
 
+func _resolution_row() -> void:
+	if str(GS.settings.get("window_mode", "")) == "":
+		GS.settings["window_mode"] = GS.window_mode()
+	var ob := OptionButton.new()
+	ob.focus_mode = Control.FOCUS_NONE
+	ob.add_theme_font_override("font", UI.font("Rajdhani-Bold"))
+	ob.add_theme_font_size_override("font_size", 18)
+	ob.custom_minimum_size = Vector2(300, 38)
+	var scr := DisplayServer.screen_get_size(DisplayServer.window_get_current_screen())
+	var ids := ["auto"]
+	ob.add_item("Otomatik (yerel %dx%d)" % [scr.x, scr.y])
+	for r in GS.RESOLUTIONS:
+		var p: PackedStringArray = r.split("x")
+		if int(p[0]) <= scr.x and int(p[1]) <= scr.y and r != "%dx%d" % [scr.x, scr.y]:
+			ids.append(r)
+			ob.add_item(r.replace("x", " × "))
+	var cur := str(GS.settings.get("resolution", "auto"))
+	ob.selected = maxi(ids.find(cur), 0)
+	ob.item_selected.connect(func(i): GS.settings["resolution"] = ids[i]; GS.apply_settings(); SFX.play("ui_click", -8))
+	_row("Çözünürlük", ob, "Tam ekranda düşük çözünürlük = daha yüksek FPS")
+
 func _section(t: String) -> void:
 	body.add_child(UI.spacer(false, 0, 6))
 	body.add_child(UI.header(t, 22))
@@ -127,7 +148,9 @@ func _build() -> void:
 			_options("dyn_target", "Hedef FPS", [[60, "60"], [75, "75"], [90, "90"], [120, "120"], [144, "144"]])
 			body.add_child(UI.lbl("Ekran kartın: %s   •   Önerilen ayar: %s" % [RenderingServer.get_video_adapter_name(), str(GS.detect_tier()).to_upper()], 15, UI.DIM, "Rajdhani-SemiBold"))
 			_section("EKRAN")
-			_check("fullscreen", "Tam Ekran")
+			_options("window_mode", "Ekran Modu", [["fullscreen", "Tam Ekran (çerçevesiz)"], ["exclusive", "Özel Tam Ekran"], ["windowed", "Pencere"]])
+			_resolution_row()
+			_slide("ui_scale", "Arayüz Boyutu", 0.75, 1.25, 0.05, "%.2fx", "Menüler ekrana sığmıyorsa küçült")
 			_check("vsync", "Dikey Senkronizasyon (V-Sync)", "Yırtılmayı önler, gecikme ekler")
 			var llc := CheckButton.new()
 			llc.button_pressed = preload("res://scripts/gfx.gd").low_latency()

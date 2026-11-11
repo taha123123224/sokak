@@ -410,6 +410,10 @@ func _process(delta: float) -> void:
 		holster_t -= delta
 		if holster_t <= 0 and pending_id != "":
 			_do_switch(pending_id, false)
+	elif alive and cur != "" and (_vm_loaded_id != cur or vm_weapon == null or not is_instance_valid(vm_weapon)):
+		# safety net: the model in hand must always be the selected weapon
+		_vm_loaded_id = ""
+		_load_vm_weapon(cur)
 	inspect_t = max(inspect_t - delta, 0.0)
 	melee_t = max(melee_t - delta, 0.0)
 	if test_freeze >= 0.0:      # screenshot tests: hold an animation at a fixed fraction
@@ -1155,6 +1159,9 @@ const HIP := {
 	"rifle": Vector3(0.14, -0.165, -0.36), "pistol": Vector3(0.13, -0.14, -0.4), "knife": Vector3(0.16, -0.13, -0.36), "frag": Vector3(0.16, -0.17, -0.34), "sniper": Vector3(0.14, -0.17, -0.33),
 }
 
+## per-weapon hip framing fixes for guns whose proportions differ from their kind (compact SMGs)
+const HIP_ADJ := {"uzi": Vector3(0.03, -0.035, -0.13)}
+
 func _vm_kind(id: String) -> String:
 	var w: Dictionary = GS.WEAPONS[id]
 	if w.get("melee", false): return "knife"
@@ -1421,7 +1428,7 @@ func _update_viewmodel(delta: float) -> void:
 		vm_env.sky_rotation = (cam.global_transform.basis.inverse()).get_euler()
 	vm_cam.fov = lerp(56.0, 40.0, ads_k * (0.0 if wdata.get("scope", false) else 1.0) * 0.5)
 	var kind := _vm_kind(cur)
-	var hip: Vector3 = HIP[kind]
+	var hip: Vector3 = HIP[kind] + HIP_ADJ.get(cur, Vector3.ZERO)
 	# sway & bob
 	sway = sway.lerp(mouse_delta * 0.0006, min(delta * 10.0, 1.0))
 	mouse_delta = Vector2.ZERO

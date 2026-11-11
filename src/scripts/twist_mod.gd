@@ -7,12 +7,18 @@ var bones: PackedInt32Array = []
 var head_kick := 0.0   # radians, head snaps back when hit in the head
 var hit_twist := 0.0  # extra torso twist from a body hit
 var head := -1
+var arms_drop := 0.0  # radians: both arms swing down together about the shoulder line (lobby low-ready)
+var arms: PackedInt32Array = []
 
 func setup(sk: Skeleton3D) -> void:
 	bones.clear()
 	for hn in ["Bip01 Head", "mixamorig_Head"]:
 		if sk.find_bone(hn) >= 0:
 			head = sk.find_bone(hn)
+	arms.clear()
+	for an in ["Bip01 R UpperArm", "Bip01 L UpperArm", "mixamorig_RightArm", "mixamorig_LeftArm"]:
+		if sk.find_bone(an) >= 0:
+			arms.append(sk.find_bone(an))
 	for n in ["Bip01 Spine", "Bip01 Spine1", "Bip01 Spine2", "mixamorig_Spine", "mixamorig_Spine1", "mixamorig_Spine2"]:
 		var i := sk.find_bone(n)
 		if i >= 0:
@@ -22,6 +28,12 @@ func _process_modification() -> void:
 	var sk := get_skeleton()
 	if sk == null or bones.is_empty():
 		return
+	if abs(arms_drop) > 0.001:
+		for a in arms:
+			var pa := sk.get_bone_parent(a)
+			var pgb: Basis = sk.get_bone_global_pose(pa).basis.orthonormalized() if pa >= 0 else Basis()
+			var axis := (pgb.inverse() * Vector3.RIGHT).normalized()
+			sk.set_bone_pose_rotation(a, Quaternion(axis, arms_drop) * sk.get_bone_pose_rotation(a))
 	if abs(twist) < 0.001 and abs(lean) < 0.001 and abs(head_kick) < 0.001 and abs(hit_twist) < 0.001:
 		return
 	var per_t := (twist + hit_twist) / bones.size()

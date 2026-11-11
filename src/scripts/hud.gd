@@ -1562,26 +1562,28 @@ class Minimap extends Control:
 		var c := Vector2(size.x / 2, R + 13)
 		var pp: Vector2 = m.world_to_minimap(p.global_position)
 		var k: float = zoom * 0.5
-		# drop shadow + glass backing
-		draw_circle(c + Vector2(0, 4), R + 12, Color(0, 0, 0, 0.35))
-		draw_circle(c, R + 9, Color(0.03, 0.05, 0.08, 0.88))
-		# map disc: polygon with UVs into the map texture (rotated so 'forward' is up)
+		# CS2 radar: rounded dark square with the rotating map clipped inside
+		var box := Rect2(c - Vector2(R, R), Vector2(R * 2, R * 2))
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.02, 0.025, 0.03, 0.78)
+		sb.set_corner_radius_all(6)
+		sb.shadow_color = Color(0, 0, 0, 0.35); sb.shadow_size = 8
+		draw_style_box(sb, box.grow(4))
 		var pts := PackedVector2Array(); var uvs := PackedVector2Array(); var cols := PackedColorArray()
 		var ts: Vector2 = tex.get_size() if tex else Vector2(512, 512)
-		for i in 64:
-			var a := i * TAU / 64.0
-			var d := Vector2(cos(a), sin(a)) * R
-			pts.append(c + d)
-			var w := (d / k).rotated(-p.yaw) + pp
-			uvs.append(w / ts)
-			cols.append(Color.WHITE)
+		var cr := 6.0
+		for ci in 4:
+			var cc: Vector2 = [Vector2(R - cr, -R + cr), Vector2(R - cr, R - cr), Vector2(-R + cr, R - cr), Vector2(-R + cr, -R + cr)][ci]
+			for si in 5:
+				var a := -PI / 2 + ci * PI / 2 + si * (PI / 2) / 4.0
+				var d: Vector2 = cc + Vector2(cos(a), sin(a)) * cr
+				pts.append(c + d)
+				uvs.append(((d / k).rotated(-p.yaw) + pp) / ts)
+				cols.append(Color(0.92, 0.92, 0.92))
 		if tex:
 			draw_polygon(pts, cols, uvs, tex)
-		# range rings + grid
-		for rr in [R * 0.33, R * 0.66]:
-			draw_arc(c, rr, 0, TAU, 48, Color(1, 1, 1, 0.06), 1.0, true)
-		draw_line(c - Vector2(R, 0), c + Vector2(R, 0), Color(1, 1, 1, 0.05), 1.0)
-		draw_line(c - Vector2(0, R), c + Vector2(0, R), Color(1, 1, 1, 0.05), 1.0)
+		pts.append(pts[0])
+		draw_polyline(pts, Color(1, 1, 1, 0.14), 1.0, true)
 		# field of view cone
 		var fov := PackedVector2Array([c, c + Vector2(-0.62, -1).normalized() * R * 0.95, c + Vector2(0, -1) * R, c + Vector2(0.62, -1).normalized() * R * 0.95])
 		draw_colored_polygon(fov, Color(1, 0.85, 0.5, 0.09))
@@ -1596,8 +1598,8 @@ class Minimap extends Control:
 				continue
 			var q: Vector2 = ((m.world_to_minimap(n.global_position) - pp) * k).rotated(p.yaw)
 			var col: Color = GS.TEAM_COLORS.get(e["team"], Color(0.3, 0.6, 1)) if friendly else Color(1, 0.2, 0.15)
-			if q.length() > R - 6:
-				q = q.normalized() * (R - 6)
+			if absf(q.x) > R - 6 or absf(q.y) > R - 6:
+				q = q.clamp(Vector2(6 - R, 6 - R), Vector2(R - 6, R - 6))
 				col.a = 0.6
 			draw_circle(c + q, 6.0, Color(0, 0, 0, 0.6))
 			draw_circle(c + q, 4.5, col)
@@ -1608,8 +1610,7 @@ class Minimap extends Control:
 			var fb2: Font = UI.font("RussoOne-Regular")
 			for st in m.sab.sites:
 				var q2: Vector2 = ((m.world_to_minimap(st["pos"]) - pp) * k).rotated(p.yaw)
-				if q2.length() > R - 12:
-					q2 = q2.normalized() * (R - 12)
+				q2 = q2.clamp(Vector2(12 - R, 12 - R), Vector2(R - 12, R - 12))
 				var hot: bool = m.sab.planted and st["pos"].distance_to(m.sab.bomb_pos) < m.sab.SITE_R
 				var sc2: Color = Color(1, 0.3, 0.25) if hot else Color(1, 0.78, 0.35)
 				var hp := PackedVector2Array()
@@ -1624,8 +1625,7 @@ class Minimap extends Control:
 			elif m.sab.bomb_drop != Vector3.INF and p.team == "a": bpos = m.sab.bomb_drop
 			if bpos != Vector3.INF:
 				var q3: Vector2 = ((m.world_to_minimap(bpos) - pp) * k).rotated(p.yaw)
-				if q3.length() > R - 8:
-					q3 = q3.normalized() * (R - 8)
+				q3 = q3.clamp(Vector2(8 - R, 8 - R), Vector2(R - 8, R - 8))
 				var bl: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.012)
 				draw_rect(Rect2(c + q3 - Vector2(6, 4), Vector2(12, 8)), Color(1, 0.25, 0.2, 0.6 + 0.4 * bl))
 		for kk in hud.pings.keys():
@@ -1636,28 +1636,16 @@ class Minimap extends Control:
 		var tri := PackedVector2Array([c + Vector2(0, -11), c + Vector2(8, 8), c + Vector2(0, 4), c + Vector2(-8, 8)])
 		draw_colored_polygon(tri, Color(1, 0.78, 0.25))
 		draw_polyline(tri + PackedVector2Array([tri[0]]), Color(0, 0, 0, 0.7), 1.5, true)
-		# outer ring + compass (rotates with the view)
-		draw_arc(c, R + 1, 0, TAU, 96, Color(1, 1, 1, 0.22), 2.0, true)
-		draw_arc(c, R + 8, 0, TAU, 96, Color(1, 0.55, 0.12, 0.85), 3.0, true)
+		# north marker on the edge (rotates with the view)
 		var f: Font = UI.font("Rajdhani-Bold")
-		var dirs := [["K", 0.0], ["D", PI / 2], ["G", PI], ["B", -PI / 2]]
-		for i in 36:
-			var a2: float = i * TAU / 36.0 + p.yaw - PI / 2
-			var r0 := R + (3.0 if i % 9 == 0 else 5.0)
-			draw_line(c + Vector2(cos(a2), sin(a2)) * r0, c + Vector2(cos(a2), sin(a2)) * (R + 8), Color(1, 1, 1, 0.35 if i % 9 else 0.8), 1.0)
-		for dd in dirs:
-			var a3: float = float(dd[1]) + p.yaw - PI / 2
-			var at := c + Vector2(cos(a3), sin(a3)) * (R - 12)
-			var txt: String = dd[0]
-			draw_circle(at, 9, Color(0.02, 0.03, 0.05, 0.8))
-			draw_string(f, at + Vector2(-5, 6), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(1, 0.75, 0.3) if txt == "K" else Color(1, 1, 1, 0.85))
+		var nd := Vector2(0, -1).rotated(p.yaw)
+		var tmax: float = R / maxf(absf(nd.x), absf(nd.y))
+		var npos := c + nd * (tmax - 10)
+		draw_circle(npos, 8, Color(0, 0, 0, 0.6))
+		draw_string(f, npos + Vector2(-5, 6), "K", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 0.78, 0.3))
 		# map name plate
 		var nm: String = GS.MAPS[m.map_id]["name"].to_upper()
-		var pw := 170.0
-		var pr := Rect2(c.x - pw / 2, c.y + R + 4, pw, 22)
-		draw_rect(pr, Color(0.02, 0.03, 0.05, 0.85))
-		draw_rect(Rect2(pr.position, Vector2(3, pr.size.y)), Color(1, 0.55, 0.12))
-		draw_string(f, pr.position + Vector2(10, 17), nm, HORIZONTAL_ALIGNMENT_LEFT, pw - 14, 16, Color(1, 1, 1, 0.9))
+		draw_string(f, Vector2(c.x - R, c.y + R + 24), nm, HORIZONTAL_ALIGNMENT_LEFT, R * 2, 16, Color(1, 1, 1, 0.75))
 
 
 class ScoreBar extends Control:
@@ -1710,8 +1698,7 @@ class ScoreBar extends Control:
 			var left := i == 0
 			var col: Color = sd[2]
 			var r := Rect2(cx - cw / 2 - 6 - sw, 6, sw, 52) if left else Rect2(cx + cw / 2 + 6, 6, sw, 52)
-			_box(Rect2(r.position + Vector2(0, 2), r.size), Color(0, 0, 0, 0.35), Color(0, 0, 0, 0), 8)
-			_box(r, Color(0.03, 0.04, 0.06, 0.78), Color(col.r, col.g, col.b, 0.55), 8)
+			ScoreBar.grad_rect(self, r, Color(0.04, 0.045, 0.05, 0.0 if left else 0.7), Color(0.04, 0.045, 0.05, 0.7 if left else 0.0))
 			# coloured inner edge toward the timer
 			var edge := Rect2(r.end.x - 4, r.position.y + 6, 4, r.size.y - 12) if left else Rect2(r.position.x, r.position.y + 6, 4, r.size.y - 12)
 			draw_rect(edge, col)
@@ -1743,13 +1730,12 @@ class ScoreBar extends Control:
 		# timer pill
 		var tl := int(m.time_left)
 		var tr := Rect2(cx - cw / 2, 2, cw, 60)
-		_box(Rect2(tr.position + Vector2(0, 2), tr.size), Color(0, 0, 0, 0.4), Color(0, 0, 0, 0), 10)
-		_box(tr, Color(0.015, 0.02, 0.03, 0.9), Color(1, 1, 1, 0.12), 10)
+		_box(tr, Color(0.04, 0.045, 0.05, 0.82), Color(1, 1, 1, 0.08), 3)
 		var tc := Color.WHITE if tl > 30 else Color(1, 0.32, 0.28).lerp(Color.WHITE, 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.01))
 		draw_string(f, Vector2(cx - cw / 2, 42), "%d:%02d" % [tl / 60, tl % 60], HORIZONTAL_ALIGNMENT_CENTER, cw, 42, tc)
 		var goal: String = ("İLK %d" % int(m.target_score)) if m.mode != "gungame" else "SİLAH %d/%d" % [int(m.entry(p).get("gg", 0)) + 1, GS.GUNGAME_ORDER.size()]
 		draw_string(fb, Vector2(cx - cw / 2, 56), goal, HORIZONTAL_ALIGNMENT_CENTER, cw, 12, Color(1, 1, 1, 0.5))
-		draw_rect(Rect2(cx - 18, tr.end.y - 2, 36, 2), Color(1, 0.6, 0.2, 0.9))
+		draw_rect(Rect2(tr.position.x, tr.end.y - 2, tr.size.x, 2), Color(1, 1, 1, 0.18))
 
 
 class HealthPanel extends Control:
@@ -1768,58 +1754,46 @@ class HealthPanel extends Control:
 		queue_redraw()
 
 	func _draw() -> void:
+		## CS2-style: no plate, just a soft shadow strip, white "+ 100" and "shield 100" with slim bars
 		var p = hud.player
 		if p == null:
 			return
 		var W := size.x; var H := size.y
-		var team_c: Color = GS.TEAM_COLORS.get(p.team, Color(1, 0.55, 0.12))
-		# glass plate fading to the right
-		ScoreBar.grad_rect(self, Rect2(0, 18, W, H - 18), Color(0.02, 0.025, 0.04, 0.78), Color(0.02, 0.025, 0.04, 0.0))
-		draw_rect(Rect2(0, 18, 3, H - 18), team_c)
-		ScoreBar.grad_rect(self, Rect2(0, 18, W * 0.8, 1), Color(1, 1, 1, 0.25), Color(1, 1, 1, 0))
-		var f: Font = UI.font("Teko")
-		var fb: Font = UI.font("Rajdhani-Bold")
+		var f: Font = UI.font("Rajdhani-Bold")
+		var fn: Font = UI.font("Teko")
+		ScoreBar.grad_rect(self, Rect2(0, H - 62, W, 62), Color(0, 0, 0, 0.42), Color(0, 0, 0, 0.0))
 		var hp := int(ceil(p.health))
-		var low: bool = hp < 30
+		var low: bool = hp <= 25
 		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.012)
-		var hpc := Color(1, 0.3, 0.26).lerp(Color.WHITE, pulse * 0.4) if low else Color.WHITE
-		# name + team on top
-		var nm: String = str(GS.profile["name"])
-		var tn: String = GS.TEAMS.get(p.team, "") if p.team != "" else ""
-		draw_string(fb, Vector2(4, 12), nm.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, 220, 15, Color(1, 1, 1, 0.85))
-		if tn != "":
-			draw_string(fb, Vector2(4 + fb.get_string_size(nm.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x + 10, 12), tn, HORIZONTAL_ALIGNMENT_LEFT, 120, 13, team_c.lightened(0.3))
-		# plus icon + number
-		var ic := Vector2(26, H - 38)
-		draw_rect(Rect2(ic + Vector2(-3.5, -11), Vector2(7, 22)), hpc)
-		draw_rect(Rect2(ic + Vector2(-11, -3.5), Vector2(22, 7)), hpc)
-		draw_string(f, Vector2(44, H - 14), str(hp), HORIZONTAL_ALIGNMENT_LEFT, 100, 70, hpc)
-		# health bar
-		var bx := 150.0; var bw := W - bx - 20.0; var by := H - 58.0; var bh := 12.0
-		var bgsb := StyleBoxFlat.new(); bgsb.bg_color = Color(1, 1, 1, 0.09); bgsb.set_corner_radius_all(3)
-		draw_style_box(bgsb, Rect2(bx, by, bw, bh))
+		var hc := Color(1, 0.32, 0.28).lerp(Color(1, 0.85, 0.8), pulse * 0.35) if low else Color(1, 1, 1, 0.96)
+		var y := H - 14.0
+		# health: plus icon
+		var ic := Vector2(20, y - 18)
+		draw_rect(Rect2(ic + Vector2(-3, -10), Vector2(6, 20)), hc)
+		draw_rect(Rect2(ic + Vector2(-10, -3), Vector2(20, 6)), hc)
+		draw_string(fn, Vector2(38, y), str(hp), HORIZONTAL_ALIGNMENT_LEFT, 90, 50, hc)
+		var bx := 38.0; var bw := 92.0
+		draw_rect(Rect2(bx, y + 3, bw, 3), Color(1, 1, 1, 0.14))
 		var tr: float = clampf(hud.hp_trail / 100.0, 0, 1)
 		var fl: float = clampf(hud.hp_shown / 100.0, 0, 1)
 		if tr > fl:
-			draw_rect(Rect2(bx + bw * fl, by, bw * (tr - fl), bh), Color(1, 0.9, 0.75, 0.75))
-		var c1 := Color("2fd67a").lerp(Color("ffc93d"), clamp((70.0 - hud.hp_shown) / 40.0, 0.0, 1.0)).lerp(Color("ff3d3d"), clamp((35.0 - hud.hp_shown) / 25.0, 0.0, 1.0))
-		if fl > 0:
-			ScoreBar.grad_rect(self, Rect2(bx, by, bw * fl, bh), c1.darkened(0.25), c1.lightened(0.1))
-			draw_rect(Rect2(bx, by, bw * fl, 3), Color(1, 1, 1, 0.22))
-			if low:
-				draw_rect(Rect2(bx - 2, by - 2, bw * fl + 4, bh + 4), Color(1, 0.2, 0.2, 0.25 * pulse), false, 2.0)
-		for t in [0.25, 0.5, 0.75]:
-			draw_rect(Rect2(bx + bw * t - 1, by, 2, bh), Color(0.02, 0.025, 0.04, 0.9))
-		# armour bar
-		var ay := by + bh + 9
-		var ar: float = clamp(float(p.armor) / 100.0, 0.0, 1.0)
-		draw_style_box(bgsb, Rect2(bx, ay, bw, 6))
-		if ar > 0:
-			ScoreBar.grad_rect(self, Rect2(bx, ay, bw * ar, 6), Color("2f7fd6"), Color("6cc0ff"))
-		var sc := Vector2(bx + 6, ay + 22)
-		draw_colored_polygon(PackedVector2Array([sc + Vector2(-6, -6), sc + Vector2(6, -6), sc + Vector2(6, 1), sc + Vector2(0, 7), sc + Vector2(-6, 1)]), Color("5aaeff"))
-		draw_string(fb, Vector2(bx + 18, ay + 28), "ZIRH  %d" % int(p.armor), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.65, 0.82, 1, 0.9))
-		draw_string(fb, Vector2(bx + bw - 120, ay + 28), "CAN  %d / 100" % hp, HORIZONTAL_ALIGNMENT_RIGHT, 120, 15, Color(1, 1, 1, 0.5))
+			draw_rect(Rect2(bx + bw * fl, y + 3, bw * (tr - fl), 3), Color(1, 0.75, 0.6, 0.8))
+		draw_rect(Rect2(bx, y + 3, bw * fl, 3), hc if not low else Color(1, 0.35, 0.3))
+		# armour: shield icon
+		var ax := 168.0
+		var sc := Vector2(ax, y - 18)
+		var arm := int(p.armor)
+		var acol := Color(1, 1, 1, 0.96) if arm > 0 else Color(1, 1, 1, 0.35)
+		draw_colored_polygon(PackedVector2Array([sc + Vector2(-9, -10), sc + Vector2(9, -10), sc + Vector2(9, 2), sc + Vector2(0, 11), sc + Vector2(-9, 2)]), acol)
+		draw_colored_polygon(PackedVector2Array([sc + Vector2(-5, -6), sc + Vector2(5, -6), sc + Vector2(5, 1), sc + Vector2(0, 6), sc + Vector2(-5, 1)]), Color(0.1, 0.12, 0.15, 0.85))
+		draw_string(fn, Vector2(ax + 18, y), str(arm), HORIZONTAL_ALIGNMENT_LEFT, 90, 50, acol)
+		draw_rect(Rect2(ax + 18, y + 3, 76, 3), Color(1, 1, 1, 0.14))
+		draw_rect(Rect2(ax + 18, y + 3, 76 * clampf(arm / 100.0, 0, 1), 3), acol)
+		# name + team (small, above)
+		var team_c: Color = GS.TEAM_COLORS.get(p.team, Color(1, 0.55, 0.12))
+		var nm: String = str(GS.profile["name"])
+		draw_rect(Rect2(10, y - 62, 3, 13), team_c)
+		draw_string(f, Vector2(18, y - 51), nm, HORIZONTAL_ALIGNMENT_LEFT, 220, 15, Color(1, 1, 1, 0.8))
 
 
 class AmmoPanel extends Control:
@@ -1850,66 +1824,69 @@ class AmmoPanel extends Control:
 		if p and p.cur != icon_id and p.cur != "":
 			icon_id = p.cur
 			Thumbs.request(icon_id, GS.wskin(icon_id), icon)
-		if icon.size != Vector2(190, 82):
-			icon.position = Vector2(26, 8); icon.size = Vector2(190, 82)
+		icon.visible = false      # CS2-style ammo block: numbers only
 		queue_redraw()
 
 	func _draw() -> void:
+		## CS2-style: "30 | 90" in white with a bullet icon, weapon name small above, grenades as a row of icons
 		var p = hud.player
 		if p == null or p.cur == "":
 			return
 		var W := size.x; var H := size.y
-		ScoreBar.grad_rect(self, Rect2(0, 0, W, H - 6), Color(0.02, 0.025, 0.04, 0.0), Color(0.02, 0.025, 0.04, 0.8))
-		draw_rect(Rect2(W - 3, 0, 3, H - 6), Color(1, 0.55, 0.12))
-		ScoreBar.grad_rect(self, Rect2(W * 0.2, 0, W * 0.8, 1), Color(1, 1, 1, 0), Color(1, 1, 1, 0.25))
-		var f: Font = UI.font("Teko")
+		ScoreBar.grad_rect(self, Rect2(0, H - 62, W, 62), Color(0, 0, 0, 0.0), Color(0, 0, 0, 0.42))
+		var fn: Font = UI.font("Teko")
 		var fb: Font = UI.font("Rajdhani-Bold")
 		var w: Dictionary = p.wdata
+		var right := W - 12.0
+		var y := H - 14.0
 		var nm: String = GS.WEAPONS[p.cur]["name"]
 		var lvl: int = GS.wlvl(p.cur)
-		draw_string(fb, Vector2(30, H - 18), nm.to_upper() + ("  +%d" % lvl if lvl > 0 else ""), HORIZONTAL_ALIGNMENT_LEFT, 200, 19, Color(1, 0.72, 0.35))
-		var right := W - 26.0
+		var nm_s := nm + ("  +%d" % lvl if lvl > 0 else "")
+		draw_string(fb, Vector2(right - 300, y - 51), nm_s, HORIZONTAL_ALIGNMENT_RIGHT, 300, 15, Color(1, 1, 1, 0.75))
 		if w.get("melee", false):
-			draw_string(f, Vector2(right - 150, 80), "YAKIN", HORIZONTAL_ALIGNMENT_RIGHT, 150, 46, Color.WHITE)
-			draw_string(fb, Vector2(right - 200, 104), "SOL TIK: KES  •  SAĞ TIK: SAPLA", HORIZONTAL_ALIGNMENT_RIGHT, 200, 14, UI.DIM)
+			draw_string(fb, Vector2(right - 300, y - 4), "SOL TIK: KES   ·   SAĞ TIK: SAPLA", HORIZONTAL_ALIGNMENT_RIGHT, 300, 15, Color(1, 1, 1, 0.6))
 		elif w.get("throwable", false):
-			draw_string(f, Vector2(right - 150, 84), "x%d" % (p.smokes if p.cur == "smoke" else p.grenades), HORIZONTAL_ALIGNMENT_RIGHT, 150, 64, Color.WHITE)
-			draw_string(fb, Vector2(right - 220, 104), "BASILI TUT: NİŞAN  •  BIRAK: AT", HORIZONTAL_ALIGNMENT_RIGHT, 220, 14, UI.DIM)
+			var cnt: int = p.smokes if p.cur == "smoke" else p.grenades
+			draw_string(fn, Vector2(right - 90, y), "x%d" % cnt, HORIZONTAL_ALIGNMENT_RIGHT, 90, 50, Color.WHITE)
+			draw_string(fb, Vector2(right - 400, y - 6), "BASILI TUT: NİŞAN  ·  BIRAK: AT   ", HORIZONTAL_ALIGNMENT_RIGHT, 300, 14, Color(1, 1, 1, 0.55))
 		elif p.ammo.has(p.cur):
 			var a: Array = p.ammo[p.cur]
 			var mx: int = int(w.get("mag_max", 30))
-			var lowa: bool = a[0] <= mx * 0.25
-			var col := Color(1, 0.3, 0.25) if lowa else Color.WHITE
-			draw_string(f, Vector2(right - 210, 86), "%d" % a[0], HORIZONTAL_ALIGNMENT_RIGHT, 140, 82, col)
-			draw_string(f, Vector2(right - 66, 86), "/%d" % a[1], HORIZONTAL_ALIGNMENT_LEFT, 80, 36, Color(1, 1, 1, 0.55))
-			# magazine pips
-			var n: int = min(mx, 50)
-			var per_row: int = 25 if n > 25 else n
-			var pw := 5.0; var ph := 12.0; var gap := 2.0
-			for i in n:
-				var row: int = i / per_row
-				var col_i: int = i % per_row
-				var x := right - (col_i + 1) * (pw + gap)
-				var y := 104.0 + row * (ph * 0.55 + 3)
-				var filled: bool = i < int(round(float(a[0]) * n / max(mx, 1)))
-				draw_rect(Rect2(x, y, pw, ph * (0.55 if n > 25 else 1.0)), (Color(1, 0.75, 0.3) if filled else Color(1, 1, 1, 0.12)))
-			var mode := "OTO" if w.get("auto", false) else ("SÜRGÜ" if w.get("bolt", false) else ("POMPA" if w.get("shell_reload", false) else "TEK"))
-			draw_string(fb, Vector2(right - 300, 40), mode, HORIZONTAL_ALIGNMENT_RIGHT, 80, 15, UI.DIM)
+			var lowa: bool = a[0] <= maxi(1, int(mx * 0.2))
+			var col := Color(1, 0.33, 0.28) if lowa else Color(1, 1, 1, 0.96)
+			var rs := str(a[1])
+			var rw := fn.get_string_size(rs, HORIZONTAL_ALIGNMENT_LEFT, -1, 30).x
+			draw_string(fn, Vector2(right - rw, y), rs, HORIZONTAL_ALIGNMENT_LEFT, -1, 30, Color(1, 1, 1, 0.6))
+			draw_rect(Rect2(right - rw - 12, y - 30, 2, 24), Color(1, 1, 1, 0.35))
+			var ms := str(a[0])
+			var mw := fn.get_string_size(ms, HORIZONTAL_ALIGNMENT_LEFT, -1, 50).x
+			var mxp := right - rw - 22 - mw
+			draw_string(fn, Vector2(mxp, y), ms, HORIZONTAL_ALIGNMENT_LEFT, -1, 50, col)
+			# bullet icon
+			var bxp := mxp - 22
+			draw_rect(Rect2(bxp, y - 30, 8, 22), col)
+			draw_colored_polygon(PackedVector2Array([Vector2(bxp, y - 30), Vector2(bxp + 8, y - 30), Vector2(bxp + 4, y - 38)]), col)
+			draw_rect(Rect2(bxp, y - 12, 8, 2), Color(0, 0, 0, 0.4))
 			if p.reload_t > 0:
 				var rf: float = 1.0 - p.reload_t / max(p.reload_total, 0.01)
-				draw_string(fb, Vector2(right - 300, 60), "DOLDURULUYOR", HORIZONTAL_ALIGNMENT_RIGHT, 120, 15, Color(1, 0.72, 0.35))
-				draw_rect(Rect2(right - 300 + 0, 66, 120 * rf, 3), Color(1, 0.55, 0.12))
-		# grenade counter chip
-		if p.slots.has("bomba") and not w.get("throwable", false):
-			var gx := 228.0
-			draw_circle(Vector2(gx, 30), 9, Color(0.35, 0.42, 0.25))
-			draw_rect(Rect2(gx - 3, 17, 6, 5), Color(0.5, 0.5, 0.5))
-			draw_string(fb, Vector2(gx + 14, 36), "x%d" % p.grenades, HORIZONTAL_ALIGNMENT_LEFT, 40, 18, Color(1, 1, 1, 0.85))
-			# smoke grenade (key 4 twice)
-			var sx := gx + 52.0
-			draw_rect(Rect2(sx - 6, 21, 12, 18), Color(0.55, 0.6, 0.5) if p.smokes > 0 else Color(0.3, 0.32, 0.3))
-			draw_rect(Rect2(sx - 6, 21, 12, 3), Color(0.8, 0.82, 0.78))
-			draw_string(fb, Vector2(sx + 11, 36), "x%d" % p.smokes, HORIZONTAL_ALIGNMENT_LEFT, 40, 18, Color(1, 1, 1, 0.85 if p.smokes > 0 else 0.4))
+				draw_rect(Rect2(right - 160, y + 4, 160, 3), Color(1, 1, 1, 0.14))
+				draw_rect(Rect2(right - 160, y + 4, 160 * rf, 3), Color(1, 1, 1, 0.9))
+			var mode := "OTO" if w.get("auto", false) else ("SÜRGÜ" if w.get("bolt", false) else ("POMPA" if w.get("shell_reload", false) else "TEK"))
+			draw_string(fb, Vector2(bxp - 120, y - 6), mode, HORIZONTAL_ALIGNMENT_RIGHT, 110, 13, Color(1, 1, 1, 0.45))
+		# grenades: small icons above the ammo (frag / smoke), dimmed when empty
+		if p.slots.has("bomba"):
+			var gx := right - 8.0
+			var gy := y - 78.0
+			for k in [["smoke", p.smokes], ["frag", p.grenades]]:
+				for j in int(k[1]):
+					var c0 := Color(1, 1, 1, 0.85 if p.cur == k[0] else 0.55)
+					if k[0] == "frag":
+						draw_circle(Vector2(gx - 6, gy + 8), 6, c0)
+						draw_rect(Rect2(gx - 9, gy - 1, 6, 4), c0)
+					else:
+						draw_rect(Rect2(gx - 11, gy, 10, 15), c0)
+						draw_rect(Rect2(gx - 11, gy, 10, 3), Color(0, 0, 0, 0.35))
+					gx -= 18.0
 
 
 class MedalRing extends Control:

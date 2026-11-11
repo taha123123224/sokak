@@ -44,6 +44,7 @@ func _ready() -> void:
 
 func _test(args: Dictionary) -> void:
 	GS.settings["fullscreen"] = false
+	GS.settings["window_mode"] = "windowed"
 	if args.has("lowfx"):
 		GS.set_meta("lowfx", true)
 		GS.settings["volumetric"] = false

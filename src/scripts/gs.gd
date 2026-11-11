@@ -424,6 +424,10 @@ const CREDITS := [
 	["PP-19-01 Vityaz", "suspensy", "CC-BY 4.0 · sketchfab.com"],
 	["Pistol 9mm - semi auto (Glock)", "Hitansh 3D", "CC-BY 4.0 · sketchfab.com"],
 	["RPK-16", "FamousUnityHubSoldier", "Sketchfab Standard · sketchfab.com"],
+	["Müzik: King of the Desert, Retribution, Thugs, Destiny", "Tanner Helland", "CC-BY 4.0 · github.com/tannerhelland/free-music"],
+	["Oculus Audio Pack 01 (adım, bıçak, ortam sesleri)", "Oculus VR, LLC", "CC BY 4.0 · developers.meta.com/vr/downloads/package/oculus-audio-pack-1"],
+	["Impact Sounds (mermi çarpma)", "Kenney", "CC0 · kenney.nl"],
+	["Interface Sounds / UI Audio (menü sesleri)", "Kenney", "CC0 · kenney.nl"],
 ]
 const TEAMS := {"a": "KARTAL", "b": "AKREP"}
 const TEAM_COLORS := {"a": Color("3d8bff"), "b": Color("ff4d3d")}
@@ -718,7 +722,7 @@ func stats_for(id: String, lvl: int = -1) -> Dictionary:
 func default_settings() -> Dictionary:
 	return {
 		"sens": 1.0, "ads_sens": 0.8, "scope_sens": 0.6, "invert_y": false, "fov": 80.0,
-		"quality": "high", "resolution_scale": 1.0, "upscaler": "fsr2", "fullscreen": true, "vsync": false, "fps_cap": -1,
+		"quality": "high", "resolution_scale": 1.0, "upscaler": "fsr2", "fullscreen": true, "window_mode": "", "resolution": "auto", "ui_scale": 1.0, "vsync": false, "fps_cap": -1,
 		"msaa": 0, "taa": false, "fxaa": true, "shadows": 2, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false,
 		"dyn_res": true, "dyn_target": 75,
 		"motion_blur": false, "draw_distance": 1.0, "sharpen": 0.3, "brightness": 1.0, "show_fps": true, "perf_overlay": 1, "grass": true, "shadow_dist": 1.0, "announcer": true,
@@ -794,15 +798,67 @@ func apply_preset(name: String) -> void:
 	for k in QUALITY_PRESETS[name].keys():
 		settings[k] = QUALITY_PRESETS[name][k]
 
+## screen sizes offered in Ayarlar > Ekran (only the ones that fit the monitor are listed)
+const RESOLUTIONS := ["1280x720", "1366x768", "1440x900", "1600x900", "1680x1050", "1920x1080", "1920x1200", "2560x1080", "2560x1440", "3440x1440", "3840x2160"]
+
+func window_mode() -> String:
+	var m := str(settings.get("window_mode", ""))
+	if m == "":
+		m = "fullscreen" if bool(settings.get("fullscreen", true)) else "windowed"
+	return m
+
+func res_size() -> Vector2i:
+	## the chosen resolution ("auto" = the monitor's native size)
+	var scr := DisplayServer.screen_get_size(DisplayServer.window_get_current_screen())
+	var r := str(settings.get("resolution", "auto"))
+	if r == "auto" or not "x" in r:
+		return scr
+	var p := r.split("x")
+	return Vector2i(int(p[0]), int(p[1]))
+
+## window mode + resolution + interface scale; the UI always lays out on a 1920x1080 canvas that is
+## stretched (and widened/heightened, never cropped) to the window, so nothing can spill off-screen.
+func apply_display() -> void:
+	if DisplayServer.get_name() == "headless" or OS.has_feature("editor_hint"):
+		return
+	var win := get_window()
+	var m := window_mode()
+	settings["fullscreen"] = m != "windowed"
+	var scr_i := DisplayServer.window_get_current_screen()
+	var usable := DisplayServer.screen_get_usable_rect(scr_i)
+	var want := res_size()
+	if m == "exclusive":
+		if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
+	elif m == "fullscreen":
+		if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_FULLSCREEN:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	else:
+		if DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		if str(settings.get("resolution", "auto")) == "auto":
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
+		else:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+			# never bigger than the free desktop area (taskbar excluded), centred
+			var sz := Vector2i(mini(want.x, usable.size.x), mini(want.y, usable.size.y - 32))
+			DisplayServer.window_set_size(sz)
+			DisplayServer.window_set_position(usable.position + (usable.size - sz) / 2)
+	# fullscreen at a lower resolution: render the 3D world at that size (FSR upscales), UI stays sharp
+	var scr := DisplayServer.screen_get_size(scr_i)
+	res_factor = 1.0
+	if m != "windowed" and str(settings.get("resolution", "auto")) != "auto" and scr.y > 0:
+		res_factor = clampf(float(want.y) / float(scr.y), 0.33, 1.0)
+	win.content_scale_factor = clampf(float(settings.get("ui_scale", 1.0)), 0.75, 1.25)
+
+var res_factor := 1.0
+
 func apply_settings() -> void:
 	var win := get_window()
 	var md := str(settings.get("mic_device", ""))
 	if md != "" and md in AudioServer.get_input_device_list():
 		AudioServer.input_device = md
-	if settings["fullscreen"]:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
-	elif DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
+	apply_display()
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if settings["vsync"] else DisplayServer.VSYNC_DISABLED)
 	Engine.max_fps = fps_limit()
 	var vp := get_viewport()
@@ -812,7 +868,7 @@ func apply_settings() -> void:
 	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_SMAA if settings["fxaa"] else Viewport.SCREEN_SPACE_AA_DISABLED
 	vp.use_taa = bool(settings["taa"])
 	vp.use_debanding = true
-	var rs := float(settings["resolution_scale"])
+	var rs := float(settings["resolution_scale"]) * res_factor
 	vp.scaling_3d_scale = rs
 	if rs < 0.99:
 		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR2 if settings["upscaler"] == "fsr2" else Viewport.SCALING_3D_MODE_FSR

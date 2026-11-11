@@ -1,37 +1,37 @@
 {
-	"version": "2.9.8",
-	"build": 37,
-	"parts": [
-		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v37.pck.part00",
-			"size": 94371840
-		},
-		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v37.pck.part01",
-			"size": 94371840
-		},
-		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v37.pck.part02",
-			"size": 94371840
-		},
-		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v37.pck.part03",
-			"size": 94371840
-		},
-		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v37.pck.part04",
-			"size": 94371840
-		},
-		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v37.pck.part05",
-			"size": 94371840
-		},
-		{
-			"url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v37.pck.part06",
-			"size": 68154900
-		}
-	],
-	"pck_size": 634385940,
-	"installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
-	"notes": "v2.9.8: CS2 tarzı lobi (güneşli sokakta silahını tutan karakter, sade üst menü, arkadaş şeridi) ve giriş ekranı; haritalarda önceden hesaplanmış gölgeler (AO) ve yansıma probları; 4 tuşu ile hacimsel SİS BOMBASI; yeni grafit renk paleti."
+ "version": "2.9.9",
+ "build": 38,
+ "parts": [
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v38.pck.part00",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v38.pck.part01",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v38.pck.part02",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v38.pck.part03",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v38.pck.part04",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v38.pck.part05",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v38.pck.part06",
+   "size": 63249368
+  }
+ ],
+ "pck_size": 629480408,
+ "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
+ "notes": "v2.9.9: Gerçek kayıt ses efektleri (Oculus Audio Pack, Kenney) ve yeni müzikler (Tanner Helland) • haritaya özel ortam sesleri • CS2 tarzı sade HUD ve kare radar • silah değiştirme görüntü hatası düzeltildi (UZI) • lobide yeni karakter duruşu ve karakter seçimi • Ayarlar: çözünürlük, ekran modu, arayüz boyutu"
 }

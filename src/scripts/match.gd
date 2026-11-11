@@ -463,8 +463,8 @@ func _build() -> void:
 	for k in 8:
 		_process_loading_pct()
 		await get_tree().process_frame
-	SFX.play_music("music_match", -16)
-	SFX.play_amb(GS.MAPS.get(map_id, {}).get("amb", {"mahalle": "amb_city", "safranbolu": "amb_town", "gemi": "amb_ship", "liman": "amb_port"}.get(map_id, "amb_town")))
+	SFX.play_music("music_match", -22)
+	SFX.play_amb(GS.MAPS.get(map_id, {}).get("amb", {"mahalle": "amb_city", "safranbolu": "amb_town", "gemi": "amb_ship", "liman": "amb_port", "insaat": "amb_wind", "canakkale": "amb_sea"}.get(map_id, "amb_town")))
 	var tw := create_tween()
 	tw.tween_property(loading, "modulate:a", 0.0, 0.5)
 	tw.tween_callback(loading.get_parent().queue_free)
@@ -1749,6 +1749,30 @@ func test_hook(i: int) -> void:
 			player._melee(i == 41)
 			player.test_freeze_kind = "melee"
 		player.test_freeze = fr
+	elif i >= 65 and i <= 79:
+		var lst := ["m4a1", "awm", "uzi", "akm", "rpk16", "vityaz", "spas", "deagle", "usp", "karambit", "m4k", "kuzgun", "aug", "awp", "m249"]
+		var w2: String = lst[i - 65]
+		var c3: String = GS.WEAPONS[w2]["cat"]
+		player.slots[c3] = w2
+		player.ammo[w2] = [10, 90]
+		player.switch_to("frag" if player.cur != "frag" else player.slots["bicak"])
+		await get_tree().create_timer(0.5).timeout
+		player.switch_to(w2)
+		await get_tree().create_timer(1.0).timeout
+		print("SWITCH ", w2, " cur=", player.cur, " fp=", player.fp_root.name if player.fp_root and is_instance_valid(player.fp_root) else "-")
+	elif i >= 60 and i <= 64:
+		# real (non-instant) weapon switching, like the keys do
+		var c2: String = ["tabanca", "bicak", "ana", "bomba", "ana"][i - 60]
+		print("SWITCH before cur=", player.cur, " slots=", player.slots)
+		if player.slots.has(c2):
+			player.switch_to(player.slots[c2])
+		await get_tree().create_timer(0.08).timeout
+		if i == 64:
+			for r in 12:
+				player._cycle(1 if r % 3 else -1)
+				await get_tree().create_timer(randf_range(0.02, 0.2)).timeout
+		await get_tree().create_timer(1.2).timeout
+		print("SWITCH after cur=", player.cur, " vm=", player.vm_weapon.name if player.vm_weapon else "-", " fp=", player.fp_root.name if player.fp_root and is_instance_valid(player.fp_root) else "-", " vmvis=", player.vm_weapon.visible if player.vm_weapon else false)
 	elif i == 52:
 		print("NADE before g=", player.grenades, " s=", player.smokes, " cur=", player.cur)
 		player.switch_to("smoke", true)

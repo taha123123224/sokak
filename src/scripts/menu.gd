@@ -1225,7 +1225,7 @@ func _make_soldier(cid: String) -> Node3D:
 		GS.parts_visual(b.gun, wid)
 		GS.level_glow(b.gun, wid)
 	b.position = Vector3(0.5, 0, 0)
-	b.rotation.y = deg_to_rad(float(OS.get_environment("LYAW")) if OS.get_environment("LYAW") != "" else 240.0)
+	b.rotation.y = deg_to_rad(float(OS.get_environment("LYAW")) if OS.get_environment("LYAW") != "" else 235.0)
 	b.set_meta("wid", wid)
 	if b.anim and b.anim.has_animation("Idle"):
 		b._play("Idle")
@@ -1255,8 +1255,9 @@ func _pose_soldier(delta: float) -> void:
 	# relaxed low ready: the shouldered aim pose with the torso bent so the muzzle points at the ground ahead
 	var br := sin(Time.get_ticks_msec() * 0.0011) * 0.02
 	if soldier.twist:
-		soldier.twist.lean = (float(OS.get_environment("LLEAN")) if OS.get_environment("LLEAN") != "" else 0.47) + br
-		soldier.twist.twist = float(OS.get_environment("LTWIST")) if OS.get_environment("LTWIST") != "" else 0.25
+		soldier.twist.lean = (float(OS.get_environment("LLEAN")) if OS.get_environment("LLEAN") != "" else 0.05) + br
+		soldier.twist.twist = float(OS.get_environment("LTWIST")) if OS.get_environment("LTWIST") != "" else 0.35
+		soldier.twist.arms_drop = float(OS.get_environment("LDROP")) if OS.get_environment("LDROP") != "" else 0.6 + br
 	soldier._follow_chest(delta)
 
 func _char_picker() -> Control:
@@ -1265,12 +1266,12 @@ func _char_picker() -> Control:
 	var ids: Array = GS.CHARACTERS.keys()
 	var c: String = char_view
 	var info: Dictionary = GS.CHARACTERS[c]
-	var p := UI.panel(UI.BG, UI.LINE, 12)
+	var p := UI.glass(12, 4)
 	var v := UI.vbox(6)
 	p.add_child(v)
 	var h := UI.hbox(8)
 	v.add_child(h)
-	h.add_child(UI.lbl("KARAKTER", 18, UI.ACCENT2, "Rajdhani-Bold"))
+	h.add_child(UI.lbl("KARAKTER", 18, Color.WHITE, "Rajdhani-Bold"))
 	h.add_child(UI.spacer())
 	h.add_child(UI.lbl(GS.TEAMS[info["team"]], 16, GS.TEAM_COLORS[info["team"]], "Rajdhani-Bold"))
 	var row := UI.hbox(8)
@@ -1316,6 +1317,7 @@ func _page_lobby() -> void:
 	left.custom_minimum_size = Vector2(372, 0)
 	content.add_child(left)
 	left.add_child(_sets_panel(true))
+	left.add_child(_char_picker())
 	# ---- centre bottom: player card (click -> profile)
 	var card := UI.glass(12, 4)
 	card.anchor_left = 0.5; card.anchor_right = 0.5; card.anchor_top = 1; card.anchor_bottom = 1
@@ -1380,8 +1382,8 @@ func _page_lobby() -> void:
 	nv.alignment = BoxContainer.ALIGNMENT_END
 	nm2.add_child(nv)
 	nv.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, UI.ACCENT2, "Rajdhani-Bold"))
-	nv.add_child(UI.lbl("CS2 TARZI GRAFİK", 26, Color.WHITE, "RussoOne-Regular"))
-	nv.add_child(_wrap("Önceden hesaplanmış gölgeler, yansımalar ve 4 tuşuyla gerçek hacimsel sis bombası!", 15))
+	nv.add_child(UI.lbl("GERÇEK SESLER", 26, Color.WHITE, "RussoOne-Regular"))
+	nv.add_child(_wrap("Stüdyo kaydı adım, çarpma ve ortam sesleri, yeni müzikler ve CS2 tarzı sade HUD!", 15))
 	var mp := UI.glass(12, 4)
 	right.add_child(mp)
 	var mv := UI.vbox(7)

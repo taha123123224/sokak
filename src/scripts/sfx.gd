@@ -44,6 +44,8 @@ func get_stream(n: String) -> AudioStream:
 	var s: AudioStream = null
 	if ResourceLoader.exists(path):
 		s = load(path)
+	elif ResourceLoader.exists(DIR + n + ".ogg"):
+		s = load(DIR + n + ".ogg")
 	streams[n] = s
 	return s
 
@@ -113,6 +115,8 @@ func play_music(n: String, vol_db: float = -4.0, loop: bool = true) -> void:
 		w.loop_mode = AudioStreamWAV.LOOP_FORWARD if loop else AudioStreamWAV.LOOP_DISABLED
 		w.loop_begin = 0
 		w.loop_end = _frames(w)
+	elif s is AudioStreamOggVorbis:
+		(s as AudioStreamOggVorbis).loop = loop
 	if music.stream == s and music.playing:
 		music.volume_db = vol_db
 		return
@@ -138,6 +142,8 @@ func play_amb(n: String) -> void:
 	if s is AudioStreamWAV:
 		(s as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
 		(s as AudioStreamWAV).loop_end = _frames(s as AudioStreamWAV)
+	elif s is AudioStreamOggVorbis:
+		(s as AudioStreamOggVorbis).loop = true
 	amb.stream = s
 	amb.volume_db = -6
 	amb.play()
