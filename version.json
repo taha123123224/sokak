@@ -1,43 +1,43 @@
 {
- "version": "3.1.0",
- "build": 40,
+ "version": "3.2.0",
+ "build": 41,
  "parts": [
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part00",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v41.pck.part00",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part01",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v41.pck.part01",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part02",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v41.pck.part02",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part03",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v41.pck.part03",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part04",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v41.pck.part04",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part05",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v41.pck.part05",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part06",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v41.pck.part06",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part07",
-   "size": 29419888
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v41.pck.part07",
+   "size": 37634576
   }
  ],
- "pck_size": 690022768,
+ "pck_size": 698237456,
  "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
- "notes": "v3.1.0: CS2 tarzı MAĞAZA ve AJAN kartları • Tek ekranda OYNA: mod sekmeleri + harita seçimi • 2K gerçek dokular ve sinematik ışık • Canlı lobi karakteri, yeni SCAR-H, CS:GO tarzı bıçak • Yeni başlatıcı, giriş ekranı ve açılış animasyonu",
+ "notes": "v3.2.0: EJDER KASASI • 4 HAREKETLİ efsanevi kaplama: Kara Ejderha, Anka Alevi, Kuantum Devresi, Yıldırım Fırtınası • Yeni kasa açılış ekranı ve ejderha animasyonu • Tüm kasalara yeni tasarım",
  "launcher": {
   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/baslatici.pck",
   "size": 1689664

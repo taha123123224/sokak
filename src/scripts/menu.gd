@@ -1508,8 +1508,8 @@ func _page_lobby() -> void:
 	nv.alignment = BoxContainer.ALIGNMENT_END
 	nm2.add_child(nv)
 	nv.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, UI.ACCENT2, "Rajdhani-Bold"))
-	nv.add_child(UI.lbl("SOKAK 3.1", 26, Color.WHITE, "RussoOne-Regular"))
-	nv.add_child(_wrap("CS2 tarzı yeni mağaza ve OYNA ekranı, canlı lobi karakteri, yeni SCAR-H ve FPS giriş animasyonu!", 15))
+	nv.add_child(UI.lbl("EJDER KASASI", 26, Color.WHITE, "RussoOne-Regular"))
+	nv.add_child(_wrap("4 yeni HAREKETLİ efsanevi kaplama: Kara Ejderha, Anka Alevi, Kuantum Devresi, Yıldırım Fırtınası!", 15))
 	var mp := UI.glass(12, 4)
 	right.add_child(mp)
 	var mv := UI.vbox(7)
@@ -2898,6 +2898,80 @@ func _toast(t: String, c: Color) -> void:
 var crate_items: Array = []
 var crate_type := "sokak"
 
+func _crate_tex(t: String) -> Texture2D:
+	var pth := "res://assets/ui/crates/%s.png" % t
+	return load(pth) if ResourceLoader.exists(pth) else null
+
+func _crate_tile(t: String) -> Control:
+	var cd: Dictionary = GS.CRATES[t]
+	var c: Color = cd["color"]
+	var on: bool = t == crate_type
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(170, 160)
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var n := UI.sb(Color(0.05, 0.056, 0.068, 1.0), c if on else Color(1, 1, 1, 0.06), 2 if on else 1, 4, 0)
+	n.border_width_bottom = 4; n.border_color = c if on else c.darkened(0.45)
+	b.add_theme_stylebox_override("normal", n)
+	var h := n.duplicate(); h.bg_color = Color(0.09, 0.1, 0.12, 1.0)
+	b.add_theme_stylebox_override("hover", h)
+	b.add_theme_stylebox_override("pressed", h)
+	var tx := _crate_tex(t)
+	if tx:
+		var tr := TextureRect.new()
+		tr.texture = tx
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.position = Vector2(25, 6); tr.size = Vector2(120, 100)
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(tr)
+	else:
+		var ic := CrateIcon.new(); ic.col = c
+		ic.position = Vector2(55, 20); ic.size = Vector2(60, 60); ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(ic)
+	var nm := UI.lbl(str(cd["name"]), 17, Color.WHITE, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+	nm.position = Vector2(4, 106); nm.size = Vector2(162, 24); nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(nm)
+	var cnt := _crate_count(t)
+	var pr := UI.lbl(("x%d" % cnt) if cnt > 0 else ("◉ " + UI.money(int(cd["price"]))), 15, UI.GREEN if cnt > 0 else UI.GOLD, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+	pr.position = Vector2(4, 128); pr.size = Vector2(162, 22); pr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(pr)
+	b.pressed.connect(func(): crate_type = t; SFX.play("ui_click", -4); show_page("crate"))
+	return b
+
+func _skin_swatch(sk: String) -> Control:
+	var sd: Dictionary = GS.SKINS[sk]
+	var rc: Color = GS.RARITY_COLORS[clampi(int(sd.get("rarity", 0)), 0, 3)]
+	var v := UI.vbox(2)
+	var p := PanelContainer.new()
+	var sb := UI.sb(Color(0, 0, 0, 0.4), rc, 0, 3, 0)
+	sb.border_width_bottom = 3
+	p.add_theme_stylebox_override("panel", sb)
+	p.custom_minimum_size = Vector2(96, 58)
+	v.add_child(p)
+	var tp := "res://assets/tex/skin_%s_albedo.png" % sk
+	if ResourceLoader.exists(tp):
+		var tr := TextureRect.new()
+		tr.texture = load(tp)
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		p.add_child(tr)
+	elif sk == "altin":
+		var cr := ColorRect.new(); cr.color = Color(0.95, 0.72, 0.32); p.add_child(cr)
+	if sd.get("anim", false):
+		var tag := UI.lbl("HAREKETLİ", 11, Color.WHITE, "Rajdhani-Bold")
+		tag.add_theme_constant_override("outline_size", 4)
+		tag.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+		tag.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		p.add_child(tag)
+	var nl := UI.lbl(str(sd["name"]), 12, rc.lightened(0.2), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+	nl.custom_minimum_size = Vector2(96, 0)
+	nl.clip_text = true
+	v.add_child(nl)
+	v.tooltip_text = "%s  •  %s" % [sd["name"], GS.RARITY_NAMES[clampi(int(sd.get("rarity", 0)), 0, 3)]]
+	return v
+
 func _crate_count(t: String) -> int:
 	if t == "sokak":
 		return int(GS.profile.get("crates", 0))
@@ -2913,58 +2987,63 @@ func _crate_take(t: String) -> void:
 
 func _page_crate() -> void:
 	soldier.visible = true
-	var p := UI.panel(UI.BG, UI.LINE, 20)
+	soldier.visible = false
+	var dim := ColorRect.new()
+	dim.color = Color(0.015, 0.017, 0.022, 0.9)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(dim)
+	var p := MarginContainer.new()
 	p.anchor_left = 0.5; p.anchor_right = 0.5
-	p.offset_left = -640; p.offset_right = 640; p.offset_top = 24
+	p.offset_left = -640; p.offset_right = 640; p.offset_top = 12
 	p.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	content.add_child(p)
-	var v := UI.vbox(14)
+	var v := UI.vbox(12)
 	p.add_child(v)
-	var top := UI.hbox(10)
-	v.add_child(top)
-	top.add_child(UI.header("KASALAR", 30))
-	top.add_child(UI.spacer())
-	# crate type selector cards (3 per row)
-	var row := GridContainer.new()
-	row.columns = 3
-	row.add_theme_constant_override("h_separation", 10)
-	row.add_theme_constant_override("v_separation", 10)
-	v.add_child(row)
+	var cd0: Dictionary = GS.CRATES[crate_type]
+	var cc0: Color = cd0["color"]
+	# ---- crate shelf: painted crate tiles (CS2 inventory cases)
+	var shelf_sc := ScrollContainer.new()
+	shelf_sc.custom_minimum_size = Vector2(0, 168)
+	shelf_sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(shelf_sc)
+	var shelf := UI.hbox(10)
+	shelf_sc.add_child(shelf)
 	for t in GS.CRATES.keys():
-		var cd: Dictionary = GS.CRATES[t]
-		var on: bool = t == crate_type
-		var b := Button.new()
-		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(406, 92)
-		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		var c: Color = cd["color"]
-		b.add_theme_stylebox_override("normal", UI.sb(c.darkened(0.7 if not on else 0.45), c if on else c.darkened(0.4), 2 if on else 1, 6, 10))
-		b.add_theme_stylebox_override("hover", UI.sb(c.darkened(0.4), c.lightened(0.2), 2, 6, 10))
-		b.add_theme_stylebox_override("pressed", UI.sb(c.darkened(0.3), Color.WHITE, 2, 6, 10))
-		var bv := UI.vbox(2)
-		bv.set_anchors_preset(Control.PRESET_FULL_RECT)
-		bv.offset_left = 14; bv.offset_top = 8; bv.offset_right = -10
-		bv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		b.add_child(bv)
-		var hh := UI.hbox(8); hh.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		bv.add_child(hh)
-		var ic := CrateIcon.new(); ic.col = c; ic.custom_minimum_size = Vector2(44, 44); ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		hh.add_child(ic)
-		var tv := UI.vbox(0); tv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		hh.add_child(tv)
-		tv.add_child(UI.lbl(cd["name"], 21, Color.WHITE, "Rajdhani-Bold"))
-		tv.add_child(UI.lbl("◉ %s   •   Sende: %d" % [UI.money(int(cd["price"])), _crate_count(t)], 15, UI.GOLD, "Rajdhani-Bold"))
-		var dl := UI.lbl(cd["desc"], 13, Color(1, 1, 1, 0.7), "Rajdhani-SemiBold")
-		dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		dl.custom_minimum_size = Vector2(380, 0)
-		bv.add_child(dl)
-		for cc in b.find_children("*", "Control", true, false):
-			(cc as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
-		b.pressed.connect(func(): crate_type = t; SFX.play("ui_click", -4); show_page("crate"))
-		row.add_child(b)
+		shelf.add_child(_crate_tile(t))
+	# ---- hero: the selected crate big, its story and what can drop
+	var hero := PanelContainer.new()
+	var hsb := UI.sb(Color(cc0.r * 0.12, cc0.g * 0.12, cc0.b * 0.12, 0.95), Color(cc0.r, cc0.g, cc0.b, 0.35), 1, 4, 16)
+	hero.add_theme_stylebox_override("panel", hsb)
+	v.add_child(hero)
+	var hh0 := UI.hbox(22)
+	hero.add_child(hh0)
+	var ctex := _crate_tex(crate_type)
+	if ctex:
+		var art := CrateBox.new()
+		art.col = cc0; art.tex = ctex; art.glow = 0.25
+		art.custom_minimum_size = Vector2(250, 220)
+		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hh0.add_child(art)
+	var hv := UI.vbox(6)
+	hv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hh0.add_child(hv)
+	hv.add_child(UI.lbl(str(cd0["name"]).to_upper(), 46, Color.WHITE, "Teko"))
+	var dl0 := UI.lbl(str(cd0["desc"]), 17, UI.TEXT, "Rajdhani-SemiBold")
+	dl0.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hv.add_child(dl0)
+	hv.add_child(UI.lbl("İÇERİK  •  ◉ %s  •  Sende: %d" % [UI.money(int(cd0["price"])), _crate_count(crate_type)], 15, UI.DIM, "Rajdhani-Bold"))
+	var ct := UI.hbox(8)
+	hv.add_child(ct)
+	var skl: Array = cd0.get("skins", []).duplicate()
+	skl.sort_custom(func(x, y): return int(GS.SKINS.get(x, {}).get("rarity", 0)) > int(GS.SKINS.get(y, {}).get("rarity", 0)))
+	for sk in skl.slice(0, 8):
+		if GS.SKINS.has(sk):
+			ct.add_child(_skin_swatch(sk))
 	var clip := Control.new()
 	clip.clip_contents = true
 	clip.custom_minimum_size = Vector2(1240, 210)
+	clip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	v.add_child(clip)
 	var strip := HBoxContainer.new()
 	strip.add_theme_constant_override("separation", 10)
@@ -3093,6 +3172,7 @@ class CrateBox extends Control:
 	var col := Color.WHITE
 	var glow := 0.0
 	var lid := 0.0           # 0 closed .. 1 blown off
+	var tex: Texture2D       # painted crate art (v3.2); the code-drawn crate is the fallback
 	func _process(_d: float) -> void:
 		queue_redraw()
 	func _box(r: Rect2, c: Color, rad: int) -> void:
@@ -3102,6 +3182,19 @@ class CrateBox extends Control:
 		draw_style_box(sb, r)
 	func _draw() -> void:
 		var w := size.x; var h := size.y
+		if tex:
+			var c0 := size * 0.5
+			for k in 10:
+				draw_circle(c0, w * (0.25 + k * 0.045 * (0.5 + glow)), Color(col.r, col.g, col.b, 0.03 * glow))
+			var sc := 1.0 + lid * 0.35 + glow * 0.05
+			var sz := Vector2(w, h) * 0.95 * sc
+			draw_texture_rect(tex, Rect2(c0 - sz * 0.5, sz), false, Color(1 + glow * 0.6, 1 + glow * 0.5, 1 + glow * 0.4, 1.0 - lid))
+			if glow > 0.2:
+				for i in 12:
+					var a := i * TAU / 12.0 + Time.get_ticks_msec() * 0.0008
+					var ln := w * (0.4 + glow * 0.5)
+					draw_colored_polygon(PackedVector2Array([c0, c0 + Vector2.from_angle(a - 0.05) * ln, c0 + Vector2.from_angle(a + 0.05) * ln]), Color(col.r, col.g, col.b, 0.1 * glow))
+			return
 		var body := Rect2(w * 0.12, h * 0.38, w * 0.76, h * 0.52)
 		# glow behind
 		for k in 8:
@@ -3225,6 +3318,41 @@ func _crate_info_box(it: Dictionary) -> Control:
 			v.add_child(UI.lbl("Hesabına eklendi. Market'te silah ve stil alabilirsin.", 16, UI.TEXT, "Rajdhani-SemiBold"))
 	return p
 
+## legendary animated skin unboxed: a fire-breathing dragon sweeps across the screen behind the reward
+func _dragon_splash(ov: Control, vs: Vector2, col: Color) -> void:
+	var pth := "res://assets/ui/dragon_splash.png"
+	if not ResourceLoader.exists(pth):
+		return
+	var d := TextureRect.new()
+	d.texture = load(pth)
+	d.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	d.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+	d.size = Vector2(vs.y * 1.05 * 1.78, vs.y * 1.05)
+	d.position = Vector2(-d.size.x, vs.y * 0.5 - d.size.y * 0.55)
+	d.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	d.modulate = Color(1, 1, 1, 0.0)
+	ov.add_child(d)
+	ov.move_child(d, 1)
+	var fire := CPUParticles2D.new()
+	fire.amount = 220; fire.lifetime = 1.4; fire.preprocess = 0.0
+	fire.direction = Vector2(1, 0.15); fire.spread = 18
+	fire.initial_velocity_min = 500; fire.initial_velocity_max = 1100
+	fire.scale_amount_min = 4.0; fire.scale_amount_max = 14.0
+	var fg := Gradient.new()
+	fg.set_color(0, Color(1, 0.95, 0.6, 1)); fg.add_point(0.4, Color(1, 0.45, 0.1, 0.9)); fg.set_color(1, Color(0.3, 0.05, 0.02, 0))
+	fire.color_ramp = fg
+	d.add_child(fire)
+	fire.position = Vector2(d.size.x * 0.9, d.size.y * 0.42)
+	SFX.play("explosion", -6, 0.6)
+	var tw := ov.create_tween()
+	tw.tween_property(d, "modulate:a", 0.78, 0.25)
+	tw.parallel().tween_property(d, "position:x", vs.x * 0.5 - d.size.x * 0.5, 1.1).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(1.3)
+	tw.tween_callback(func(): fire.emitting = false)
+	tw.tween_property(d, "position:x", vs.x + 40.0, 0.9).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(d, "modulate:a", 0.0, 0.9)
+	tw.tween_callback(d.queue_free)
+
 func _crate_reveal(it: Dictionary, label: String) -> void:
 	## 1) the crate shakes and its seams glow  2) flash + burst  3) the item rises in the light with its spec sheet
 	var col: Color = it["color"]
@@ -3242,6 +3370,7 @@ func _crate_reveal(it: Dictionary, label: String) -> void:
 	ov.add_child(bg)
 	var box := CrateBox.new()
 	box.col = col
+	box.tex = _crate_tex(crate_type)
 	box.size = Vector2(360, 300)
 	box.position = Vector2(vs.x * 0.5 - 180, vs.y * 0.42 - 170)
 	box.pivot_offset = box.size * 0.5
@@ -3306,6 +3435,8 @@ func _crate_reveal(it: Dictionary, label: String) -> void:
 	bh.add_child(UI.btn("✔ TAMAM", func(): ov.queue_free(), 20, true, 220, 48))
 	if str(it.get("type", "")) in ["weapon", "skin"]:
 		bh.add_child(UI.btn("ÇANTADA GÖR", func(): ov.queue_free(); show_page("bag"), 18, false, 220, 48))
+	if str(it.get("type", "")) == "skin":
+		bh.add_child(UI.btn("3D İNCELE", func(): ov.queue_free(); _inspect(str(it["wid"]), str(it["id"])), 18, false, 200, 48))
 	var sp := CPUParticles2D.new()
 	sp.position = Vector2(vs.x * 0.5, vs.y * 0.42)
 	sp.amount = 140 + 70 * rar; sp.lifetime = 1.8; sp.one_shot = true; sp.explosiveness = 0.97
@@ -3334,6 +3465,8 @@ func _crate_reveal(it: Dictionary, label: String) -> void:
 		sp.emitting = true
 		SFX.play("success")
 		if rar >= 2: SFX.play("medal", -2)
+		if str(it.get("type", "")) == "skin" and GS.SKINS.get(str(it.get("id", "")), {}).get("anim", false):
+			_dragon_splash(ov, vs, col)
 		if rar >= 3: SFX.play("multikill", -4))
 	tw.tween_property(fl, "color:a", 0.9 if rar >= 2 else 0.55, 0.06)
 	tw.parallel().tween_property(box, "lid", 1.0, 0.35).set_ease(Tween.EASE_OUT)
@@ -3414,10 +3547,20 @@ func _crate_card(it: Dictionary) -> Control:
 		pi.custom_minimum_size = Vector2(0, 110)
 		pi.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		v.add_child(pi)
+	elif it["type"] == "char" and _agent_art(str(it["id"]), Vector2(0, 110), true):
+		v.add_child(_agent_art(str(it["id"]), Vector2(0, 110), true))
 	elif it["type"] == "char":
 		var l2 := UI.lbl("👤", 64, it["color"], "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
 		l2.custom_minimum_size = Vector2(0, 110)
 		v.add_child(l2)
+	elif it["type"] == "mat" or it["type"] == "gold":
+		var ic := CurIcon.new()
+		ic.kind = "gold" if it["type"] == "gold" else "gem"
+		ic.mat = str(it["id"]) if it["type"] == "mat" else ""
+		ic.col = it["color"]
+		ic.custom_minimum_size = Vector2(0, 110)
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.add_child(ic)
 	else:
 		var l := UI.lbl("■" if it["type"] == "mat" else "◉", 60, it["color"], "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
 		l.custom_minimum_size = Vector2(0, 110)
@@ -4453,6 +4596,11 @@ func test_hook(i: int) -> void:
 			_store_detail("scar")
 		61:
 			market_tab = "karakter"; show_page("market")
+		66:
+			crate_type = "ejder"
+			_crate_reveal({"type": "skin", "id": "ejderha", "wid": "ak47", "label": "AK-47 | Kara Ejderha", "color": Color("ffb02e"), "rarity": 3}, "AK-47 | Kara Ejderha")
+		62, 63, 64, 65:
+			_inspect(["ak47", "scar", "awm", "m4a1"][i - 62], ["ejderha", "kuantum", "anka", "yildirim"][i - 62])
 		38, 39:
 			if not GS.owned("m4a1"):
 				GS.profile["owned"]["m4a1"] = {"lvl": 0, "skins": ["std"], "skin": "std"}

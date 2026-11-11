@@ -72,6 +72,32 @@
 				"kuzgun"
 			]
 		},
+		"ejder": {
+			"chars": [],
+			"parts": [],
+			"price": 6500,
+			"skins": [
+				"ejderha",
+				"anka",
+				"kuantum",
+				"yildirim",
+				"lav",
+				"galaksi",
+				"aurora",
+				"buz",
+				"ejder",
+				"kizil"
+			],
+			"wchance": 0.2,
+			"weapons": [
+				"awm",
+				"awp",
+				"scar",
+				"rpk16",
+				"m4a1",
+				"ak47"
+			]
+		},
 		"eklenti": {
 			"chars": [],
 			"parts": [
@@ -621,6 +647,10 @@
 			"price": 5000,
 			"rarity": 3
 		},
+		"anka": {
+			"price": 8500,
+			"rarity": 3
+		},
 		"aurora": {
 			"price": 5200,
 			"rarity": 3
@@ -648,6 +678,10 @@
 		"ejder": {
 			"price": 3400,
 			"rarity": 2
+		},
+		"ejderha": {
+			"price": 9000,
+			"rarity": 3
 		},
 		"galaksi": {
 			"price": 3500,
@@ -680,6 +714,10 @@
 		"kizil": {
 			"price": 2200,
 			"rarity": 2
+		},
+		"kuantum": {
+			"price": 7500,
+			"rarity": 3
 		},
 		"lale": {
 			"price": 1900,
@@ -716,6 +754,10 @@
 		"turkuaz": {
 			"price": 3200,
 			"rarity": 2
+		},
+		"yildirim": {
+			"price": 8000,
+			"rarity": 3
 		},
 		"zumrut": {
 			"price": 4400,
@@ -992,6 +1034,16 @@
 			"price": 5200,
 			"rpm": 560.0,
 			"throwable": false
+		},
+		"smoke": {
+			"cat": "bomba",
+			"dmg": 0.0,
+			"head": 1.0,
+			"melee": false,
+			"pellets": 1,
+			"price": 0,
+			"rpm": 60.0,
+			"throwable": true
 		},
 		"spas": {
 			"cat": "ana",

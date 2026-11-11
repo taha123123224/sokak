@@ -531,6 +531,7 @@ uniform float skin_rough = 0.35;
 uniform float coat = 0.6;
 uniform float emission = 0.0;
 uniform float sheen = 0.0;
+uniform int anim = 0;       // 1 dragon lava pulse, 2 phoenix flames, 3 quantum data pulse, 4 lightning flicker
 varying vec3 opos;
 varying vec3 onrm;
 void vertex() { opos = VERTEX; onrm = NORMAL; }
@@ -542,7 +543,9 @@ vec3 tri(vec3 p, vec3 n) {
 void fragment() {
 	vec3 base = has_albedo ? texture(base_albedo, UV).rgb * base_col.rgb : base_col.rgb;
 	float lum = dot(base, vec3(0.299, 0.587, 0.114));
-	vec3 sk = (has_skin_tex ? tri(opos * tri_scale, normalize(onrm)) : vec3(1.0)) * skin_tint.rgb;
+	vec3 pp = opos * tri_scale;
+	if (anim == 2) { pp += vec3(0.0, TIME * 0.09, TIME * 0.03); }
+	vec3 sk = (has_skin_tex ? tri(pp, normalize(onrm)) : vec3(1.0)) * skin_tint.rgb;
 	// keep the model's painted detail (edge wear, grime, engravings) under the skin
 	float det = clamp(lum / 0.32, 0.3, 1.7);
 	ALBEDO = sk * mix(1.0, det, detail_mix);
@@ -555,8 +558,23 @@ void fragment() {
 	CLEARCOAT_ROUGHNESS = 0.12;
 	float fres = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
 	EMISSION = sk * emission + sk * fres * sheen;
+	if (anim > 0) {
+		// animated skins: only the bright parts of the pattern (veins, feathers, traces, bolts) light up
+		float l = max(sk.r, max(sk.g, sk.b));
+		float mask = smoothstep(0.5, 0.92, l);
+		float k = 0.0;
+		if (anim == 1) { k = 1.1 + 0.9 * sin(TIME * 2.2 - dot(opos, vec3(3.0, 18.0, 7.0))); }
+		else if (anim == 2) { k = 1.0 + 0.5 * sin(TIME * 7.0 + opos.y * 40.0) * sin(TIME * 3.1 + opos.z * 25.0); }
+		else if (anim == 3) { float band = sin(dot(opos, vec3(9.0, 4.0, 16.0)) - TIME * 4.5) * 0.5 + 0.5; k = 0.45 + 3.2 * pow(band, 14.0); }
+		else if (anim == 4) { float f = step(0.82, fract(sin(floor(TIME * 13.0) * 12.9898) * 43758.5453)); k = 0.5 + 3.5 * f + 0.25 * sin(TIME * 40.0); }
+		EMISSION += sk * mask * k * 1.6;
+		ROUGHNESS = min(ROUGHNESS, 0.3);
+	}
 }
 """
+
+## v3.2 animated legendary skins -> shader animation mode
+const ANIM_SKINS := {"ejderha": 1, "anka": 2, "kuantum": 3, "yildirim": 4}
 
 const _CH := [Vector4(1, 0, 0, 0), Vector4(0, 1, 0, 0), Vector4(0, 0, 1, 0), Vector4(0, 0, 0, 1), Vector4(0.333, 0.333, 0.333, 0)]
 
@@ -591,6 +609,7 @@ func ext_skin_mat(orig: BaseMaterial3D, skin: String) -> Material:
 		m.set_shader_parameter("emission", src.emission_energy_multiplier * 0.6 if src.emission_enabled else 0.0)
 		# a solid metal finish (gold) should not darken the model's detail as much
 		m.set_shader_parameter("detail_mix", 0.35 if src.albedo_texture == null else 0.6)
+		m.set_shader_parameter("anim", ANIM_SKINS.get(skin, 0))
 		m.set_shader_parameter("sheen", 0.25 if skin in ["galaksi", "buz", "turkuaz", "altin", "zumrut", "aurora", "nazar", "kehribar"] else 0.0)
 	cache[key] = m
 	return m
@@ -615,7 +634,9 @@ func apply(node: Node, skin: String = "") -> void:
 				if n.begins_with("rb_"):
 					_tune_rb(sm)
 					continue
-				if skin != "" and skin != "std" and n.begins_with("gun_paint_ext") and sm is BaseMaterial3D:
+				if ANIM_SKINS.has(skin) and n.begins_with("gun_paint") and sm is BaseMaterial3D:
+					mi.set_surface_override_material(i, ext_skin_mat(sm as BaseMaterial3D, skin))
+				elif skin != "" and skin != "std" and n.begins_with("gun_paint_ext") and sm is BaseMaterial3D:
 					mi.set_surface_override_material(i, ext_skin_mat(sm as BaseMaterial3D, skin))
 				elif skin != "" and skin != "std" and n.begins_with("gun_paint"):
 					mi.set_surface_override_material(i, skin_mat(skin))

@@ -76,6 +76,11 @@ var SKINS := {
 	"mermer": {"name": "Marmara Mermeri", "price": 4600, "rarity": 3},
 	"aurora": {"name": "Kuzey Işığı", "price": 5200, "rarity": 3},
 	"ayyildiz": {"name": "Ay Yıldız", "price": 5500, "rarity": 3},
+	# v3.2 animated legendaries (glowing, moving patterns)
+	"ejderha": {"name": "Kara Ejderha", "price": 9000, "rarity": 3, "anim": true},
+	"anka": {"name": "Anka Alevi", "price": 8500, "rarity": 3, "anim": true},
+	"kuantum": {"name": "Kuantum Devresi", "price": 7500, "rarity": 3, "anim": true},
+	"yildirim": {"name": "Yıldırım Fırtınası", "price": 8000, "rarity": 3, "anim": true},
 }
 var CRATES := {
 	"sokak": {"name": "Sokak Kasası", "price": 1000, "color": Color("ff8a1f"), "desc": "Her şeyden biraz: malzeme, altın, stiller.",
@@ -88,6 +93,8 @@ var CRATES := {
 		"skins": ["karbon", "dijital"], "weapons": [], "chars": [], "parts": ["sus", "kompen", "optik", "durbun", "sarjor", "tutamak", "lazer"]},
 	"osmanli": {"name": "Osmanlı Kasası", "price": 2500, "color": Color("2fb6a8"), "desc": "Çini ve turkuaz desenler, Magnum ve Patron karakteri şansı.",
 		"skins": ["cini", "turkuaz", "altin", "kizil", "neon", "lale", "nazar", "mermer", "ayyildiz", "kehribar"], "weapons": ["revolver", "kartal", "deagle", "karambit", "hancer", "m1911"], "wchance": 0.32, "chars": ["patron", "kapson"]},
+	"ejder": {"name": "Ejder Kasası", "price": 6500, "color": Color("ff3b1f"), "desc": "HAREKETLİ efsanevi kaplamalar: Kara Ejderha, Anka Alevi, Kuantum Devresi, Yıldırım Fırtınası!",
+		"skins": ["ejderha", "anka", "kuantum", "yildirim", "lav", "galaksi", "aurora", "buz", "ejder", "kizil"], "weapons": ["awm", "awp", "scar", "rpk16", "m4a1", "ak47"], "wchance": 0.2, "chars": [], "parts": []},
 	"efsane": {"name": "Efsane Kasası", "price": 5000, "color": Color("ffb02e"), "desc": "En az Epik garantili! Lav, Buz, Galaksi, Altın.",
 		"skins": ["lav", "buz", "galaksi", "altin", "cini", "turkuaz", "zumrut", "mermer", "aurora", "ayyildiz", "ejder", "kehribar"], "weapons": ["awp", "awm", "scar", "m249", "rpk16", "kuzgun"], "wchance": 0.4, "chars": ["kot", "patron", "asker2"], "parts": ["sus", "optik", "durbun", "sarjor"]},
 }
