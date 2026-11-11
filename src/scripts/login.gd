@@ -91,9 +91,12 @@ func _ready() -> void:
 	SFX.play_music("music_menu")
 
 var bg_still: TextureRect
+var bg_live: ShaderMaterial
+## light positions (UV) in login_keyart.jpg for the live shader
+var LOGIN_LIGHTS := {"lantern0": Vector2(0.13, 0.075), "lantern1": Vector2(0.484, 0.512), "lantern2": Vector2(0.536, 0.565), "sun": Vector2(0.638, 0.295)}
 func _build_world() -> void:
 	# CS2-style: a sunlit street still (same art as the lobby) with a slow drift instead of loading a whole map
-	for p in ["res://assets/ui/lobby_bg_1.jpg", "res://assets/ui/lobby_bg_0.jpg"]:
+	for p in ["res://assets/ui/login_keyart.jpg", "res://assets/ui/lobby_bg_1.jpg", "res://assets/ui/lobby_bg_0.jpg"]:
 		if ResourceLoader.exists(p):
 			var cl := CanvasLayer.new()
 			cl.layer = -1
@@ -104,6 +107,15 @@ func _build_world() -> void:
 			bg_still.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 			bg_still.set_anchors_preset(Control.PRESET_FULL_RECT)
 			bg_still.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			if p.ends_with("login_keyart.jpg"):
+				# living key art: drifting smoke, flickering lanterns, sun rays (same shader as the launcher)
+				var sm := ShaderMaterial.new()
+				sm.shader = load("res://shaders/bg_live.gdshader")
+				sm.set_shader_parameter("art", bg_still.texture)
+				for kv in LOGIN_LIGHTS.keys():
+					sm.set_shader_parameter(kv, LOGIN_LIGHTS[kv])
+				bg_still.material = sm
+				bg_live = sm
 			cl.add_child(bg_still)
 			return
 	var we := WorldEnvironment.new()
@@ -158,7 +170,9 @@ func _build_world() -> void:
 
 func _process(delta: float) -> void:
 	t += delta
-	if bg_still:
+	if bg_live:
+		bg_live.set_shader_parameter("t", t)
+	if bg_still and bg_live == null:
 		var vs := get_viewport().get_visible_rect().size
 		var k := 1.06 + sin(t * 0.05) * 0.03
 		bg_still.size = vs * k
@@ -225,9 +239,10 @@ func _build_ui() -> void:
 	logo.texture = load("res://assets/ui/logo.png")
 	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	logo.anchor_top = 0.5; logo.anchor_bottom = 0.5
-	logo.offset_left = 80; logo.offset_right = 900; logo.offset_top = -300; logo.offset_bottom = -54
-	logo.pivot_offset = Vector2(410, 123)
+	# v3.1: the key art has the operators on the left, so the wordmark sits top-right above the login card
+	logo.anchor_left = 1; logo.anchor_right = 1
+	logo.offset_left = -585; logo.offset_right = -85; logo.offset_top = 58; logo.offset_bottom = 208
+	logo.pivot_offset = Vector2(250, 75)
 	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(logo)
 	var em := TextureRect.new()
@@ -236,10 +251,11 @@ func _build_ui() -> void:
 	em.anchor_top = 0.5; em.anchor_bottom = 0.5
 	em.offset_left = 400; em.offset_right = 580; em.offset_top = -480; em.offset_bottom = -300
 	em.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	em.visible = false
 	ui.add_child(em)
-	var tag := UI.lbl("Türkiye'nin sokaklarında taktik çatışma.  Mahalle • Safranbolu • Gemi • Liman • İnşaat • Çanakkale", 22, Color(1, 1, 1, 0.85), "Rajdhani-SemiBold")
-	tag.anchor_top = 0.5; tag.anchor_bottom = 0.5
-	tag.offset_left = 120; tag.offset_top = -40; tag.offset_right = 1000
+	var tag := UI.lbl("TÜRKİYE'NİN SOKAKLARINDA TAKTİK ÇATIŞMA", 18, Color(1, 1, 1, 0.8), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+	tag.anchor_left = 1; tag.anchor_right = 1
+	tag.offset_left = -585; tag.offset_right = -85; tag.offset_top = 212; tag.offset_bottom = 240
 	tag.add_theme_constant_override("outline_size", 6)
 	tag.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	ui.add_child(tag)
@@ -249,7 +265,7 @@ func _build_ui() -> void:
 	csb.shadow_color = Color(0, 0, 0, 0.55); csb.shadow_size = 30
 	card.add_theme_stylebox_override("panel", csb)
 	card.anchor_left = 1; card.anchor_right = 1; card.anchor_top = 0.5; card.anchor_bottom = 0.5
-	card.offset_left = -580; card.offset_right = -90; card.offset_top = 0; card.offset_bottom = 0
+	card.offset_left = -580; card.offset_right = -90; card.offset_top = 70; card.offset_bottom = 70
 	card.grow_vertical = Control.GROW_DIRECTION_BOTH
 	ui.add_child(card)
 	var strip := ColorRect.new()
@@ -427,7 +443,7 @@ func _build_ui() -> void:
 	clip.offset_top = -40; clip.offset_left = 150; clip.offset_right = -260
 	ui.add_child(clip)
 	ui.add_child(bp)
-	ticker = UI.lbl("YENİ v3.0: Gerçek kayıt silah sesleri   •   Kevin MacLeod sinematik müzikleri   •   CS2 tarzı öldürme akışı ve HUD   •   Yeni lobi duruşu ve karakter seçimi   •   Çözünürlük ve arayüz boyutu ayarları", 19, Color(1, 1, 1, 0.9), "Rajdhani-SemiBold")
+	ticker = UI.lbl("YENİ v3.1: CS2 tarzı MAĞAZA ve AJAN kartları   •   Tek ekranda OYNA: mod sekmeleri + harita seçimi   •   2K gerçek dokular ve sinematik gün batımı ışığı   •   Canlı lobi karakteri   •   Yeni SCAR-H   •   CS:GO tarzı bıçak görünümü   •   Yeni başlatıcı ve açılış animasyonu", 19, Color(1, 1, 1, 0.9), "Rajdhani-SemiBold")
 	ticker.position = Vector2(1400, 8)
 	clip.add_child(ticker)
 	var ver := UI.lbl("SOKAK: Operasyon  v%s   " % Updater.VERSION, 16, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_RIGHT)

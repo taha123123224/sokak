@@ -7,8 +7,8 @@ signal update_available(info: Dictionary)
 signal progress(frac: float, text: String)
 signal failed(msg: String)
 
-const VERSION := "3.0.0"
-const BUILD := 39
+const VERSION := "3.1.0"
+const BUILD := 40
 var latest := {}
 var _dl: HTTPRequest
 var _total := 0
@@ -35,6 +35,40 @@ func check() -> void:
 		latest = d
 		if has_update():
 			update_available.emit(latest)
+		_update_launcher()
+
+## the launcher (SOKAK.exe --main-pack baslatici.pck) cannot update itself on older installs, so the game
+## refreshes baslatici.pck in the background whenever the manifest lists a different one
+func _update_launcher() -> void:
+	var li = latest.get("launcher", {})
+	if not (li is Dictionary) or not li.has("url") or OS.get_name() != "Windows":
+		return
+	var dir := OS.get_executable_path().get_base_dir()
+	var path := dir.path_join("baslatici.pck")
+	if not FileAccess.file_exists(path):
+		return
+	var f := FileAccess.open(path, FileAccess.READ)
+	var have := f.get_length() if f else -1
+	f = null
+	if have == int(li.get("size", 0)):
+		return
+	var h := HTTPRequest.new()
+	h.timeout = 60.0
+	h.download_file = path + ".new"
+	add_child(h)
+	if h.request(str(li["url"])) != OK:
+		h.queue_free(); return
+	var r: Array = await h.request_completed
+	h.queue_free()
+	var nf := FileAccess.open(path + ".new", FileAccess.READ)
+	var got := nf.get_length() if nf else -1
+	nf = null
+	if int(r[1]) == 200 and got == int(li.get("size", 0)):
+		DirAccess.remove_absolute(path)
+		DirAccess.rename_absolute(path + ".new", path)
+		print("launcher updated")
+	else:
+		DirAccess.remove_absolute(path + ".new")
 
 func download_and_install() -> void:
 	if not has_update():

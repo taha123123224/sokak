@@ -43,6 +43,17 @@ SPECS = {
                  parts={'pump': ['pump']}),
 }
 
+FG = '/home/claude/ext3d/fak/weapons/'
+SPECS['scar'] = dict(file=FG + 'flat_guns_west/Flat Guns West/GLB/Rifle_Battle_West.glb', axis='Y', real=0.95,
+                     # CC0 "Flat Guns West" battle rifle (petroulacl/fps-asset-kit) - a proper SCAR-H silhouette
+                     rhand=(-0.13, -0.055), muzzle=(0.455, 0.018), sight=(0.0, 0.09), lhand=(0.15, -0.008), eject=(0.05, 0.015),
+                     drop=['Icosphere'], keep_mats=True, flat_shade=True,
+                     mat_fix={'M_PCL_Flat_Grey_Darker': ((0.36, 0.28, 0.18), 0.0), 'M_PCL_Flat_Black_Lighter': ((0.045, 0.043, 0.04), 0.0)},
+                     mat_pbr={'M_PCL_Flat_Grey_Darker': (0.62, 0.0), 'M_PCL_Flat_Black_Lighter': (0.55, 0.0), 'M_PCL_Flat_Black': (0.4, 0.6),
+                              'M_PCL_Flat_Grey_Dark': (0.45, 0.5)},
+                     zones=[((0.30, 0.41), (0.0, 0.035), ((0.03, 0.03, 0.032), 0.7, 0.4))],
+                     split_mag=((-0.035, 0.05), (-0.16, -0.045)))
+
 M19 = '/home/claude/ext3d/new/m1911/tex2k/m1911_'
 NEW = '/home/claude/ext3d/new'
 SPECS.update({
@@ -130,6 +141,13 @@ def load(spec):
     elif f.endswith('.stl'):
         bpy.ops.wm.read_factory_settings(use_empty=True)
         bpy.ops.wm.stl_import(filepath=f)
+    elif f.endswith('.glb') or f.endswith('.gltf'):
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        bpy.ops.import_scene.gltf(filepath=f)
+        for o in bpy.data.objects:
+            if o.type == 'MESH':
+                for md in list(o.modifiers):
+                    o.modifiers.remove(md)
     else:
         bpy.ops.wm.read_factory_settings(use_empty=True)
         bpy.ops.import_scene.fbx(filepath=f)
@@ -412,7 +430,7 @@ def build(wid):
             with bpy.context.temp_override(object=o):
                 bpy.ops.object.modifier_apply(modifier='dec')
         for p in o.data.polygons:
-            p.use_smooth = True
+            p.use_smooth = not spec.get('flat_shade', False)
     W.finish_export(wid) if False else export_glb(os.path.join(OUT, 'w_%s.glb' % wid))
     print('BUILT', wid, 'scale', round(s, 5))
 

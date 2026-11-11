@@ -36,11 +36,21 @@ func _ready() -> void:
 		load("res://tools/dump_catalog.gd").run()
 		get_tree().quit()
 		return
+	if args.has("intro"):
+		go_login()
+		add_child(preload("res://scripts/intro.gd").new())
+		for tt in str(args["intro"]).split(","):
+			await get_tree().create_timer(float(tt)).timeout
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_jpg("/tmp/intro_%s.jpg" % tt, 0.9)
+		get_tree().quit()
+		return
 	if args.has("shot"):
 		_test(args)
 		return
 	_check_last_crash()
 	go_login()
+	add_child(preload("res://scripts/intro.gd").new())
 
 func _test(args: Dictionary) -> void:
 	GS.settings["fullscreen"] = false

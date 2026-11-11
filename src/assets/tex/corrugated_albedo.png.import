@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://md2b713hr5jo"
-path="res://.godot/imported/corrugated_albedo.png-089c7334faec91f74745c9f676f81fe7.ctex"
+path.s3tc="res://.godot/imported/corrugated_albedo.png-089c7334faec91f74745c9f676f81fe7.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tex/corrugated_albedo.png"
-dest_files=["res://.godot/imported/corrugated_albedo.png-089c7334faec91f74745c9f676f81fe7.ctex"]
+dest_files=["res://.godot/imported/corrugated_albedo.png-089c7334faec91f74745c9f676f81fe7.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -23,7 +24,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=false
+mipmaps/generate=true
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

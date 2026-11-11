@@ -427,6 +427,7 @@ const CREDITS := [
 	["Müzik: Movement Proposition, Mechanolith, Heroic Age, Darkest Child", "Kevin MacLeod (incompetech.com)", "CC BY 4.0 · creativecommons.org/licenses/by/4.0"],
 	["Silah sesleri: The Free Firearm Sound Library", "Still North Media", "CC0 · github.com/buddingmonkey/FreeFirearmsSFXLibrary"],
 	["Oculus Audio Pack 01 (adım, bıçak, ortam sesleri)", "Oculus VR, LLC", "CC BY 4.0 · developers.meta.com/vr/downloads/package/oculus-audio-pack-1"],
+	["SCAR-H modeli: Flat Guns West (Battle Rifle)", "fps-asset-kit", "CC0 · github.com/petroulacl/fps-asset-kit"],
 	["Impact Sounds (mermi çarpma)", "Kenney", "CC0 · kenney.nl"],
 	["Interface Sounds / UI Audio (menü sesleri)", "Kenney", "CC0 · kenney.nl"],
 ]

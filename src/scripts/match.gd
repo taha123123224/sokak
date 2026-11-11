@@ -341,6 +341,11 @@ func _build() -> void:
 	bounds = map_data["bounds"]
 	if not map_data.has("env"):
 		map_data["env"] = {"preset": "day"}
+	# v3.1 cinematic look, matching the map key art: warm low sun on the old-town maps
+	if MAP_LOOK.has(map_id) and not OS.has_environment("ENVPRESET"):
+		map_data["env"]["preset"] = MAP_LOOK[map_id]
+	if OS.has_environment("ENVPRESET"):
+		map_data["env"]["preset"] = OS.get_environment("ENVPRESET")
 	var ps: PackedScene = GS.map_scene(map_id)
 	var vis := ps.instantiate()
 	vis.name = "Map"
@@ -681,6 +686,8 @@ func _apply_baked_ao(vis: Node3D) -> void:
 					done[key] = m2
 				m.set_surface_override_material(si, done[key])
 
+const MAP_LOOK := {"mahalle": "golden", "safranbolu": "golden"}
+
 func _setup_env(env_cfg: Dictionary) -> void:
 	Engine.max_fps = GS.fps_limit()   # menu caps at 144, the match uses the player's setting
 	var preset: String = env_cfg.get("preset", "day")
@@ -771,7 +778,7 @@ func _setup_env(env_cfg: Dictionary) -> void:
 		e.sdfgi_bounce_feedback = 0.6
 	e.glow_enabled = bool(s["glow"])
 	e.glow_intensity = 0.5; e.glow_strength = 0.95; e.glow_bloom = 0.025; e.glow_hdr_threshold = 1.25
-	e.glow_hdr_scale = 2.2; e.glow_mix = 0.06
+	e.glow_hdr_scale = 2.2; e.glow_mix = 0.09; e.glow_bloom = 0.04
 	e.set_glow_level(0, 0.0); e.set_glow_level(1, 0.6); e.set_glow_level(2, 1.0); e.set_glow_level(3, 0.8); e.set_glow_level(4, 0.4); e.set_glow_level(5, 0.2)
 	e.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 	e.volumetric_fog_enabled = bool(s["volumetric"])
@@ -782,8 +789,8 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	e.volumetric_fog_sky_affect = 1.0   # smoke grenades must also hide the sky behind them
 	e.adjustment_enabled = true
 	e.adjustment_brightness = 1.0
-	e.adjustment_contrast = 1.1
-	e.adjustment_saturation = c["sat"]
+	e.adjustment_contrast = 1.13
+	e.adjustment_saturation = float(c["sat"]) * 1.06
 	e.adjustment_color_correction = _grade_lut()
 	world_env.environment = e
 	var ca := CameraAttributesPractical.new()
@@ -1750,7 +1757,7 @@ func test_hook(i: int) -> void:
 			player.test_freeze_kind = "melee"
 		player.test_freeze = fr
 	elif i >= 65 and i <= 79:
-		var lst := ["m4a1", "awm", "uzi", "akm", "rpk16", "vityaz", "spas", "deagle", "usp", "karambit", "m4k", "kuzgun", "aug", "awp", "m249"]
+		var lst := ["m4a1", "awm", "uzi", "akm", "rpk16", "vityaz", "spas", "deagle", "usp", "karambit", "m4k", "kuzgun", "aug", "awp", "scar"]
 		var w2: String = lst[i - 65]
 		var c3: String = GS.WEAPONS[w2]["cat"]
 		player.slots[c3] = w2

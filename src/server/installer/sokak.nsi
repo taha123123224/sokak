@@ -30,7 +30,7 @@ VIAddVersionKey "LegalCopyright" "SOKAK"
 !define MUI_UNWELCOMEFINISHPAGE_BITMAP "welcome.bmp"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "SOKAK: Operasyon Kurulumuna Hoş Geldin"
-!define MUI_WELCOMEPAGE_TEXT "Türkiye'nin sokaklarında taktik çatışma!$\r$\n$\r$\nBu sihirbaz oyunu bilgisayarına kuracak, masaüstüne ve Başlat menüsüne kısayol ekleyecek.$\r$\n$\r$\nKurulumdan sonra SOKAK Başlatıcı açılır ve oyun dosyalarını (yaklaşık 330 MB) indirir. İndirme bitince BAŞLAT düğmesiyle oyuna girersin. Güncellemeler de başlatıcıdan otomatik gelir; oyuncu verilerin silinmez."
+!define MUI_WELCOMEPAGE_TEXT "Türkiye'nin sokaklarında taktik çatışma!$\r$\n$\r$\nBu sihirbaz oyunu bilgisayarına kuracak, masaüstüne ve Başlat menüsüne kısayol ekleyecek.$\r$\n$\r$\nKurulumdan sonra SOKAK Başlatıcı açılır ve oyun dosyalarını (yaklaşık 600 MB) indirir. İndirme bitince BAŞLAT düğmesiyle oyuna girersin. Güncellemeler de başlatıcıdan otomatik gelir; oyuncu verilerin silinmez."
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY

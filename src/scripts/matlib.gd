@@ -44,7 +44,7 @@ var DEFS := {
 	"aw_stripe_green": ["", 0.6, Color(1, 1, 1), 0.85, 0, {"tex": "aw_stripe_green.png", "cull": false}],
 	"aw_stripe_blue": ["", 0.6, Color(1, 1, 1), 0.85, 0, {"tex": "aw_stripe_blue.png", "cull": false}],
 	"aw_stripe_orange": ["", 0.6, Color(1, 1, 1), 0.85, 0, {"tex": "aw_stripe_orange.png", "cull": false}],
-	"brick": ["brick", 0.5, Color(1, 1, 1), 0.85, 0, {"jpg": true}],
+	"brick": ["brick2", 0.5, Color(1, 1, 1), -1, 0, {}],
 	"woodbeam": ["woodbeam", 0.7, Color(0.85, 0.8, 0.75), -1, 0, {}],
 	"planks": ["planks", 0.5, Color(1, 1, 1), -1, 0, {}],
 	"planks_crate": ["planks", 0.8, Color(1.05, 0.95, 0.8), -1, 0, {}],

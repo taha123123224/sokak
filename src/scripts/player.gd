@@ -1160,7 +1160,7 @@ const HIP := {
 }
 
 ## per-weapon hip framing fixes for guns whose proportions differ from their kind (compact SMGs)
-const HIP_ADJ := {"uzi": Vector3(0.03, -0.035, -0.13)}
+const HIP_ADJ := {"uzi": Vector3(0.03, -0.035, -0.13), "scar": Vector3(0.025, -0.025, -0.15)}
 
 func _vm_kind(id: String) -> String:
 	var w: Dictionary = GS.WEAPONS[id]
@@ -1233,6 +1233,14 @@ func _load_vm_weapon(id: String) -> void:
 		# knives and grenades live in the right hand and follow every swing/throw
 		if fp_skel and (wdata.get("melee", false) or wdata.get("throwable", false)):
 			held_att = _attach_to_bone(vm_weapon, "RightHand")
+		# CS:GO knife view: the free left arm is not shown (it floated open-handed beside the knife)
+		if fp_skel and wdata.get("melee", false):
+			var hb = preload("res://scripts/hide_bone_mod.gd").new()
+			for bn in ["Bip01 L UpperArm", "mixamorig_LeftArm", "LeftArm", "upperarm_l"]:
+				var bi := fp_skel.find_bone(bn)
+				if bi >= 0:
+					hb.bones.append(bi)
+			fp_skel.add_child(hb)
 
 ## animated first-person rig (arms + its own gun, from a CC-BY animation pack): the static weapon is
 ## hidden (its markers still drive ADS / muzzle flash / shells), the rig's gun gets the skin + upgrade glow,

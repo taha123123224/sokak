@@ -153,6 +153,8 @@ func _ready() -> void:
 	ui.theme = main.theme
 	ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cl.add_child(ui)
+	if OS.get_environment("KEYART") != "":
+		ui.visible = false     # key-art renders for the launcher: scene only
 	# soft vignette (edges a touch darker so the panels read on the bright street, centre stays clean)
 	var vig := TextureRect.new()
 	var vt := GradientTexture2D.new()
@@ -963,7 +965,7 @@ func _refresh_currency() -> void:
 	mc.add_child(mh)
 	for k in [["demir", Color("aab3bb")], ["krom", Color("d9ecff")], ["titanyum", Color("62c8ff")], ["kobalt", Color("5b7cff")]]:
 		var ic := CurIcon.new()
-		ic.kind = "gem"; ic.col = k[1]
+		ic.kind = "gem"; ic.col = k[1]; ic.mat = k[0]
 		ic.custom_minimum_size = Vector2(18, 18)
 		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1003,9 +1005,20 @@ class CurIcon extends Control:
 	## vector currency icons: gold coin, cut gems for upgrade materials, crate
 	var kind := "gold"
 	var col := Color.WHITE
+	var mat := ""
+	static var _icons := {}
 	func _draw() -> void:
 		var c := size * 0.5
 		var r: float = min(size.x, size.y) * 0.46
+		# painted icons (v3.1) when present: gold coin, crate, one per upgrade material
+		var key := mat if mat != "" else kind
+		if not _icons.has(key):
+			var pth := "res://assets/ui/icons/%s.png" % key
+			_icons[key] = load(pth) if ResourceLoader.exists(pth) else null
+		if _icons[key]:
+			var sz: float = min(size.x, size.y) * 1.12
+			draw_texture_rect(_icons[key], Rect2(c - Vector2(sz, sz) * 0.5, Vector2(sz, sz)), false)
+			return
 		match kind:
 			"gold":
 				draw_circle(c, r, col.darkened(0.35))
@@ -1122,6 +1135,7 @@ func show_page(p: String) -> void:
 		mode_chip.visible = p != "mode"
 	match p:
 		"mode": _page_mode()
+		"play": _page_play()
 		"lobby": _page_lobby()
 		"bag": _page_bag()
 		"market": _page_market()
@@ -1293,6 +1307,11 @@ func _swap_soldier(c: String) -> void:
 	soldier.scale = Vector3(0.94, 0.94, 0.94)
 	create_tween().tween_property(soldier, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
+var _idle_t := 0.0
+var _idle_next := 3.0
+var _idle_act := ""
+var _look_goal := Vector2.ZERO
+var _head_look := Vector2.ZERO
 func _pose_soldier(delta: float) -> void:
 	if soldier == null or not is_instance_valid(soldier) or not soldier.visible or not ("aim_node" in soldier):
 		return
@@ -1305,13 +1324,64 @@ func _pose_soldier(delta: float) -> void:
 		soldier.transform = t
 		soldier.visible = vis
 		return
-	# relaxed low ready: the shouldered aim pose with the torso bent so the muzzle points at the ground ahead
-	var br := sin(Time.get_ticks_msec() * 0.0011) * 0.02
+	# living idle (CS2 lobby agents never stand still): breathing, a slow weight shift, the head
+	# looking around, and every few seconds a weapon check (gun brought up and turned to the light)
+	var tt := Time.get_ticks_msec() * 0.001
+	_idle_t += delta
+	if _idle_t > _idle_next:
+		_idle_t = 0.0
+		_idle_act = ["check", "look", "look", "shift"][randi() % 4]
+		_idle_next = randf_range(4.5, 8.0)
+		_look_goal = Vector2(randf_range(-0.5, 0.45), randf_range(-0.12, 0.1))
+	var ph: float = clampf(_idle_t / 2.6, 0.0, 1.0)
+	var bump: float = sin(ph * PI)   # 0 -> 1 -> 0 over the action
+	bump = bump * bump * (3.0 - 2.0 * bump)
+	var br := sin(tt * 1.5) * 0.018 + sin(tt * 0.37) * 0.01
+	var drop := 0.6 + br
+	var tw := 0.35 + sin(tt * 0.23) * 0.04
+	var lean := 0.05 + sin(tt * 1.5 + 0.6) * 0.012
+	var look := Vector2(sin(tt * 0.31) * 0.08, sin(tt * 0.53) * 0.03)
+	match _idle_act:
+		"check":
+			drop -= 0.38 * bump
+			tw += 0.12 * bump
+			look += Vector2(0.35, 0.22) * bump
+		"look":
+			look += _look_goal * bump
+			tw += _look_goal.x * 0.25 * bump
+		"shift":
+			lean += 0.03 * bump
+	_head_look = _head_look.lerp(look, minf(delta * 4.0, 1.0))
 	if soldier.twist:
-		soldier.twist.lean = (float(OS.get_environment("LLEAN")) if OS.get_environment("LLEAN") != "" else 0.05) + br
-		soldier.twist.twist = float(OS.get_environment("LTWIST")) if OS.get_environment("LTWIST") != "" else 0.35
-		soldier.twist.arms_drop = float(OS.get_environment("LDROP")) if OS.get_environment("LDROP") != "" else 0.6 + br
+		soldier.twist.lean = float(OS.get_environment("LLEAN")) if OS.get_environment("LLEAN") != "" else lean
+		soldier.twist.twist = float(OS.get_environment("LTWIST")) if OS.get_environment("LTWIST") != "" else tw
+		soldier.twist.arms_drop = float(OS.get_environment("LDROP")) if OS.get_environment("LDROP") != "" else drop
+		soldier.twist.head_yaw = _head_look.x
+		soldier.twist.head_pitch = _head_look.y
+	# weight shift: hips sway a couple of centimetres
+	soldier.position.x = 0.5 + sin(tt * 0.42) * 0.012
+	soldier.position.z = sin(tt * 0.42 + 1.3) * 0.006
 	soldier._follow_chest(delta)
+
+## CS2-style agent card art (assets/ui/agents/<id>.jpg), cropped to fill
+func _agent_art(cid: String, sz: Vector2, face: bool = false) -> TextureRect:
+	var pth := "res://assets/ui/agents/%s.jpg" % cid
+	if not ResourceLoader.exists(pth):
+		return null
+	var tr := TextureRect.new()
+	tr.texture = load(pth)
+	if face:
+		# head-and-shoulders crop for small slots
+		var at := AtlasTexture.new()
+		at.atlas = tr.texture
+		var w: float = tr.texture.get_width()
+		at.region = Rect2(0, w * 0.02, w, w * 0.62)
+		tr.texture = at
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	tr.custom_minimum_size = sz
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return tr
 
 func _char_picker() -> Control:
 	if char_view == "":
@@ -1337,6 +1407,9 @@ func _char_picker() -> Control:
 	row.add_child(UI.btn("◀", func(): step.call(-1), 22, false, 48, 48))
 	var mid := UI.vbox(0)
 	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var portrait := _agent_art(c, Vector2(0, 150), true)
+	if portrait:
+		mid.add_child(portrait)
 	mid.add_child(UI.lbl(info["name"], 26, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER))
 	mid.add_child(UI.lbl(info["desc"], 15, UI.DIM, "Rajdhani-SemiBold", HORIZONTAL_ALIGNMENT_CENTER))
 	row.add_child(mid)
@@ -1435,8 +1508,8 @@ func _page_lobby() -> void:
 	nv.alignment = BoxContainer.ALIGNMENT_END
 	nm2.add_child(nv)
 	nv.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, UI.ACCENT2, "Rajdhani-Bold"))
-	nv.add_child(UI.lbl("SOKAK 3.0", 26, Color.WHITE, "RussoOne-Regular"))
-	nv.add_child(_wrap("Gerçek silah kayıtları, sinematik müzikler, CS2 tarzı öldürme akışı ve yeni lobi duruşu!", 15))
+	nv.add_child(UI.lbl("SOKAK 3.1", 26, Color.WHITE, "RussoOne-Regular"))
+	nv.add_child(_wrap("CS2 tarzı yeni mağaza ve OYNA ekranı, canlı lobi karakteri, yeni SCAR-H ve FPS giriş animasyonu!", 15))
 	var mp := UI.glass(12, 4)
 	right.add_child(mp)
 	var mv := UI.vbox(7)
@@ -1477,7 +1550,7 @@ func _page_lobby() -> void:
 	info.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	info.add_theme_constant_override("shadow_outline_size", 4)
 	pb.add_child(info)
-	var quick := UI.btn("OYNA", _quick_play, 44, true, 374, 82)
+	var quick := UI.btn("OYNA", func(): show_page("play"), 44, true, 374, 82)
 	quick.add_theme_font_override("font", UI.font("RussoOne-Regular"))
 	pb.add_child(quick)
 	var pulse := quick.create_tween().set_loops()
@@ -1506,6 +1579,196 @@ func _claim(ms: Dictionary) -> void:
 	if r["ok"]:
 		SFX.play("buy")
 	show_page("lobby")
+
+# ================================================================ PLAY (CS2-style matchmaking panel)
+var play_sel_mode := "tdm"
+var play_maps: Array = []        # empty = any map
+var play_diff := 1
+var play_bots := 9
+var play_time := 8
+
+func _page_play() -> void:
+	## CS2: one screen, mode tabs on top, a grid of maps to tick, one big GO button. No room, no chat.
+	soldier.visible = false
+	var online_mode: bool = GS.play_mode == "online"
+	var dim := ColorRect.new()
+	dim.color = Color(0.015, 0.018, 0.024, 0.82)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(dim)
+	var root := MarginContainer.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	for side in ["left", "right"]:
+		root.add_theme_constant_override("margin_" + side, 90)
+	root.add_theme_constant_override("margin_top", 26)
+	root.add_theme_constant_override("margin_bottom", 34)
+	content.add_child(root)
+	var v := UI.vbox(18)
+	root.add_child(v)
+	# header
+	var hh := UI.hbox(16)
+	v.add_child(hh)
+	hh.add_child(UI.lbl("OYNA", 52, Color.WHITE, "Teko"))
+	var sub := UI.lbl("ÇEVRİMİÇİ MAÇ" if online_mode else "BOTLARLA MAÇ", 20, UI.ACCENT2, "Rajdhani-Bold")
+	sub.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hh.add_child(sub)
+	hh.add_child(UI.spacer())
+	var sw := UI.btn("MODU DEĞİŞTİR ⇄", func(): show_page("mode"), 16, false, 0, 40)
+	sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hh.add_child(sw)
+	# mode tabs (CS2 top tabs)
+	var tabs := UI.hbox(0)
+	v.add_child(tabs)
+	for md in GS.MODES.keys():
+		var on: bool = md == play_sel_mode
+		var b := Button.new()
+		b.text = str(GS.MODES[md]["name"]).to_upper()
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(0, 50)
+		b.add_theme_font_override("font", UI.font("Rajdhani-Bold"))
+		b.add_theme_font_size_override("font_size", 20)
+		var nsb := UI.sb(Color(1, 1, 1, 0.08) if on else Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0, 0, 0)
+		nsb.content_margin_left = 26; nsb.content_margin_right = 26
+		nsb.border_width_bottom = 3; nsb.border_color = UI.ACCENT if on else Color(1, 1, 1, 0.08)
+		b.add_theme_stylebox_override("normal", nsb)
+		var hsb := nsb.duplicate()
+		hsb.bg_color = Color(1, 1, 1, 0.12)
+		b.add_theme_stylebox_override("hover", hsb)
+		b.add_theme_stylebox_override("pressed", hsb)
+		b.add_theme_color_override("font_color", Color.WHITE if on else Color(1, 1, 1, 0.6))
+		b.add_theme_color_override("font_hover_color", Color.WHITE)
+		b.pressed.connect(func(): SFX.play("ui_click", -8); play_sel_mode = md; show_page("play"))
+		tabs.add_child(b)
+	v.add_child(UI.lbl(str(GS.MODES[play_sel_mode]["desc"]), 18, UI.DIM, "Rajdhani-SemiBold"))
+	# body: map grid + summary
+	var body := UI.hbox(26)
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(body)
+	var gv := UI.vbox(10)
+	gv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(gv)
+	var gh := UI.hbox(10)
+	gv.add_child(gh)
+	gh.add_child(UI.lbl("HARİTALAR", 18, Color.WHITE, "Rajdhani-Bold"))
+	gh.add_child(UI.lbl("(boş bırakırsan rastgele)" if play_maps.is_empty() else "%d seçili" % play_maps.size(), 16, UI.DIM, "Rajdhani-SemiBold"))
+	gh.add_child(UI.spacer())
+	gh.add_child(_chip("TÜMÜNÜ TEMİZLE", false, func(): play_maps.clear(); show_page("play")))
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 14)
+	grid.add_theme_constant_override("v_separation", 14)
+	gv.add_child(grid)
+	for mid in GS.MAPS.keys():
+		grid.add_child(_play_map_card(mid))
+	# summary column
+	var side := UI.glass(20, 4)
+	side.custom_minimum_size = Vector2(430, 0)
+	body.add_child(side)
+	var sv := UI.vbox(12)
+	side.add_child(sv)
+	sv.add_child(UI.lbl("MAÇ AYARI", 16, UI.DIM, "Rajdhani-Bold"))
+	sv.add_child(UI.lbl(str(GS.MODES[play_sel_mode]["name"]), 34, Color.WHITE, "RussoOne-Regular"))
+	var mn: Array = []
+	for m in play_maps:
+		mn.append(GS.MAPS[m]["name"])
+	sv.add_child(UI.lbl("Harita: " + (", ".join(mn) if mn.size() > 0 else "Rastgele"), 17, UI.TEXT, "Rajdhani-SemiBold"))
+	if not online_mode:
+		sv.add_child(UI.lbl("ZORLUK", 15, UI.DIM, "Rajdhani-Bold"))
+		var dh := UI.hbox(6)
+		sv.add_child(dh)
+		for i in 3:
+			dh.add_child(_chip(["KOLAY", "NORMAL", "ZOR"][i], play_diff == i, func(): play_diff = i; show_page("play"), 120))
+		sv.add_child(UI.lbl("BOT SAYISI", 15, UI.DIM, "Rajdhani-Bold"))
+		var bh := UI.hbox(6)
+		sv.add_child(bh)
+		for n in [5, 7, 9, 11, 13]:
+			bh.add_child(_chip(str(n), play_bots == n, func(): play_bots = n; show_page("play"), 66))
+		if play_sel_mode != "sabotaj":
+			sv.add_child(UI.lbl("SÜRE", 15, UI.DIM, "Rajdhani-Bold"))
+			var th := UI.hbox(6)
+			sv.add_child(th)
+			for n in [5, 8, 10, 15]:
+				th.add_child(_chip("%d dk" % n, play_time == n, func(): play_time = n; show_page("play"), 80))
+	var sp := Control.new()
+	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sv.add_child(sp)
+	var go := UI.btn("BAŞLAT", func(): _play_go(), 40, true, 0, 84)
+	go.add_theme_font_override("font", UI.font("Teko"))
+	sv.add_child(go)
+	var adv := UI.btn("Gelişmiş oda kur (sohbet, takım, şifre)", func(): show_page("rooms"), 15, false, 0, 36)
+	sv.add_child(adv)
+
+func _play_map_card(mid: String) -> Control:
+	var on: bool = mid in play_maps
+	var card := Button.new()
+	card.focus_mode = Control.FOCUS_NONE
+	card.custom_minimum_size = Vector2(0, 205)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var nsb := UI.sb(Color(0, 0, 0, 0.3), UI.ACCENT if on else Color(1, 1, 1, 0.08), 3 if on else 1, 4, 0)
+	card.add_theme_stylebox_override("normal", nsb)
+	var hsb := nsb.duplicate()
+	hsb.border_color = UI.ACCENT2 if on else Color(1, 1, 1, 0.45)
+	card.add_theme_stylebox_override("hover", hsb)
+	card.add_theme_stylebox_override("pressed", hsb)
+	var img := TextureRect.new()
+	var pth := "res://assets/ui/map_%s.jpg" % mid
+	if ResourceLoader.exists(pth):
+		img.texture = load(pth)
+	img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	img.set_anchors_preset(Control.PRESET_FULL_RECT)
+	img.offset_left = 3; img.offset_top = 3; img.offset_right = -3; img.offset_bottom = -3
+	img.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	img.modulate = Color.WHITE if on or play_maps.is_empty() else Color(0.62, 0.62, 0.62)
+	card.add_child(img)
+	var shade := TextureRect.new()
+	var gt := GradientTexture2D.new()
+	var g := Gradient.new()
+	g.set_color(0, Color(0, 0, 0, 0)); g.set_color(1, Color(0, 0, 0, 0.85))
+	gt.gradient = g; gt.fill_from = Vector2(0, 0.35); gt.fill_to = Vector2(0, 1)
+	shade.texture = gt
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.offset_left = 3; shade.offset_top = 3; shade.offset_right = -3; shade.offset_bottom = -3
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(shade)
+	var nm := UI.lbl(str(GS.MAPS[mid]["name"]).to_upper(), 24, Color.WHITE, "RussoOne-Regular")
+	nm.position = Vector2(16, 146)
+	nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(nm)
+	var sz := UI.lbl(str(GS.MAPS[mid]["size"]).to_upper() + " HARİTA", 14, UI.DIM, "Rajdhani-Bold")
+	sz.position = Vector2(17, 178)
+	sz.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(sz)
+	# tick box (CS2 map checkbox)
+	var tick := UI.lbl("✔" if on else "", 20, Color.BLACK, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+	var tp := PanelContainer.new()
+	tp.add_theme_stylebox_override("panel", UI.sb(UI.ACCENT if on else Color(0, 0, 0, 0.45), Color(1, 1, 1, 0.6), 1, 3, 0))
+	tp.custom_minimum_size = Vector2(30, 30)
+	tp.position = Vector2(14, 14)
+	tp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tick.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tp.add_child(tick)
+	card.add_child(tp)
+	card.pressed.connect(func():
+		SFX.play("ui_click", -8)
+		if on: play_maps.erase(mid)
+		else: play_maps.append(mid)
+		show_page("play"))
+	return card
+
+func _play_go() -> void:
+	SFX.play("beep_go", -4)
+	if GS.play_mode == "online":
+		online.quick_join()
+		return
+	var pool: Array = play_maps if play_maps.size() > 0 else GS.MAPS.keys()
+	var md := play_sel_mode
+	var tgt := 6 if md == "sabotaj" else (99 if md == "gungame" else (60 if GS.MODES[md]["teams"] else 40))
+	var cfg := {"name": "Hızlı Oyun", "map": pool[randi() % pool.size()], "mode": md, "bots": play_bots, "diff": play_diff,
+		"time": play_time, "target": tgt, "team": "a", "no": randi_range(100, 999)}
+	room_cfg = cfg
+	main.start_match(cfg)
 
 func _quick_play() -> void:
 	if GS.play_mode == "online":
@@ -2147,89 +2410,83 @@ func _upgrade_dialog(id: String) -> void:
 
 # ================================================================ MARKET
 func _page_market() -> void:
+	## CS2 Store: full-width dark page, tabs on top, a featured hero row, then a grid of item tiles,
+	## each with a rarity stripe; clicking a tile opens a clean purchase card
 	soldier.visible = false
 	cam_target = Vector3(1.6, 1.42, 1.5)
 	cam_look = Vector3(1.6, 1.3, -0.4)
-	var p := UI.panel(UI.BG, UI.LINE, 16)
-	_margin(p, 28, 18, 640, 24)
-	content.add_child(p)
-	var v := UI.vbox(12)
-	p.add_child(v)
-	var th := UI.hbox(6)
+	var dim := ColorRect.new()
+	dim.color = Color(0.016, 0.019, 0.025, 0.93)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(dim)
+	var root := MarginContainer.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_theme_constant_override("margin_left", 70)
+	root.add_theme_constant_override("margin_right", 70)
+	root.add_theme_constant_override("margin_top", 18)
+	root.add_theme_constant_override("margin_bottom", 22)
+	content.add_child(root)
+	var v := UI.vbox(14)
+	root.add_child(v)
+	var th := UI.hbox(0)
 	v.add_child(th)
-	th.add_child(UI.header("MARKET", 28))
-	th.add_child(UI.spacer(false, 20))
-	for t in [["silah", "SİLAHLAR"], ["eklenti", "EKLENTİLER"], ["stil", "STİLLER"], ["karakter", "KARAKTERLER"], ["kasa", "KASALAR"], ["malzeme", "MALZEME"]]:
-		var tb := UI.btn(t[1], func(): market_tab = t[0]; show_page("market"), 16, false, 0, 40)
+	var ttl := UI.lbl("MAĞAZA", 50, Color.WHITE, "Teko")
+	ttl.custom_minimum_size = Vector2(210, 0)
+	th.add_child(ttl)
+	for t in [["silah", "SİLAHLAR"], ["stil", "KAPLAMALAR"], ["kasa", "KASALAR"], ["karakter", "AJANLAR"], ["eklenti", "EKLENTİLER"], ["malzeme", "MALZEME"]]:
 		var on: bool = market_tab == t[0]
-		for stn in ["normal", "hover", "pressed"]:
-			var tsb := UI.sb(Color(1, 0.55, 0.12, 0.14) if on else (Color(1, 1, 1, 0.05) if stn == "hover" else Color(0, 0, 0, 0)), UI.ACCENT if on else Color(0, 0, 0, 0), 0, 0, 0)
-			tsb.border_width_bottom = 3 if on else 0
-			tsb.content_margin_left = 12; tsb.content_margin_right = 12
-			tb.add_theme_stylebox_override(stn, tsb)
-		tb.add_theme_color_override("font_color", UI.ACCENT2 if on else UI.TEXT)
+		var tb := Button.new()
+		tb.text = t[1]
+		tb.focus_mode = Control.FOCUS_NONE
+		tb.size_flags_vertical = Control.SIZE_SHRINK_END
+		tb.custom_minimum_size = Vector2(0, 48)
+		tb.add_theme_font_override("font", UI.font("Rajdhani-Bold"))
+		tb.add_theme_font_size_override("font_size", 19)
+		var nsb := UI.sb(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0, 0, 0)
+		nsb.content_margin_left = 22; nsb.content_margin_right = 22
+		nsb.border_width_bottom = 3; nsb.border_color = UI.ACCENT if on else Color(1, 1, 1, 0.07)
+		tb.add_theme_stylebox_override("normal", nsb)
+		var hsb := nsb.duplicate(); hsb.bg_color = Color(1, 1, 1, 0.07)
+		tb.add_theme_stylebox_override("hover", hsb)
+		tb.add_theme_stylebox_override("pressed", hsb)
+		tb.add_theme_color_override("font_color", Color.WHITE if on else Color(1, 1, 1, 0.55))
+		tb.add_theme_color_override("font_hover_color", Color.WHITE)
+		tb.pressed.connect(func(): SFX.play("ui_click", -8); market_tab = t[0]; show_page("market"))
 		th.add_child(tb)
-	# live preview card over the 3D showcase (right side)
-	mk_info = UI.panel(Color(0.02, 0.025, 0.035, 0.9), UI.ACCENT.darkened(0.3), 14, 2)
-	mk_info.anchor_left = 1; mk_info.anchor_right = 1; mk_info.anchor_top = 1; mk_info.anchor_bottom = 1
-	mk_info.offset_left = -600; mk_info.offset_right = -28; mk_info.offset_top = -200; mk_info.offset_bottom = -24
+	# hidden legacy preview card (other tabs still feed it on hover)
+	mk_info = UI.panel(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0)
+	mk_info.visible = false
 	content.add_child(mk_info)
 	_mk_preview("", "")
-	# featured offer banner
 	if market_tab == "silah":
-		var feat := ""
-		for fid in ["m249", "aug", "vector", "scar"]:
-			if not GS.owned(fid):
-				feat = fid; break
-		if feat != "":
-			var fb := UI.panel(Color(0.12, 0.07, 0.02, 0.95), UI.ACCENT, 12)
-			v.add_child(fb)
-			var fh := UI.hbox(18)
-			fb.add_child(fh)
-			var ftr := thumb_rect(feat, "std", Vector2(300, 110))
-			fh.add_child(ftr)
-			var fv := UI.vbox(4)
-			fv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			fh.add_child(fv)
-			fv.add_child(UI.lbl("HAFTANIN SİLAHI", 15, UI.ACCENT2, "Rajdhani-Bold"))
-			fv.add_child(UI.lbl(GS.WEAPONS[feat]["name"], 34, Color.WHITE, "RussoOne-Regular"))
-			fv.add_child(UI.lbl("★ " + str(GS.ball(feat).get("ability", "")), 17, UI.TEXT, "Rajdhani-SemiBold"))
-			var fp: int = int(GS.WEAPONS[feat]["price"] * 0.8)
-			var fbb := UI.btn("◉ %s   (-%%20)  SATIN AL" % UI.money(fp), func():
-				var r: Dictionary = await _act("buy_weapon", {"id": feat})
-				if not r["ok"]: return
-				SFX.play("buy"); _toast(GS.WEAPONS[feat]["name"] + " alındı!", UI.GREEN); show_page("market"), 20, true, 330, 50)
-			fh.add_child(fbb)
-			fbb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		v.add_child(_store_hero())
 	var sc := ScrollContainer.new()
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(sc)
 	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 10)
-	grid.add_theme_constant_override("v_separation", 10)
+	grid.columns = 5 if market_tab == "silah" else 4
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
 	sc.add_child(grid)
 	match market_tab:
 		"silah":
 			var any := false
+			var ids: Array = []
 			for id in GS.WEAPONS.keys():
-				if GS.WEAPONS[id].get("hidden", false):
+				if GS.WEAPONS[id].get("hidden", false) or GS.WEAPONS[id].get("throwable", false):
 					continue
 				if GS.owned(id) and GS.wtime_left(id) <= 0.0:
 					continue      # timed (crate) weapons stay buyable: buying makes them permanent
+				ids.append(id)
+			ids.sort_custom(func(x, y): return int(GS.WEAPONS[x]["price"]) > int(GS.WEAPONS[y]["price"]))
+			for id in ids:
 				any = true
-				var price: int = GS.WEAPONS[id]["price"]
-				var wc := _weapon_card(id, false, func(): _buy_weapon(id), price)
-				wc.mouse_entered.connect(func(): set_showcase(id, "std"); _mk_preview(id, ""))
-				var pvb := UI.btn("3D", func(): _inspect(id, "std"), 15, false, 44, 30)
-				pvb.tooltip_text = "3D önizleme"
-				pvb.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-				pvb.position = Vector2(-48, 34)
-				wc.add_child(pvb)
-				grid.add_child(wc)
+				grid.add_child(_store_tile(id))
 			if not any:
 				v.add_child(UI.lbl("Tüm silahlara sahipsin!", 24, UI.GREEN))
-			set_showcase("awp" if not GS.owned("awp") else "m4a1")
 		"stil":
 			var target_id := bag_sel if bag_sel != "" and GS.owned(bag_sel) else "ak47"
 			var sel := UI.hbox(6)
@@ -2274,27 +2531,8 @@ func _page_market() -> void:
 				card.mouse_entered.connect(func(): set_showcase(target_id, sk); _mk_preview(target_id, sk))
 				grid.add_child(card)
 		"karakter":
-			set_showcase(GS.active_set().get("ana", "ak47"))
 			for c in GS.CHARACTERS.keys():
-				var cd: Dictionary = GS.CHARACTERS[c]
-				var card := UI.panel(Color(0.07, 0.085, 0.11, 0.96), GS.TEAM_COLORS[cd["team"]], 12)
-				card.custom_minimum_size = Vector2(300, 170)
-				var cv := UI.vbox(4)
-				card.add_child(cv)
-				cv.add_child(UI.lbl(cd["name"], 24, Color.WHITE, "RussoOne-Regular"))
-				cv.add_child(UI.lbl(GS.TEAMS[cd["team"]] + "  •  " + cd["desc"], 15, UI.DIM, "Rajdhani-SemiBold"))
-				if _char_owned(c):
-					cv.add_child(UI.lbl("✔ SAHİPSİN", 18, UI.GREEN, "Rajdhani-Bold"))
-					cv.add_child(UI.btn("KUŞAN", func(): GS.profile["char"] = c; GS.save_profile(); char_view = c; _swap_soldier(c); _toast(cd["name"] + " kuşanıldı", UI.GREEN), 18, false, 0, 38))
-				else:
-					var pr := int(cd["price"])
-					cv.add_child(UI.btn("◉ " + UI.money(pr) + "  SATIN AL", func():
-						var r: Dictionary = await _act("buy_char", {"id": c})
-						if not r["ok"]: return
-						SFX.play("buy"); show_page("market"), 18, true, 0, 38))
-				card.mouse_entered.connect(func(): _swap_soldier(c))
-				grid.add_child(card)
-			soldier.visible = true
+				grid.add_child(_agent_card(c))
 		"kasa":
 			for t in GS.CRATES.keys():
 				var cd: Dictionary = GS.CRATES[t]
@@ -2371,6 +2609,247 @@ func _mk_preview(id: String, skin: String) -> void:
 		v.add_child(g)
 		for r in _stat_rows(id).slice(0, 4):
 			g.add_child(_stat(r[0], r[1], r[2], true))
+
+func _agent_card(c: String) -> Control:
+	var cd: Dictionary = GS.CHARACTERS[c]
+	var tc: Color = GS.TEAM_COLORS[cd["team"]]
+	var p := PanelContainer.new()
+	var sb := UI.sb(Color(0.05, 0.056, 0.068, 1.0), Color(1, 1, 1, 0.06), 1, 3, 0)
+	sb.border_width_bottom = 4; sb.border_color = tc
+	p.add_theme_stylebox_override("panel", sb)
+	p.custom_minimum_size = Vector2(0, 470)
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var cc := Control.new()
+	cc.clip_contents = true
+	p.add_child(cc)
+	var art := _agent_art(c, Vector2.ZERO)
+	if art:
+		art.set_anchors_preset(Control.PRESET_FULL_RECT)
+		cc.add_child(art)
+	var sh := TextureRect.new()
+	var gt := GradientTexture2D.new(); var g := Gradient.new()
+	g.set_color(0, Color(0, 0, 0, 0)); g.set_color(1, Color(0.02, 0.02, 0.03, 0.95))
+	gt.gradient = g; gt.fill_from = Vector2(0, 0.45); gt.fill_to = Vector2(0, 1)
+	sh.texture = gt; sh.set_anchors_preset(Control.PRESET_FULL_RECT); sh.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cc.add_child(sh)
+	var v := UI.vbox(4)
+	v.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	v.offset_left = 16; v.offset_right = -16; v.offset_top = -150; v.offset_bottom = -14
+	cc.add_child(v)
+	v.add_child(UI.lbl(GS.TEAMS[cd["team"]] + "  •  AJAN", 14, tc.lightened(0.3), "Rajdhani-Bold"))
+	v.add_child(UI.lbl(str(cd["name"]).to_upper(), 34, Color.WHITE, "Teko"))
+	var dl := UI.lbl(cd["desc"], 15, UI.TEXT, "Rajdhani-SemiBold")
+	dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(dl)
+	if c == GS.cur_char():
+		v.add_child(UI.lbl("✔ KUŞANILDI", 18, UI.GREEN, "Rajdhani-Bold"))
+	elif _char_owned(c):
+		v.add_child(UI.btn("KUŞAN", func(): GS.profile["char"] = c; GS.save_profile(); char_view = c; _swap_soldier(c); _toast(cd["name"] + " kuşanıldı", UI.GREEN); show_page("market"), 18, false, 0, 40))
+	else:
+		var pr := int(cd["price"])
+		var bb := UI.btn("◉ " + UI.money(pr) + "  SATIN AL", func():
+			var r: Dictionary = await _act("buy_char", {"id": c})
+			if not r["ok"]: return
+			SFX.play("buy"); show_page("market"), 18, true, 0, 40)
+		bb.disabled = int(GS.profile["gold"]) < pr
+		v.add_child(bb)
+	return p
+
+## price tier -> CS2-like rarity colour (grade stripe on the tile)
+func _store_grade(id: String) -> int:
+	var pr := int(GS.WEAPONS[id].get("price", 0))
+	return 3 if pr >= 5000 else (2 if pr >= 3500 else (1 if pr >= 2000 else 0))
+
+const STORE_GRADE_COL := [Color("5e98d9"), Color("8847ff"), Color("d32ce6"), Color("eb4b4b")]
+const STORE_GRADE_NAME := ["ASKERİ", "SINIRLI", "GİZLİ", "ÖZEL"]
+
+func _store_bg(col: Color) -> StyleBoxFlat:
+	var sb := UI.sb(Color(0.055, 0.062, 0.075, 1.0), Color(1, 1, 1, 0.05), 1, 3, 0)
+	sb.border_width_bottom = 4
+	sb.border_color = col
+	return sb
+
+func _store_tile(id: String) -> Control:
+	var w: Dictionary = GS.WEAPONS[id]
+	var gi := _store_grade(id)
+	var gc: Color = STORE_GRADE_COL[gi]
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(0, 236)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var n := _store_bg(gc)
+	b.add_theme_stylebox_override("normal", n)
+	var h := n.duplicate(); h.bg_color = Color(0.09, 0.1, 0.12, 1.0); h.border_color = gc.lightened(0.25)
+	b.add_theme_stylebox_override("hover", h)
+	b.add_theme_stylebox_override("pressed", h)
+	# soft rarity glow from the bottom
+	var glow := TextureRect.new()
+	var gt := GradientTexture2D.new(); var g := Gradient.new()
+	g.set_color(0, Color(gc, 0.0)); g.set_color(1, Color(gc, 0.22))
+	gt.gradient = g; gt.fill_from = Vector2(0, 0.2); gt.fill_to = Vector2(0, 1)
+	glow.texture = gt
+	glow.set_anchors_preset(Control.PRESET_FULL_RECT)
+	glow.offset_bottom = -4
+	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(glow)
+	var tr := thumb_rect(id, "std", Vector2(300, 130))
+	tr.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	tr.offset_top = 22; tr.offset_bottom = 160; tr.offset_left = 18; tr.offset_right = -18
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(tr)
+	var cls := UI.lbl(str(w.get("cls", "")).to_upper(), 13, Color(1, 1, 1, 0.45), "Rajdhani-Bold")
+	cls.position = Vector2(14, 8)
+	cls.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(cls)
+	var nm := UI.lbl(str(w["name"]), 21, Color.WHITE, "Rajdhani-Bold")
+	nm.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	nm.offset_top = -66; nm.offset_bottom = -40; nm.offset_left = 14; nm.offset_right = -10
+	nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(nm)
+	var gl := UI.lbl(STORE_GRADE_NAME[gi], 13, gc.lightened(0.2), "Rajdhani-Bold")
+	gl.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	gl.offset_top = -38; gl.offset_bottom = -14; gl.offset_left = 14; gl.offset_right = -10
+	gl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(gl)
+	var pr := UI.lbl("◉ " + UI.money(int(w["price"])), 20, UI.GOLD, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_RIGHT)
+	pr.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	pr.offset_top = -40; pr.offset_bottom = -12; pr.offset_left = 14; pr.offset_right = -14
+	pr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(pr)
+	b.pressed.connect(func(): SFX.play("ui_click", -6); _store_detail(id))
+	return b
+
+func _store_hero() -> Control:
+	var feat := ""
+	for fid in ["m249", "aug", "vector", "scar", "awm", "rpk16"]:
+		if GS.WEAPONS.has(fid) and not GS.owned(fid):
+			feat = fid; break
+	var row := UI.hbox(12)
+	row.custom_minimum_size = Vector2(0, 250)
+	# featured weapon (2/3)
+	var big := PanelContainer.new()
+	big.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	big.size_flags_stretch_ratio = 2.0
+	var bsb := UI.sb(Color(0.08, 0.05, 0.03, 1.0), Color(1, 0.55, 0.12, 0.5), 1, 3, 0)
+	big.add_theme_stylebox_override("panel", bsb)
+	row.add_child(big)
+	var bc := Control.new()
+	bc.clip_contents = true
+	big.add_child(bc)
+	var hg := TextureRect.new()
+	var gt := GradientTexture2D.new(); var g := Gradient.new()
+	g.set_color(0, Color(1, 0.5, 0.1, 0.32)); g.set_color(1, Color(0, 0, 0, 0))
+	gt.gradient = g; gt.fill = GradientTexture2D.FILL_RADIAL; gt.fill_from = Vector2(0.7, 0.55); gt.fill_to = Vector2(1.25, 1.1)
+	hg.texture = gt; hg.set_anchors_preset(Control.PRESET_FULL_RECT); hg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bc.add_child(hg)
+	if feat != "":
+		var tr := thumb_rect(feat, "std", Vector2(560, 220))
+		tr.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
+		tr.offset_left = -640; tr.offset_right = -30; tr.offset_top = 10; tr.offset_bottom = -10
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bc.add_child(tr)
+		var fv := UI.vbox(6)
+		fv.position = Vector2(34, 28)
+		bc.add_child(fv)
+		fv.add_child(UI.lbl("HAFTANIN SİLAHI  •  %20 İNDİRİM", 16, UI.ACCENT2, "Rajdhani-Bold"))
+		fv.add_child(UI.lbl(str(GS.WEAPONS[feat]["name"]).to_upper(), 58, Color.WHITE, "Teko"))
+		var ab := UI.lbl(str(GS.ball(feat).get("ability", "")), 18, UI.TEXT, "Rajdhani-SemiBold")
+		ab.custom_minimum_size = Vector2(520, 0)
+		ab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		fv.add_child(ab)
+		var ph := UI.hbox(14)
+		fv.add_child(ph)
+		var old := UI.lbl("◉ " + UI.money(int(GS.WEAPONS[feat]["price"])), 20, Color(1, 1, 1, 0.4), "Rajdhani-Bold")
+		ph.add_child(old)
+		var fp: int = int(GS.WEAPONS[feat]["price"] * 0.8)
+		var fbb := UI.btn("◉ %s   SATIN AL" % UI.money(fp), func():
+			var r: Dictionary = await _act("buy_weapon", {"id": feat})
+			if not r["ok"]: return
+			SFX.play("buy"); _toast(GS.WEAPONS[feat]["name"] + " alındı!", UI.GREEN); show_page("market"), 20, true, 260, 50)
+		ph.add_child(fbb)
+		ph.add_child(UI.btn("3D İNCELE", func(): _inspect(feat, "std"), 17, false, 150, 50))
+	else:
+		var ok := UI.lbl("Bütün öne çıkan silahlara sahipsin!", 26, UI.GREEN, "Rajdhani-Bold")
+		ok.position = Vector2(34, 100)
+		bc.add_child(ok)
+	# crates promo (1/3)
+	var cr := Button.new()
+	cr.focus_mode = Control.FOCUS_NONE
+	cr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cr.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var csb := UI.sb(Color(0.05, 0.06, 0.085, 1.0), Color(0.55, 0.3, 1.0, 0.45), 1, 3, 0)
+	cr.add_theme_stylebox_override("normal", csb)
+	var chs := csb.duplicate(); chs.bg_color = Color(0.08, 0.09, 0.12, 1.0)
+	cr.add_theme_stylebox_override("hover", chs)
+	cr.add_theme_stylebox_override("pressed", chs)
+	cr.pressed.connect(func(): SFX.play("ui_click", -8); market_tab = "kasa"; show_page("market"))
+	row.add_child(cr)
+	var ck: String = str(GS.CRATES.keys()[0]) if GS.CRATES.size() > 0 else ""
+	if ck != "":
+		var ic := CurIcon.new(); ic.kind = "crate"; ic.col = GS.CRATES[ck]["color"]
+		ic.position = Vector2(26, 18); ic.size = Vector2(120, 120)
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cr.add_child(ic)
+	var cv := UI.vbox(4)
+	cv.position = Vector2(30, 140)
+	cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cr.add_child(cv)
+	var l1 := UI.lbl("KASALAR", 40, Color.WHITE, "Teko"); l1.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cv.add_child(l1)
+	var l2 := UI.lbl("Nadir kaplamalar, silahlar ve eklentiler →", 17, UI.DIM, "Rajdhani-SemiBold"); l2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cv.add_child(l2)
+	return row
+
+func _store_detail(id: String) -> void:
+	## CS2 purchase card: dim the page, big item art, rarity, stats, buy / inspect / cancel
+	var w: Dictionary = GS.WEAPONS[id]
+	var gi := _store_grade(id)
+	var gc: Color = STORE_GRADE_COL[gi]
+	var dimr := ColorRect.new()
+	dimr.color = Color(0, 0, 0, 0.72)
+	dimr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ui.add_child(dimr)
+	dimr.gui_input.connect(func(e): if e is InputEventMouseButton and e.pressed: dimr.queue_free())
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dimr.add_child(cc)
+	var p := PanelContainer.new()
+	var psb := UI.sb(Color(0.05, 0.056, 0.068, 0.99), Color(1, 1, 1, 0.08), 1, 4, 26)
+	psb.border_width_top = 4; psb.border_color = gc
+	p.add_theme_stylebox_override("panel", psb)
+	p.custom_minimum_size = Vector2(860, 0)
+	cc.add_child(p)
+	var v := UI.vbox(12)
+	p.add_child(v)
+	var hh := UI.hbox(10)
+	v.add_child(hh)
+	var tv := UI.vbox(0)
+	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hh.add_child(tv)
+	tv.add_child(UI.lbl(STORE_GRADE_NAME[gi] + "  •  " + str(w.get("cls", "")).to_upper(), 16, gc.lightened(0.25), "Rajdhani-Bold"))
+	tv.add_child(UI.lbl(str(w["name"]).to_upper(), 56, Color.WHITE, "Teko"))
+	hh.add_child(UI.btn("✕", func(): dimr.queue_free(), 20, false, 48, 48))
+	var art := thumb_rect(id, "std", Vector2(808, 300))
+	v.add_child(art)
+	var ab := UI.lbl("★ " + str(GS.ball(id).get("ability", "")), 18, UI.TEXT, "Rajdhani-SemiBold")
+	ab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(ab)
+	var st := UI.hbox(26)
+	v.add_child(st)
+	for kv in [["HASAR", str(int(w.get("dmg", 0)))], ["ATIŞ HIZI", "%d/dk" % int(w.get("rpm", 0))], ["ŞARJÖR", str(int(w.get("mag", 0)))], ["MENZİL", "%d m" % int(w.get("range", 0))]]:
+		var sv := UI.vbox(0)
+		sv.add_child(UI.lbl(kv[0], 14, UI.DIM, "Rajdhani-Bold"))
+		sv.add_child(UI.lbl(kv[1], 30, Color.WHITE, "Teko"))
+		st.add_child(sv)
+	var bh := UI.hbox(10)
+	v.add_child(bh)
+	bh.add_child(UI.btn("3D İNCELE", func(): dimr.queue_free(); _inspect(id, "std"), 18, false, 180, 56))
+	bh.add_child(UI.spacer())
+	var buy := UI.btn("◉ %s   SATIN AL" % UI.money(int(w["price"])), func(): dimr.queue_free(); _buy_weapon(id), 22, true, 320, 56)
+	buy.disabled = int(GS.profile["gold"]) < int(w["price"])
+	bh.add_child(buy)
 
 func _buy_weapon(id: String) -> void:
 	var r: Dictionary = await _act("buy_weapon", {"id": id})
@@ -3970,6 +4449,10 @@ func _page_mods() -> void:
 # ---------------------------------------------------------------- screenshot test hooks
 func test_hook(i: int) -> void:
 	match i:
+		60:
+			_store_detail("scar")
+		61:
+			market_tab = "karakter"; show_page("market")
 		38, 39:
 			if not GS.owned("m4a1"):
 				GS.profile["owned"]["m4a1"] = {"lvl": 0, "skins": ["std"], "skin": "std"}

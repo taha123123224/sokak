@@ -1,37 +1,45 @@
 {
- "version": "3.0.0",
- "build": 39,
+ "version": "3.1.0",
+ "build": 40,
  "parts": [
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v39.pck.part00",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part00",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v39.pck.part01",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part01",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v39.pck.part02",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part02",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v39.pck.part03",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part03",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v39.pck.part04",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part04",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v39.pck.part05",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part05",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v39.pck.part06",
-   "size": 59370416
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part06",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v40.pck.part07",
+   "size": 29419888
   }
  ],
- "pck_size": 625601456,
+ "pck_size": 690022768,
  "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
- "notes": "v3.0.0: Gerçek kayıt silah sesleri (Free Firearm Sound Library, sentetik katman yok) • Kevin MacLeod sinematik müzikleri, CS2 gibi maç başı müziği • CS2 tarzı öldürme akışı • Lobi: iki elle silah tutan yeni duruş, karakter seçimi, her ekrana uyan üst bar • Ayarlar: çözünürlük, ekran modu, arayüz boyutu"
+ "notes": "v3.1.0: CS2 tarzı MAĞAZA ve AJAN kartları • Tek ekranda OYNA: mod sekmeleri + harita seçimi • 2K gerçek dokular ve sinematik ışık • Canlı lobi karakteri, yeni SCAR-H, CS:GO tarzı bıçak • Yeni başlatıcı, giriş ekranı ve açılış animasyonu",
+ "launcher": {
+  "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/baslatici.pck",
+  "size": 1689664
+ }
 }
