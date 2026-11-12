@@ -25,13 +25,14 @@ func set_remote(on: bool) -> void:
 		return
 	wolf = on
 	host.wolf = on
-	_tint(on)
+	_show_body(on)
 	SFX.play3d("explosion" if on else "gore0", host.global_position, -8, 0.45 if on else 0.7, 40.0, 6.0)
 
 func _process(delta: float) -> void:
 	if host == null or not is_instance_valid(host):
 		queue_free()
 		return
+	_update_body()
 	if remote:
 		return
 	var mn = host.match_node
@@ -74,13 +75,16 @@ func transform() -> void:
 	if is_player:
 		host.health = minf(host.health * 1.2 + 20.0, 100.0)
 		host.switch_to("pence", false)
+		_show_body(true)
+		body.howl()
 		var hud = host.match_node.hud
 		if hud and hud.has_method("wolf_fx"):
 			hud.wolf_fx(true)
 	else:
 		host.health = minf(host.health + 30.0, 100.0)
 		host.set_weapon("pence")
-		_tint(true)
+		_show_body(true)
+		body.howl()
 
 func revert(silent: bool = false) -> void:
 	if not wolf:
@@ -89,6 +93,7 @@ func revert(silent: bool = false) -> void:
 	host.wolf = false
 	if not silent:
 		SFX.play3d("gore0", host.global_position, -8, 0.7, 30.0, 4.0)
+	_show_body(false)
 	if is_player:
 		if host.alive and prev_weapon != "" and host._has(prev_weapon):
 			host.switch_to(prev_weapon, false)
@@ -98,11 +103,49 @@ func revert(silent: bool = false) -> void:
 		if hud and hud.has_method("wolf_fx"):
 			hud.wolf_fx(false)
 	else:
-		_tint(false)
 		if host.alive and prev_weapon != "" and prev_weapon != "pence":
 			host.set_weapon(prev_weapon)
 
-## bots: dark fur overlay, a hunched, bigger silhouette and glowing red eyes
+## v3.6.1: the wolf is a real rigged quadruped seen from outside (player: third-person camera)
+var body: Node3D
+func _show_body(on: bool) -> void:
+	if on and body == null:
+		body = preload("res://scripts/wolf_body.gd").new()
+		body.name = "WolfBody"
+		host.add_child(body)
+		if is_player:
+			# the player node itself is hidden (first-person): the wolf lives in world space
+			body.top_level = true
+			body.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+			body.add_fill()
+		_update_body()
+	elif not on and body != null:
+		body.queue_free()
+		body = null
+	if is_player:
+		if host.has_method("wolf_view"):
+			host.wolf_view(on)
+	elif "model" in host and host.model:
+		host.model.visible = not on
+
+func _update_body() -> void:
+	if body == null or not is_instance_valid(body):
+		return
+	body.on_floor = host.is_on_floor() if host.has_method("is_on_floor") else true
+	if is_player:
+		var o: Vector3 = host.get_global_transform_interpolated().origin if host.is_physics_interpolated_and_enabled() else host.global_position
+		body.global_transform = Transform3D(Basis(Vector3.UP, host.yaw), o)
+		body.set_flip(1.0 - host.flip_t / 0.55 if host.flip_t > 0.0 else 0.0)
+	elif "model" in host and host.model:
+		body.rotation.y = host.model.rotation.y - PI
+	# player: hide the own wolf when a wall pushes the camera into it
+	body.visible = host.alive and (not is_player or host._tp_dist > 1.1)
+
+func attack_fx() -> void:
+	if body and is_instance_valid(body):
+		body.attack()
+
+## (legacy) bots: dark fur overlay, a hunched, bigger silhouette and glowing red eyes
 static var _fur: StandardMaterial3D
 func _tint(on: bool) -> void:
 	var model: Node3D = host.model if "model" in host else null

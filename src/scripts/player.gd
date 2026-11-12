@@ -449,9 +449,6 @@ func _process(delta: float) -> void:
 	punch = punch.lerp(Vector3.ZERO, min(delta * 12.0, 1.0))
 	var sh := Vector3(randf_range(-1, 1), randf_range(-1, 1), 0) * shake * 0.03
 	head.rotation = Vector3(pitch, 0, 0) + punch + sh
-	if flip_t > 0.0:
-		# wolf double jump: a full forward flip of the view
-		head.rotation.x -= TAU * smoothstep(0.0, 1.0, 1.0 - flip_t / 0.55)
 	_sync_cam()
 	# timers
 	fire_cd = max(fire_cd - delta, 0.0)
@@ -833,6 +830,14 @@ func _melee(heavy: bool) -> void:
 		_fp_play(ma, 0.05, _fp_len(ma) / melee_t)
 		get_tree().create_timer(melee_t + 0.02).timeout.connect(func(): if fp_anim == ma: _fp_play("idle", 0.15))
 	var dmg: float = float(wdata["dmg"]) * (1.9 if heavy else 1.0)
+	if wolf:
+		# third person: the claws strike from the wolf's chest in the direction the camera looks
+		if wolf_ctl:
+			wolf_ctl.attack_fx()
+		get_tree().create_timer(0.16).timeout.connect(func():
+			var fwd := -cam.global_transform.basis.z
+			match_node.melee(self, global_position + Vector3.UP * 1.15 + Vector3(fwd.x, 0, fwd.z).normalized() * 0.5, fwd, dmg * 1.0, cur))
+		return
 	get_tree().create_timer(0.12).timeout.connect(func(): match_node.melee(self, cam.global_position, -cam.global_transform.basis.z, dmg, cur))
 
 func _start_throw() -> void:
@@ -1002,7 +1007,37 @@ func take_damage(amount: float, attacker, pos: Vector3, headshot: bool, wid: Str
 
 func _sync_cam() -> void:
 	var o: Vector3 = get_global_transform_interpolated().origin if is_physics_interpolated_and_enabled() else global_position
+	if wolf:
+		# v3.6.1 Kurt: third-person camera behind and above the wolf, pulled in by walls
+		var b := Basis(Vector3.UP, yaw) * Basis(Vector3.RIGHT, clampf(pitch, -1.2, 0.9))
+		var piv := o + Vector3.UP * 1.75
+		var want := piv + b * Vector3(0.0, 0.55, 4.0)
+		# sphere sweep so the camera never pokes through walls or corners
+		var sq := PhysicsShapeQueryParameters3D.new()
+		var sph := SphereShape3D.new(); sph.radius = 0.28
+		sq.shape = sph
+		sq.transform = Transform3D(Basis(), piv)
+		sq.motion = want - piv
+		sq.collision_mask = 1
+		sq.exclude = [get_rid()]
+		var frac: PackedFloat32Array = get_world_3d().direct_space_state.cast_motion(sq)
+		if frac.size() > 0 and frac[0] < 1.0:
+			want = piv + (want - piv) * frac[0]
+		var wd := piv.distance_to(want)
+		_tp_dist = wd if (_tp_dist <= 0.0 or wd < _tp_dist) else lerpf(_tp_dist, wd, 0.12)
+		var dir := (b * Vector3(0.0, 0.55, 4.0)).normalized()
+		cam.global_transform = Transform3D(b, piv + dir * _tp_dist)
+		return
 	cam.global_transform = Transform3D(Basis(Vector3.UP, yaw), o) * head.transform
+
+var _tp_dist := 0.0
+func wolf_view(on: bool) -> void:
+	_tp_dist = 0.0
+	vm_rect.visible = not on and alive
+	if on:
+		cam.fov = GS.settings["fov"] + 6.0
+	else:
+		cam.fov = GS.settings["fov"]
 
 func respawn(pos: Vector3, yaw_: float) -> void:
 	global_position = pos
@@ -1777,7 +1812,7 @@ func _update_viewmodel(delta: float) -> void:
 	var scoped: bool = wdata.get("scope", false) and ads_k > 0.92
 	vm_off.visible = not scoped
 	# the weapon is a whole second 3D render pass: skip it entirely while scoped in or dead
-	var vm_need := not scoped and alive
+	var vm_need := not scoped and alive and not wolf
 	if vm_rect and vm_rect.visible != vm_need:
 		vm_rect.visible = vm_need
 		vm_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if vm_need else SubViewport.UPDATE_DISABLED

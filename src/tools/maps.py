@@ -2245,7 +2245,91 @@ def map_canakkale():
     finalize('canakkale', dict(preset='golden', sun=[-40, 250], fog=0.008, sky='sunset', water=True), [X0, Y0, X1, Y1])
 
 
-ALL = dict(mahalle=map_mahalle, safranbolu=map_safranbolu, gemi=map_gemi, liman=map_liman, insaat=map_insaat, canakkale=map_canakkale)
+def map_ayvadisi():
+    """v3.5.2 Kurt Adam map: a ruined mountain village in a glowing violet-orange twilight.
+    Tall broken stone walls and towers to climb as a wolf, a rune-lit stone circle in the middle, timber houses."""
+    mm = begin()
+    RR = random.Random(77)
+    X0, X1, Y0, Y1 = -54, 54, -42, 42
+    moss = M('moss_ground', (0.24, 0.3, 0.2), 0.95)
+    ground('land', X0 - 300, Y0 - 300, X1 + 300, Y1 + 300, 0, moss)
+    box('path_ring', (9, 9, 0.04), (0, 0, 0.02), m=M('path_stone', (0.48, 0.46, 0.44), 0.9))
+    for (a, b) in [((-50, 0), (-6, 0)), ((6, 0), (50, 0)), ((0, -38), (0, -6)), ((0, 6), (0, 38))]:
+        cx, cy = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+        L = math.hypot(b[0] - a[0], b[1] - a[1])
+        box('path', (L, 3.6, 0.04), (cx, cy, 0.021), (0, 0, math.degrees(math.atan2(b[1] - a[1], b[0] - a[0]))), m=M('path_dirt', (0.42, 0.34, 0.25), 0.95))
+    # distant mountains around the valley
+    rock = M('mountain_rock', (0.36, 0.33, 0.36), 0.95)
+    for i in range(16):
+        ang = i / 16 * math.tau
+        r = RR.uniform(170, 230)
+        h = RR.uniform(45, 95)
+        sphere('mountain', 60, (math.cos(ang) * r, math.sin(ang) * r, -10), m=rock, scale=(RR.uniform(1.2, 1.9), RR.uniform(1.2, 1.9), h / 60))
+    stone = M('ruin_stone', (0.6, 0.57, 0.54), 0.9)
+    dark = M('ruin_stone_dark', (0.42, 0.4, 0.39), 0.92)
+    rune = M('rune_glow', (0.55, 0.2, 1.0), 0.4, emission=(0.6, 0.25, 1.0), emit_strength=5)
+    ember = M('ember_glow', (1.0, 0.45, 0.15), 0.4, emission=(1.0, 0.45, 0.15), emit_strength=4)
+    # ---- stone circle (menhirs) with a rune altar at the centre
+    for i in range(10):
+        ang = i / 10 * math.tau
+        h = RR.uniform(3.2, 5.2)
+        box('menhir', (1.2, 0.8, h), (math.cos(ang) * 8.5, math.sin(ang) * 8.5, h / 2), (RR.uniform(-4, 4), RR.uniform(-4, 4), math.degrees(ang) + 90), m=dark)
+        col((math.cos(ang) * 8.5, math.sin(ang) * 8.5, h / 2), (1.2, 1.2, h))
+        box('rune_line', (0.06, 0.82, h * 0.7), (math.cos(ang) * 8.5 - math.cos(ang) * 0.62, math.sin(ang) * 8.5 - math.sin(ang) * 0.62, h * 0.45), (0, 0, math.degrees(ang) + 90), m=rune)
+    cyl('altar', 1.6, 1.0, (0, 0, 0.5), m=stone, axis='Z', verts=16)
+    col((0, 0, 0.5), (3.2, 3.2, 1.0))
+    cyl('altar_rune', 1.25, 0.06, (0, 0, 1.03), m=rune, axis='Z', verts=16)
+    # ---- ruined walls: broken segments of different heights (wolf climbing)
+    for (x, y, sx, sy, h) in [(-26, -18, 16, 1.6, 6.5), (-34, -10, 1.6, 14, 8.0), (-18, -26, 1.6, 10, 4.5), (26, 18, 16, 1.6, 6.5),
+                             (34, 10, 1.6, 14, 8.0), (18, 26, 1.6, 10, 4.5), (-22, 22, 12, 1.6, 5.0), (22, -22, 12, 1.6, 5.0),
+                             (-8, 30, 8, 1.6, 3.2), (8, -30, 8, 1.6, 3.2), (-40, 26, 1.6, 10, 6.0), (40, -26, 1.6, 10, 6.0)]:
+        wall('ruin_wall', x, y, 0, sx, sy, h, stone, uv=0.3)
+        # jagged broken top
+        for k in range(int(max(sx, sy) / 2.2)):
+            t = -max(sx, sy) / 2 + 1.1 + k * 2.2
+            bx, by = (x + t, y) if sx > sy else (x, y + t)
+            hh = RR.uniform(0.3, 1.6)
+            box('ruin_cap', (1.6 if sx > sy else 1.7, 1.7 if sx > sy else 1.6, hh), (bx, by, h + hh / 2), m=stone)
+    # ---- watch towers at the corners (climb to the top for the view)
+    for (tx, ty) in [(-44, -32), (44, 32), (-44, 32), (44, -32)]:
+        cyl('tower', 3.4, 13, (tx, ty, 6.5), m=dark, axis='Z', verts=20, uv=0.25)
+        col((tx, ty, 6.5), (6.4, 6.4, 13))
+        for k in range(8):
+            ang = k / 8 * math.tau
+            box('tower_merlon', (1.1, 1.1, 1.2), (tx + math.cos(ang) * 3.0, ty + math.sin(ang) * 3.0, 13.6), m=dark)
+        box('tower_fire', (0.9, 0.9, 0.5), (tx, ty, 13.3), m=ember)
+    # ---- timber houses
+    for i, (hx, hy, r) in enumerate([(-30, 4, 90), (30, -4, 270), (-12, -36, 0), (12, 36, 180), (-46, -8, 90), (46, 8, 270)]):
+        konak('wolf_house', hx, hy, r, 9, 8, mm, seed=i + 40, floors=2, cumba=(i % 2 == 0), color='p_white')
+    # lanterns along the paths (warm light pools in the twilight)
+    for (lx, ly, r) in [(-14, 3, 0), (14, -3, 180), (-3, -16, 90), (3, 16, 270), (-30, -3, 0), (30, 3, 180), (-3, -30, 90), (3, 30, 270)]:
+        street_lamp(lx, ly, r, mm, ottoman=True)
+    # crates, barrels and carts as cover
+    for (cx, cy) in [(-16, -10), (16, 10), (-10, 16), (10, -16), (-24, 10), (24, -10), (-38, 16), (38, -16)]:
+        crate(cx, cy, 0, 1.2, mm, rot=RR.uniform(-25, 25))
+        wood_barrel(cx + 1.5, cy + 0.4, mm)
+    # pines and rocks
+    for i in range(34):
+        tx, ty = RR.uniform(X0 + 3, X1 - 3), RR.uniform(Y0 + 3, Y1 - 3)
+        if math.hypot(tx, ty) < 13 or abs(tx) < 3 or abs(ty) < 3:
+            continue
+        tree(tx, ty, mm, h=RR.uniform(7, 11), r=RR.uniform(2.0, 2.8), seed=i + 3)
+    for i in range(22):
+        rx, ry = RR.uniform(X0 + 4, X1 - 4), RR.uniform(Y0 + 4, Y1 - 4)
+        if math.hypot(rx, ry) < 12:
+            continue
+        sz = RR.uniform(0.7, 1.7)
+        sphere('rock', sz, (rx, ry, 0.25), m=dark, scale=(1.3, 1.0, 0.75))
+        col((rx, ry, sz * 0.5), (sz * 2.2, sz * 1.8, sz * 1.2))
+    spawns_a = [(-48, -20, 70), (-48, -2, 90), (-48, 14, 110), (-40, -36, 50), (-36, 36, 130), (-50, 6, 90)]
+    spawns_b = [(48, 20, 250), (48, 2, 270), (48, -14, 290), (40, 36, 230), (36, -36, 310), (50, -6, 270)]
+    for i, (x, y, yaw) in enumerate(spawns_a + spawns_b):
+        spawn(x, y, 0.1, yaw, 'a' if i < 6 else 'b')
+    bounds_walls(X0, Y0, X1, Y1, 30)
+    finalize('ayvadisi', dict(preset='twilight', sun=[-16, 250], fog=0.0025, sky='sunset'), [X0, Y0, X1, Y1])
+
+
+ALL = dict(ayvadisi=map_ayvadisi, mahalle=map_mahalle, safranbolu=map_safranbolu, gemi=map_gemi, liman=map_liman, insaat=map_insaat, canakkale=map_canakkale)
 if __name__ == '__main__':
     for n in [a for a in sys.argv[1:] if a in ALL] or list(ALL):
         try:

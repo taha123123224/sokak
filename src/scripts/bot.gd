@@ -710,6 +710,8 @@ func _fire(tp: Vector3, dist: float) -> void:
 		if dist < 2.3:
 			fire_cd = 0.7
 			SFX.play3d("knife_swing", global_position, -2)
+			if wolf and wolf_ctl:
+				wolf_ctl.attack_fx()
 			match_node.melee(self, global_position + Vector3.UP * 1.5, (tp - (global_position + Vector3.UP * 1.5)).normalized(), float(wdata["dmg"]), wid)
 		return
 	if mag <= 0:

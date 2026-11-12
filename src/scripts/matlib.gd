@@ -53,6 +53,12 @@ var DEFS := {
 	"rooftiles": ["rooftiles", 0.9, Color(1, 1, 1), -1, 0, {}],
 	"stonewall": ["stonewall", 0.62, Color(1.05, 1.02, 0.97), -1, 0, {}],
 	"grass": ["grass", 0.25, Color(1, 1, 1), -1, 0, {}],
+	# Ay Vadisi (Kurt Adam)
+	"moss_ground": ["grass", 0.22, Color(0.78, 0.95, 0.62), 0.96, 0, {}],
+	"mountain_rock": ["stonewall", 0.03, Color(0.42, 0.5, 0.42), 0.95, 0, {}],
+	"ruin_stone": ["stonewall", 0.55, Color(0.95, 0.93, 0.88), -1, 0, {}],
+	"ruin_stone_dark": ["ashlar", 0.6, Color(0.62, 0.62, 0.66), 0.92, 0, {}],
+	"path_stone": ["cobble", 0.5, Color(0.9, 0.88, 0.85), -1, 0, {}],
 	# İnşaat / Çanakkale
 	"site_dirt": ["dryground", 0.22, Color(0.92, 0.9, 0.9), 0.97, 0, {}],
 	"gravel": ["gravel2", 0.45, Color(0.92, 0.9, 0.87), 0.95, 0, {}],

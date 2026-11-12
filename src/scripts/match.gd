@@ -347,9 +347,8 @@ func _build() -> void:
 	if MAP_LOOK.has(map_id) and not OS.has_environment("ENVPRESET"):
 		map_data["env"]["preset"] = MAP_LOOK[map_id]
 	if mode == "kurt" and not OS.has_environment("ENVPRESET"):
-		# Kurt Adam is always played at night: moonlight, dark blue fog
-		map_data["env"]["preset"] = "night"
-		map_data["env"]["fog"] = maxf(float(map_data["env"].get("fog", 0.006)), 0.012)
+		# Kurt Adam: cinematic blue-hour dusk (deep blue sky, amber horizon, moonrise, faint aurora)
+		map_data["env"]["preset"] = "alaca"
 	if OS.has_environment("ENVPRESET"):
 		map_data["env"]["preset"] = OS.get_environment("ENVPRESET")
 	var ps: PackedScene = GS.map_scene(map_id)
@@ -520,7 +519,7 @@ func _build() -> void:
 			var wc = preload("res://scripts/wolf.gd").new()
 			wc.host = c["node"]
 			wc.is_player = c["is_player"]
-			if OS.has_environment("WOLFFULL"): wc.energy = 100.0
+			if OS.has_environment("WOLFFULL") and (c["is_player"] or not OS.has_environment("WOLFPONLY")): wc.energy = 100.0
 			c["node"].wolf_ctl = wc
 			c["node"].add_child(wc)
 	if OS.has_environment("DBGLOAD"): print("SPAWNED")
@@ -780,7 +779,9 @@ func _setup_env(env_cfg: Dictionary) -> void:
 		"day":      {"elev": -52.0, "az": 35.0, "sun": Color(1.0, 0.93, 0.82), "se": 2.3, "top": Color("4a76ad"), "hor": Color("c2cfdc"), "amb": Color(0.72, 0.73, 0.76), "ae": 0.85, "fog": Color("bfcad6"), "exp": 0.97, "sat": 0.93, "fill": Color(0.8, 0.84, 0.92)},
 		"golden":   {"elev": -36.0, "az": 220.0, "sun": Color(1.0, 0.83, 0.62), "se": 2.3, "top": Color("4570a8"), "hor": Color("dcbf9f"), "amb": Color(0.72, 0.7, 0.7), "ae": 0.82, "fog": Color("d9c0a4"), "exp": 0.96, "sat": 1.0, "fill": Color(0.7, 0.75, 0.92)},
 		"sunset":   {"elev": -22.0, "az": 280.0, "sun": Color(1.0, 0.74, 0.52), "se": 2.15, "top": Color("41689f"), "hor": Color("e0ae8e"), "amb": Color(0.7, 0.66, 0.68), "ae": 0.8, "fog": Color("d9ab8e"), "exp": 0.95, "sat": 0.98, "fill": Color(0.62, 0.66, 0.9)},
+		"twilight": {"elev": -16.0, "az": 250.0, "sun": Color(1.0, 0.72, 0.5), "se": 2.4, "top": Color("2a3a9a"), "hor": Color("ffa86a"), "amb": Color(0.78, 0.76, 0.84), "ae": 1.15, "fog": Color("b9a3b8"), "exp": 1.05, "sat": 1.1, "fill": Color(0.6, 0.6, 1.0)},
 		"night":    {"elev": -38.0, "az": 140.0, "sun": Color(0.62, 0.72, 1.0), "se": 0.75, "top": Color("08101f"), "hor": Color("2b3350"), "amb": Color(0.3, 0.34, 0.48), "ae": 0.62, "fog": Color("1d2438"), "exp": 1.05, "sat": 0.85, "fill": Color(0.4, 0.48, 0.85)},
+		"alaca":    {"elev": -14.0, "az": 235.0, "sun": Color(1.0, 0.68, 0.46), "se": 2.1, "top": Color("0f1a3a"), "hor": Color("e8925a"), "amb": Color(0.56, 0.63, 0.8), "ae": 0.95, "fog": Color("6d7d99"), "exp": 1.0, "sat": 0.98, "fill": Color(0.5, 0.6, 0.95)},
 		"overcast": {"elev": -55.0, "az": 120.0, "sun": Color(1.0, 0.96, 0.9), "se": 1.9, "top": Color("5a7fa8"), "hor": Color("c0ccd8"), "amb": Color(0.7, 0.72, 0.76), "ae": 0.75, "fog": Color("c2ccd6"), "exp": 1.0, "sat": 0.92, "fill": Color(0.8, 0.84, 0.9)},
 	}
 	var c: Dictionary = P.get(preset, P["day"])
@@ -811,14 +812,22 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	sm.ground_energy_multiplier = 0.6
 	sm.sky_cover = load("res://assets/tex/clouds.png") if ResourceLoader.exists("res://assets/tex/clouds.png") else null
 	sm.sky_cover_modulate = Color(1, 1, 1, 0.9)
-	if str(env_cfg.get("preset", "")) == "night":
+	if str(env_cfg.get("preset", "")) == "alaca":
+		var ssm := ShaderMaterial.new()
+		ssm.shader = preload("res://shaders/sky_alaca.gdshader")
+		var sdir: Vector3 = Basis.from_euler(Vector3(deg_to_rad(float(c["elev"])), deg_to_rad(float(c["az"])), 0.0)).z
+		ssm.set_shader_parameter("sun_dir", sdir)
+		ssm.set_shader_parameter("moon_dir", (Vector3(-sdir.x, 0.0, -sdir.z).normalized() * 0.92 + Vector3(0.25, 0.0, 0.0)).normalized() + Vector3.UP * 0.32)
+		sky.sky_material = ssm
+	elif str(env_cfg.get("preset", "")) == "night":
 		# moonlit night: dim blue-grey clouds, a big pale moon, dark ground, cool ambient
 		sm.sky_cover_modulate = Color(0.16, 0.19, 0.28, 0.85)
 		sm.ground_bottom_color = Color(0.03, 0.035, 0.05)
 		sm.sun_angle_max = 2.5
 		sm.sun_curve = 0.05
 		sm.sky_energy_multiplier = 0.55
-	sky.sky_material = sm
+	if str(env_cfg.get("preset", "")) != "alaca":
+		sky.sky_material = sm
 	# soft fill light from the opposite side (lifts shadows, no extra shadow pass)
 	var fill := DirectionalLight3D.new()
 	fill.rotation_degrees = Vector3(-30, float(c["az"]) + 180.0, 0)
@@ -880,6 +889,14 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	e.adjustment_contrast = 1.13
 	e.adjustment_saturation = float(c["sat"]) * 1.06
 	e.adjustment_color_correction = _grade_lut()
+	if preset == "alaca":
+		# cinematic blue hour: cool shadows, warm low sun, light haze in the valley
+		e.volumetric_fog_albedo = Color(0.8, 0.86, 1.0)
+		e.volumetric_fog_density = 0.0024
+		e.fog_sun_scatter = 0.28
+		e.fog_density = 0.45
+		e.glow_intensity = 0.6; e.glow_mix = 0.1
+		e.adjustment_contrast = 1.12
 	world_env.environment = e
 	var ca := CameraAttributesPractical.new()
 	ca.auto_exposure_enabled = false
@@ -1787,6 +1804,7 @@ func test_hook(i: int) -> void:
 			player.wolf_ctl.energy = 100.0
 			player.wolf_ctl.transform()
 		for c in combatants:
+			if OS.has_environment("WOLFPONLY"): break
 			if not c["is_player"] and c["node"].wolf_ctl:
 				c["node"].wolf_ctl.energy = 100.0
 				c["node"].wolf_ctl._auto_t = 99.0

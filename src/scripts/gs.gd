@@ -455,6 +455,7 @@ var MAPS := {
 	"liman": {"name": "Liman Deposu", "desc": "Sisli sabah, konteyner sahası ve depo. Nişancı dostu.", "size": "Büyük"},
 	"insaat": {"name": "İnşaat", "desc": "Yarım kalmış 3 katlı beton bina, vinç ve şantiye. Küçük ve hızlı, yakın çatışma.", "size": "Küçük"},
 	"canakkale": {"name": "Çanakkale", "desc": "Boğaz kıyısında taş tabya, top mevzileri ve siper hattı. Gün batımında destansı çatışma.", "size": "Büyük"},
+	"ayvadisi": {"name": "Ay Vadisi", "desc": "Alacakaranlıkta yıkık dağ köyü: rün taşları, tırmanılacak duvarlar ve kuleler. Kurt Adam modu için!", "size": "Orta", "amb": "amb_wind"},
 	"kum": {"name": "Kum Kasabası", "desc": "Çöl kasabasında kemerli dar geçit, kerpiç duvarlar ve köşe kapışmaları.", "size": "Küçük", "amb": "amb_wind"},
 	"hurda": {"name": "Hurda Sahası", "desc": "Çukurdaki konteyner sahası: hesco bariyerleri, lastikler, sürekli çatışma.", "size": "Küçük", "amb": "amb_site"},
 	"fabrika": {"name": "Paslı Fabrika", "desc": "Terk edilmiş tuğla fabrika kompleksi, avlular, depolar ve bacalar.", "size": "Büyük", "amb": "amb_city"},
@@ -465,7 +466,7 @@ var MODES := {
 	"gungame": {"name": "Silah Oyunu", "desc": "Her öldürmede silahın değişir. Son silah bıçak!", "teams": false},
 	"knife": {"name": "Bıçak Arenası", "desc": "Sadece bıçak ve el bombası. Saf refleks.", "teams": false},
 	"sniper": {"name": "Nişancı Düellosu", "desc": "Sadece keskin nişancı tüfekleri. Takımlı.", "teams": true},
-	"kurt": {"name": "Kurt Adam", "desc": "Gece çöktü. Enerjin dolunca 3'e bas ve KURDA DÖNÜŞ: hızlı koşu, çift zıplama taklası, duvara tırmanma, ölümcül pençe!", "teams": true},
+	"kurt": {"name": "Kurt Adam", "desc": "Ay Vadisinde alacakaranlık. Enerjin dolunca 3'e bas ve KURDA DÖNÜŞ: hızlı koşu, çift zıplama taklası, duvara tırmanma, ölümcül pençe!", "teams": true},
 	"sabotaj": {"name": "Sabotaj", "desc": "KARTAL bombayı A ya da B noktasına kurar, AKREP çözer. Turlu, ilk 6 turu alan kazanır.", "teams": true},
 }
 ## CC-BY 4.0 assets: [work, author, licence/link] — shown in Ayarlar > Lisanslar
@@ -487,6 +488,7 @@ const CREDITS := [
 	["Dust2-short (Kum Kasabası haritası)", "frostychaos144", "CC-BY 4.0 · sketchfab.com/frostychaos144"],
 	["Maps (Hurda Sahası haritası)", "frostychaos144", "CC-BY 4.0 · sketchfab.com/frostychaos144"],
 	["Rust (Paslı Fabrika haritası)", "frostychaos144", "CC-BY 4.0 · sketchfab.com/frostychaos144"],
+	["Howling (Kurt Adam modeli, rig + animasyon: SOKAK)", "Daniele De Filippis", "CC-BY 4.0 · sketchfab.com/danieledefilippis"],
 	["Interface Sounds / UI Audio (menü sesleri)", "Kenney", "CC0 · kenney.nl"],
 ]
 const TEAMS := {"a": "KARTAL", "b": "AKREP"}

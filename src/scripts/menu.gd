@@ -1797,6 +1797,8 @@ func _play_go() -> void:
 		return
 	var pool: Array = play_maps if play_maps.size() > 0 else GS.MAPS.keys()
 	var md := play_sel_mode
+	if md == "kurt" and play_maps.size() == 0:
+		pool = ["ayvadisi"]     # Kurt Adam has its own map
 	var tgt := 6 if md == "sabotaj" else (99 if md == "gungame" else (60 if GS.MODES[md]["teams"] else 40))
 	var cfg := {"name": "Hızlı Oyun", "map": pool[randi() % pool.size()], "mode": md, "bots": play_bots, "diff": play_diff,
 		"time": play_time, "target": tgt, "team": "a", "no": randi_range(100, 999)}
