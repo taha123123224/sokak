@@ -140,6 +140,16 @@ func _on_msg(d: Dictionary) -> void:
 		"sys":
 			if mt.hud:
 				mt.hud.center_msg(str(d.get("msg", "")), UI.RED)
+		"spray":
+			var sp: Array = d.get("p", [0, 0, 0]); var sn: Array = d.get("nr", [0, 1, 0]); var su: Array = d.get("u", [0, 1, 0])
+			mt.ensure_comms().place_spray(Vector3(float(sp[0]), float(sp[1]), float(sp[2])), Vector3(float(sn[0]), float(sn[1]), float(sn[2])),
+				Vector3(float(su[0]), float(su[1]), float(su[2])), str(d.get("id", "gg")), false)
+		"radio":
+			var rt := str(d.get("team", ""))
+			var rmine: String = mt.player.team if mt.player and "team" in mt.player else ""
+			var ri := int(d.get("i", 0))
+			if (rt == "" or rt == rmine) and ri >= 0 and ri < 8:
+				mt.ensure_comms().show_radio(str(d.get("n", "?")), preload("res://scripts/comms.gd").RADIO[ri][0], rt, false)
 		"ping":
 			var tp := str(d.get("team", ""))
 			var mine2: String = mt.player.team if mt.player and "team" in mt.player else ""

@@ -1799,7 +1799,7 @@ func _play_go() -> void:
 	var md := play_sel_mode
 	if md == "kurt" and play_maps.size() == 0:
 		pool = ["ayvadisi"]     # Kurt Adam has its own map
-	var tgt := 6 if md == "sabotaj" else (99 if md == "gungame" else (60 if GS.MODES[md]["teams"] else 40))
+	var tgt := 6 if md == "sabotaj" else (3 if md == "bayrak" else (99 if md == "gungame" else (60 if GS.MODES[md]["teams"] else 40)))
 	var cfg := {"name": "Hızlı Oyun", "map": pool[randi() % pool.size()], "mode": md, "bots": play_bots, "diff": play_diff,
 		"time": play_time, "target": tgt, "team": "a", "no": randi_range(100, 999)}
 	room_cfg = cfg
@@ -4313,9 +4313,9 @@ func _create_room_dialog() -> void:
 	var cfg := {"name": str(GS.profile["name"]) + " odası", "map": "mahalle", "mode": "ffa", "bots": 9, "diff": 1, "time": 8, "target": 40, "team": "a", "no": randi_range(100, 999)}
 	_room_dialog(cfg)
 
-const MODE_ICONS := {"tdm": "⚔", "ffa": "✦", "gungame": "↑", "knife": "✂", "sniper": "◎", "sabotaj": "✹"}
+const MODE_ICONS := {"tdm": "⚔", "ffa": "✦", "gungame": "↑", "knife": "✂", "sniper": "◎", "sabotaj": "✹", "bayrak": "⚑", "kurt": "☾"}
 const MODE_SHORT := {"tdm": "Takımlar en çok öldürmeye yarışır", "ffa": "Herkes herkese karşı", "gungame": "Her öldürmede yeni silah",
-	"knife": "Sadece bıçaklar", "sniper": "Sadece nişancı tüfekleri", "sabotaj": "Bomba kur / çöz, turlu oyun"}
+	"knife": "Sadece bıçaklar", "sniper": "Sadece nişancı tüfekleri", "sabotaj": "Bomba kur / çöz, turlu oyun", "bayrak": "Bayrağı çal, üssüne getir", "kurt": "Kurda dönüş, pençe ve takla"}
 
 func _chip(text: String, on: bool, cb: Callable, w: int = 0) -> Button:
 	var b := Button.new()
@@ -4440,7 +4440,7 @@ func _room_dialog(cfg: Dictionary, is_online: bool = false, done: Callable = Cal
 		mv.add_child(n2)
 		mb.pressed.connect(func():
 			cfg["mode"] = md
-			cfg["target"] = 6 if md == "sabotaj" else (60 if GS.MODES[md]["teams"] else 40)
+			cfg["target"] = 6 if md == "sabotaj" else (3 if md == "bayrak" else (60 if GS.MODES[md]["teams"] else 40))
 			SFX.play("ui_click", -6); redraw.call())
 		mdg.add_child(mb)
 	# ---------------- right: settings + summary

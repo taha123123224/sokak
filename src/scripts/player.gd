@@ -142,6 +142,7 @@ func _ready() -> void:
 	_build_viewmodel()
 
 func setup_loadout(set: Dictionary, mode: String) -> void:
+	refresh_gear()
 	slots.clear()
 	if mode == "knife":
 		slots = {"bicak": set.get("bicak", "knife"), "bomba": "frag"}
@@ -170,8 +171,8 @@ func setup_loadout(set: Dictionary, mode: String) -> void:
 	for c in slots.keys():
 		var id: String = slots[c]
 		var st := GS.stats_for(id)
-		ammo[id] = [st["mag"], int(GS.WEAPONS[id].get("reserve", 0))]
-	grenades = 2 if slots.has("bomba") else 0
+		ammo[id] = [st["mag"], int(round(float(GS.WEAPONS[id].get("reserve", 0)) * (1.0 + g_reserve)))]
+	grenades = (2 + int(g_nades)) if slots.has("bomba") else 0
 	smokes = 1 if slots.has("bomba") else 0
 	cur = ""
 	var first = "ana" if slots.has("ana") else ("tabanca" if slots.has("tabanca") else slots.keys()[0])
@@ -263,6 +264,20 @@ func _unhandled_input(e: InputEvent) -> void:
 			velocity.y = JUMP * wolf_ctl.JUMP
 			_wolf_jumps = 0
 		return
+	# v3.8 radio menu open: number keys pick a call-out instead of a weapon
+	if match_node and match_node.comms and match_node.comms.radio_open and e is InputEventKey and e.pressed and not e.echo:
+		var kc: int = (e as InputEventKey).physical_keycode
+		if kc >= KEY_1 and kc <= KEY_9:
+			match_node.comms.radio_key(kc - KEY_0)
+			return
+		if e.is_action_pressed("radio") or kc == KEY_ESCAPE:
+			match_node.comms.toggle_radio()
+			return
+	if e.is_action_pressed("radio") and alive and match_node and match_node.has_method("ensure_comms"):
+		match_node.ensure_comms().toggle_radio()
+		return
+	if e.is_action_pressed("spray") and alive and match_node and match_node.has_method("ensure_comms"):
+		match_node.ensure_comms().try_spray()
 	if e.is_action_pressed("slot1") and slots.has("ana"): switch_to(slots["ana"])
 	if e.is_action_pressed("slot2") and slots.has("tabanca"): switch_to(slots["tabanca"])
 	if e.is_action_pressed("slot3") and slots.has("bicak"): switch_to(slots["bicak"])
@@ -273,6 +288,12 @@ func _unhandled_input(e: InputEvent) -> void:
 		elif grenades > 0: switch_to("frag")
 		elif smokes > 0: switch_to("smoke")
 	if e.is_action_pressed("last_weapon") and last != "" and _has(last): switch_to(last)
+	# v3.8: G drops the gun in your hands, E picks up the one you look at
+	if e.is_action_pressed("drop") and alive and match_node and match_node.has_method("ensure_pickups") and mode_allows_drop():
+		match_node.ensure_pickups()
+		drop_current()
+	if e.is_action_pressed("use") and alive and match_node and match_node.pickups:
+		match_node.pickups.try_pickup()
 	if e.is_action_pressed("reload"): start_reload()
 	if e.is_action_pressed("ping") and alive and match_node and match_node.has_method("place_ping"):
 		# v3.4 tactical ping: mark the spot under the crosshair for the whole team
@@ -304,6 +325,36 @@ func equip_from_menu(cat: String, id: String) -> void:
 	var st := GS.stats_for(id)
 	ammo[id] = [st["mag"], int(GS.WEAPONS[id].get("reserve", 0))]
 	switch_to(id, true)
+
+func mode_allows_drop() -> bool:
+	return str(GS.room.get("mode", "")) not in ["kurt", "gungame"]
+
+func drop_current() -> void:
+	if cur == "" or not GS.WEAPONS.has(cur):
+		return
+	var cat := str(GS.WEAPONS[cur]["cat"])
+	if cat == "bicak" or cat == "bomba" or GS.WEAPONS[cur].get("hidden", false):
+		return
+	var a: Array = ammo.get(cur, [0, 0])
+	var fwd := -cam.global_transform.basis.z
+	match_node.pickups.drop_weapon(cur, a[0], a[1], cam.global_position + fwd * 0.6 - Vector3(0, 0.25, 0), fwd * 4.5 + Vector3(0, 2.0, 0) + velocity * 0.5)
+	SFX.play("equip", -8, 0.8)
+	var dropped := cur
+	slots.erase(cat)
+	ammo.erase(dropped)
+	cur = ""
+	for c in ["ana", "tabanca", "bicak"]:
+		if slots.has(c):
+			switch_to(slots[c], false)
+			break
+
+func take_ground_weapon(cat: String, wid: String, mag: int, res: int) -> void:
+	var old: String = slots.get(cat, "")
+	slots[cat] = wid
+	if old != "" and old != wid:
+		ammo.erase(old)
+	ammo[wid] = [mag, res]
+	switch_to(wid, false)
 
 func _has(id: String) -> bool:
 	if id == "smoke":
@@ -363,7 +414,7 @@ func _physics_process(delta: float) -> void:
 	col.position.y = capsule.height / 2
 	eye = lerp(eye, EYE_CROUCH if crouching else EYE_STAND, min(delta * 12.0, 1.0))
 	# speed
-	var spd := RUN * float(wdata.get("speed", 1.0))
+	var spd := RUN * float(wdata.get("speed", 1.0)) * (1.0 + g_speed)
 	if slow_t > 0:   # hit by a slowing (.45) round
 		slow_t -= delta
 		spd *= 0.62
@@ -403,7 +454,7 @@ func _physics_process(delta: float) -> void:
 		step_dist += hv.length() * delta
 		if step_dist > 2.1:
 			step_dist = 0
-			SFX.play_var("step_" + match_node.surface, 4, -10)
+			SFX.play_var("step_" + match_node.surface, 4, -10 + (linear_to_db(1.0 - g_step) if g_step > 0.0 else 0.0))
 	if global_position.y < -20:
 		take_damage(1000, null, global_position, false, "")
 
@@ -453,6 +504,9 @@ func _process(delta: float) -> void:
 	# timers
 	fire_cd = max(fire_cd - delta, 0.0)
 	equip_t = max(equip_t - delta, 0.0)
+	hurt_clock += delta
+	if g_regen > 0.0 and alive and hurt_clock > 5.0 and health < 100.0:
+		health = minf(health + g_regen * delta, 100.0)
 	if holster_t > 0:
 		holster_t -= delta
 		if holster_t <= 0 and pending_id != "":
@@ -556,7 +610,7 @@ func _do_switch(id: String, instant: bool) -> void:
 	bolt_t = 0
 	inspect_t = 0
 	ads = false
-	draw_total = _draw_time(id)
+	draw_total = _draw_time(id) * (1.0 - g_swap)
 	equip_t = 0.0 if instant else draw_total
 	_mag_release()
 	_load_vm_weapon(id)
@@ -659,6 +713,8 @@ func _try_fire() -> void:
 	var hr: float = hrec * 0.35 * randf_range(-1.0, 1.0)
 	if n > 4:
 		hr += hrec * 1.25 * sin(float(n - 4) * 0.42 + float(hash(cur) % 7)) * min(float(n - 4) / 4.0, 1.0)
+	rk *= 1.0 - g_recoil
+	hr *= 1.0 - g_recoil
 	recoil_vel += Vector2(rk, hr)
 	recoil_pitch += rk
 	punch += Vector3(rk * 0.6, 0, randf_range(-0.004, 0.004))
@@ -708,7 +764,7 @@ func start_reload() -> void:
 		return
 	ads = false
 	inspect_t = 0
-	reload_total = float(wdata["reload"])
+	reload_total = float(wdata["reload"]) * (1.0 - g_reload)
 	reload_t = reload_total
 	if wdata.get("shell_reload", false):
 		SFX.play("equip", -10)
@@ -981,6 +1037,14 @@ func take_damage(amount: float, attacker, pos: Vector3, headshot: bool, wid: Str
 	var dmg := amount
 	if wolf and wolf_ctl:
 		dmg *= wolf_ctl.DMG_TAKEN
+	# v3.8 gear: vest / helmet (a sniper headshot still kills through the helmet)
+	if wid != "" and not GS.WEAPONS.get(wid, {}).get("throwable", false):
+		if headshot:
+			if not str(GS.WEAPONS.get(wid, {}).get("cls", "")).contains("Nişancı"):
+				dmg *= 1.0 - g_head_dr
+		else:
+			dmg *= 1.0 - g_body_dr
+	hurt_clock = 0.0
 	var bl: Dictionary = GS.ball(wid) if wid != "" else {}
 	if bl.get("abil", "") == "slow":
 		slow_t = 0.9
@@ -1041,6 +1105,27 @@ func wolf_view(on: bool) -> void:
 	else:
 		cam.fov = GS.settings["fov"]
 
+## v3.8 equipped gear effects (refreshed every spawn; see GS.GEAR)
+var g_body_dr := 0.0
+var g_head_dr := 0.0
+var g_speed := 0.0
+var g_swap := 0.0
+var g_reload := 0.0
+var g_recoil := 0.0
+var g_step := 0.0
+var g_reserve := 0.0
+var g_nades := 0.0
+var g_kill_heal := 0.0
+var g_regen := 0.0
+var hurt_clock := 99.0
+func refresh_gear() -> void:
+	for k in ["body_dr", "head_dr", "speed", "swap", "reload", "recoil", "step", "reserve", "nades", "kill_heal", "regen"]:
+		set("g_" + k, GS.gear(k))
+
+func on_kill_gear() -> void:
+	if g_kill_heal > 0.0 and alive:
+		health = minf(health + g_kill_heal, 100.0)
+
 func respawn(pos: Vector3, yaw_: float) -> void:
 	global_position = pos
 	velocity = Vector3.ZERO
@@ -1055,6 +1140,7 @@ func respawn(pos: Vector3, yaw_: float) -> void:
 	dmg_log.clear()
 	crouching = false
 	vm_rect.visible = true
+	hurt_clock = 99.0
 	setup_loadout(GS.active_set(), GS.room.get("mode", "ffa"))
 
 func eye_pos() -> Vector3:
@@ -1253,7 +1339,7 @@ const HIP := {
 }
 
 ## per-weapon hip framing fixes for guns whose proportions differ from their kind (compact SMGs)
-const HIP_ADJ := {"uzi": Vector3(0.03, -0.035, -0.13), "scar": Vector3(0.025, -0.025, -0.15), "mp5": Vector3(0.025, -0.02, -0.17), "ump45": Vector3(0.025, -0.02, -0.17)}
+const HIP_ADJ := {"uzi": Vector3(0.03, -0.035, -0.13), "ump45": Vector3(0.025, -0.02, -0.17)}
 
 func _vm_kind(id: String) -> String:
 	var w: Dictionary = GS.WEAPONS[id]

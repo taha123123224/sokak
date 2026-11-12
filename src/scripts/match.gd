@@ -13,6 +13,7 @@ var player
 var combatants: Array = []
 var net = null   # net_match.gd when playing online
 var sab = null   # sabotage.gd in SABOTAJ mode
+var ctf = null   # ctf.gd in BAYRAK SAVAŞI mode
 var spawn_points: Array = []
 var world_env: WorldEnvironment
 var sun: DirectionalLight3D
@@ -145,6 +146,9 @@ func _show_loading() -> void:
 	var infos: Array[String] = []
 	if mode == "sabotaj":
 		infos.append("%d TUR" % int(cfg.get("target", 5)))
+	elif mode == "bayrak":
+		infos.append("%d DK" % int(cfg.get("time", 8)))
+		infos.append("İLK %d SAYI" % (int(cfg.get("target", 3)) if int(cfg.get("target", 3)) <= 10 else 3))
 	else:
 		infos.append("%d DK" % int(cfg.get("time", 8)))
 		infos.append("HEDEF %d" % int(cfg.get("target", 40)))
@@ -308,13 +312,20 @@ func _build() -> void:
 		sb.position = Vector3(c["c"][0], c["c"][1], c["c"][2])
 		sb.rotation = Vector3(c["r"][0], c["r"][1], c["r"][2])
 	# v3.4 imported maps: their own meshes are the collision (trimesh, world layer)
-	if map_data.get("mesh_collision", false):
+	# v3.8: built maps can name meshes (e.g. the terrain) that get trimesh collision too
+	var only_tm: Array = map_data.get("trimesh", [])
+	if map_data.get("mesh_collision", false) or not only_tm.is_empty():
 		var nocol: Array = map_data.get("nocol", [])
 		for mi in vis.find_children("*", "MeshInstance3D", true, false):
 			var m3 := mi as MeshInstance3D
 			if m3.mesh == null:
 				continue
 			var skip := false
+			if not only_tm.is_empty():
+				skip = true
+				for tn in only_tm:
+					if str(tn) in String(m3.name):
+						skip = false
 			for nc in nocol:
 				if str(nc) in String(m3.name):
 					skip = true
@@ -374,6 +385,7 @@ func _build() -> void:
 	if not GS.has_meta("nonav"):
 		await _bake_nav()
 	_add_occluders()
+	_place_posters()
 	_add_reflection_probes()
 	await _render_minimap()
 	await _progress(85, "Oyuncular hazırlanıyor...")
@@ -468,6 +480,10 @@ func _build() -> void:
 		sab = preload("res://scripts/sabotage.gd").new()
 		add_child(sab)
 		sab.setup(self)
+	if mode == "bayrak":
+		ctf = preload("res://scripts/ctf.gd").new()
+		add_child(ctf)
+		ctf.setup(self)
 	GS.act("match_start")   # the server measures real match time (bounds the rewards)
 
 func _frame_drawn() -> void:
@@ -704,7 +720,7 @@ func _setup_env(env_cfg: Dictionary) -> void:
 		"sunset":   {"elev": -22.0, "az": 280.0, "sun": Color(1.0, 0.74, 0.52), "se": 2.15, "top": Color("2a539f"), "hor": Color("ffab7a"), "amb": Color(0.7, 0.66, 0.68), "ae": 0.8, "fog": Color("d9ab8e"), "exp": 0.95, "sat": 0.98, "fill": Color(0.62, 0.66, 0.9)},
 		"twilight": {"elev": -16.0, "az": 250.0, "sun": Color(1.0, 0.72, 0.5), "se": 2.4, "top": Color("2a3a9a"), "hor": Color("ffa86a"), "amb": Color(0.78, 0.76, 0.84), "ae": 1.15, "fog": Color("b9a3b8"), "exp": 1.05, "sat": 1.1, "fill": Color(0.6, 0.6, 1.0)},
 		"night":    {"elev": -38.0, "az": 140.0, "sun": Color(0.62, 0.72, 1.0), "se": 0.75, "top": Color("08101f"), "hor": Color("2b3350"), "amb": Color(0.3, 0.34, 0.48), "ae": 0.62, "fog": Color("1d2438"), "exp": 1.05, "sat": 0.85, "fill": Color(0.4, 0.48, 0.85)},
-		"alaca":    {"elev": -14.0, "az": 235.0, "sun": Color(1.0, 0.68, 0.46), "se": 2.1, "top": Color("0f1a3a"), "hor": Color("e8925a"), "amb": Color(0.56, 0.63, 0.8), "ae": 0.95, "fog": Color("6d7d99"), "exp": 1.0, "sat": 0.98, "fill": Color(0.5, 0.6, 0.95)},
+		"alaca":    {"elev": -18.0, "az": 235.0, "sun": Color(1.0, 0.72, 0.5), "se": 2.6, "top": Color("16285a"), "hor": Color("f0a066"), "amb": Color(0.64, 0.7, 0.86), "ae": 1.3, "fog": Color("71819c"), "exp": 1.22, "sat": 1.02, "fill": Color(0.55, 0.65, 1.0)},
 		"overcast": {"elev": -55.0, "az": 120.0, "sun": Color(1.0, 0.96, 0.9), "se": 1.9, "top": Color("4f7fb8"), "hor": Color("c6d5e4"), "amb": Color(0.7, 0.72, 0.76), "ae": 0.75, "fog": Color("c2ccd6"), "exp": 1.0, "sat": 0.92, "fill": Color(0.8, 0.84, 0.9)},
 	}
 	var c: Dictionary = P.get(preset, P["day"])
@@ -1390,6 +1406,7 @@ func gg_level(n) -> int:
 	return int(entry(n).get("gg", 0))
 
 func on_death(victim, attacker, wid: String, head: bool) -> void:
+	_drop_on_death(victim)
 	if OS.has_environment("PERF"): print("EV death t=%.1f" % (Time.get_ticks_msec() / 1000.0))
 	var __t := Time.get_ticks_usec()
 	if attacker != null and is_instance_valid(attacker) and attacker != victim and "wolf_ctl" in attacker and attacker.wolf_ctl:
@@ -1409,7 +1426,7 @@ func _sp_on_death(victim, attacker, wid: String, head: bool) -> void:
 		ae["kills"] += 1
 		ae["score"] += 100 + (50 if head else 0)
 		if head: ae["head"] += 1
-		if teams and sab == null:
+		if teams and sab == null and ctf == null:
 			team_score[ae["team"]] += 1
 	elif teams:
 		pass
@@ -1459,6 +1476,8 @@ func _sp_on_death(victim, attacker, wid: String, head: bool) -> void:
 			hud.center_msg("YENİ SİLAH: " + GS.WEAPONS[nw]["name"], UI.ACCENT2)
 		elif a.alive:
 			a.set_weapon(nw)
+	if ctf:
+		ctf.on_death(victim)
 	if sab:
 		sab.on_death(victim)   # rounds: no respawn until the next round
 		if victim == player:
@@ -1467,10 +1486,116 @@ func _sp_on_death(victim, attacker, wid: String, head: bool) -> void:
 			get_tree().create_timer(1.2).timeout.connect(func(): if spectating: spec_next(1))
 		return
 	# respawn timer
-	get_tree().create_timer(3.5 if victim == player else 3.0).timeout.connect(func(): if not ended: _spawn(ve, false))
+	get_tree().create_timer((3.5 * (1.0 - GS.gear("respawn"))) if victim == player else 3.0).timeout.connect(func(): if not ended: _spawn(ve, false))
 	_check_win()
 
+## v3.8: SOKAK OPERASYON posters and billboards on real walls near the spawns (deterministic per map)
+func _place_posters() -> void:
+	if map_id == "ayvadisi" or spawn_points.is_empty():
+		return
+	await get_tree().physics_frame
+	var space := get_world_3d().direct_space_state
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(map_id)
+	var tex_p: Texture2D = load("res://assets/tex/posters/poster_a.jpg")
+	var tex_b: Texture2D = load("res://assets/tex/posters/billboard_a.jpg")
+	var placed: Array[Vector3] = []
+	var want_p := 6
+	var want_b := 2
+	for tries in 260:
+		if want_p <= 0 and want_b <= 0:
+			break
+		var sp: Dictionary = spawn_points[rng.randi() % spawn_points.size()]
+		var big := want_b > 0 and tries % 3 == 0
+		var w := 5.2 if big else 1.25
+		var h := 2.4 if big else 1.85
+		var o: Vector3 = sp["pos"] + Vector3(rng.randf_range(-6, 6), (3.2 if big else 1.75), rng.randf_range(-6, 6))
+		var a := rng.randf() * TAU
+		var dir := Vector3(sin(a), 0, cos(a))
+		var r := space.intersect_ray(PhysicsRayQueryParameters3D.create(o, o + dir * 22.0, 1))
+		if r.is_empty():
+			continue
+		var n: Vector3 = r["normal"]
+		if absf(n.y) > 0.15 or o.distance_to(r["position"]) < 2.5:
+			continue
+		n.y = 0.0; n = n.normalized()
+		var c: Vector3 = r["position"]
+		var right := Vector3.UP.cross(n).normalized()
+		# the whole poster must sit on one flat wall: probe its corners
+		var ok := true
+		for cx in [-0.5, 0.5]:
+			for cy in [-0.5, 0.5]:
+				var pc: Vector3 = c + right * w * float(cx) + Vector3.UP * h * float(cy)
+				var rr := space.intersect_ray(PhysicsRayQueryParameters3D.create(pc + n * 0.4, pc - n * 0.4, 1))
+				if rr.is_empty() or absf(rr["position"].distance_to(pc)) > 0.08 or (rr["normal"] as Vector3).dot(n) < 0.95:
+					ok = false
+		if not ok or c.y - h * 0.5 < (sp["pos"] as Vector3).y - 0.6:
+			continue
+		var close := false
+		for q in placed:
+			if q.distance_to(c) < 7.0:
+				close = true
+		if close:
+			continue
+		placed.append(c)
+		var mi := MeshInstance3D.new()
+		var qm := QuadMesh.new()
+		qm.size = Vector2(w, h)
+		mi.mesh = qm
+		var mt := StandardMaterial3D.new()
+		mt.albedo_texture = tex_b if big else tex_p
+		mt.roughness = 0.75
+		mt.uv1_scale = Vector3(1, 1, 1)
+		mi.material_override = mt
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		statics.add_child(mi)
+		mi.global_transform = Transform3D(Basis(right, Vector3.UP, n), c + n * 0.025)
+		if big:
+			want_b -= 1
+		else:
+			want_p -= 1
+
+var comms: Node3D
+func ensure_comms() -> Node3D:
+	if comms == null:
+		comms = preload("res://scripts/comms.gd").new()
+		comms.name = "Comms"
+		add_child(comms)
+		comms.setup(self)
+	return comms
+
+var pickups: Node3D
+func ensure_pickups() -> Node3D:
+	if pickups == null:
+		pickups = preload("res://scripts/pickups.gd").new()
+		pickups.name = "Pickups"
+		add_child(pickups)
+		pickups.setup(self)
+	return pickups
+
+func _drop_on_death(victim) -> void:
+	## v3.8: the fallen soldier's gun lands on the ground and his ammo bag stays behind
+	if victim == null or not is_instance_valid(victim) or mode == "kurt" or mode == "gungame":
+		return
+	ensure_pickups()
+	var pos: Vector3 = victim.global_position + Vector3(0, 1.1, 0)
+	var w := ""
+	if victim == player:
+		w = player.cur
+	elif "wid" in victim:
+		w = str(victim.wid)
+	if w != "" and GS.WEAPONS.has(w) and not ["bicak", "bomba"].has(str(GS.WEAPONS[w]["cat"])) and not GS.WEAPONS[w].get("hidden", false):
+		var st := GS.stats_for(w)
+		var res := int(GS.WEAPONS[w].get("reserve", 0)) / 2
+		if victim == player and player.ammo.has(w):
+			st["mag"] = player.ammo[w][0]; res = player.ammo[w][1]
+		pickups.drop_weapon(w, int(st["mag"]), res, pos, Vector3(randf_range(-1.5, 1.5), 2.5, randf_range(-1.5, 1.5)))
+	if victim != player:
+		pickups.drop_bag(victim.global_position + Vector3(0, 0.5, 0))
+
 func _player_kill(head: bool, wid: String) -> void:
+	if player and player.has_method("on_kill_gear"):
+		player.on_kill_gear()
 	# kills / headshots are reported once at match end (economy rules count them, see econ.gd)
 	player_streak += 1
 	var now := match_time
@@ -1741,6 +1866,12 @@ func test_hook(i: int) -> void:
 		for c in combatants:
 			if c["node"] != player:
 				c["node"].set_physics_process(false)
+		return
+	if i == 95 and ctf:
+		player.global_position = ctf.flags[ctf.enemy(player.team)]["home"] + Vector3(0.3, 0.2, 0)
+		return
+	if i == 96 and ctf:
+		player.global_position = ctf.flags[player.team]["home"] + Vector3(0.3, 0.2, 0)
 		return
 	if i == 24 and sab:
 		# stand on site A with the bomb and start planting

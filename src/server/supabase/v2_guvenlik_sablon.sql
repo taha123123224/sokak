@@ -165,6 +165,28 @@ begin
     p := jsonb_set(p, '{chars}', (p->'chars') || to_jsonb(id));
     p := jsonb_set(p, '{char}', to_jsonb(id));
 
+  when 'buy_gear' then
+    id := args->>'id';
+    if cat->'gear'->id is null then raise exception 'Geçersiz ekipman'; end if;
+    if not (p ? 'gear') or jsonb_typeof(p->'gear') <> 'array' then p := jsonb_set(p, '{gear}', '[]'); end if;
+    if not (p ? 'gear_eq') or jsonb_typeof(p->'gear_eq') <> 'object' then p := jsonb_set(p, '{gear_eq}', '{}'); end if;
+    if (p->'gear') ? id then raise exception 'Bu ekipmana zaten sahipsin'; end if;
+    p := _pay(p, _si(cat, array['gear', id, 'price']));
+    p := jsonb_set(p, '{gear}', (p->'gear') || to_jsonb(id));
+    p := jsonb_set(p, array['gear_eq', cat->'gear'->id->>'slot'], to_jsonb(id));
+    res := jsonb_build_object('id', id);
+
+  when 'equip_gear' then
+    t := args->>'slot'; id := coalesce(args->>'id', '');
+    if not (p ? 'gear_eq') or jsonb_typeof(p->'gear_eq') <> 'object' then p := jsonb_set(p, '{gear_eq}', '{}'); end if;
+    if id = '' then
+      p := jsonb_set(p, '{gear_eq}', (p->'gear_eq') - t);
+    else
+      if cat->'gear'->id is null or not coalesce((p->'gear') ? id, false) or cat->'gear'->id->>'slot' <> t then
+        raise exception 'Bu ekipmanı takamazsın'; end if;
+      p := jsonb_set(p, array['gear_eq', t], to_jsonb(id));
+    end if;
+
   when 'buy_crate' then
     t := args->>'id';
     if cat->'crates'->t is null then raise exception 'Geçersiz kasa'; end if;

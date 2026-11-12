@@ -79,8 +79,12 @@ gun("shot_ak", "AK-47/C_28P.wav", 0.75, far="AK-47/C_31P.wav", far_dur=1.2)
 gun("shot_m4", "AR-15/D_32P.wav", 0.7, far="AR-15/D_24P.wav", far_dur=1.2, bright=0.1)
 gun("shot_scar", "Savage 10 .300 Blackout/T_27P.wav", 0.85, pitch=0.97)
 gun("shot_smg", "Carl Gustav M45/G_31P.wav", 0.5)
-gun("shot_ump", "Carl Gustav M45/G_31P.wav", 0.5, pitch=0.94)
+gun("shot_ump", "1911/A_42P.wav", 0.5, pitch=0.98)          # UMP-45 / Vector: real .45 ACP (1911)
 gun("shot_p90", "PPSh/P_30P.wav", 0.42, pitch=1.08)
+# v3.8: own voices for the new models (real recordings of the same calibre / action)
+gun("shot_vector", "1911/A_42P.wav", 0.4, pitch=1.06, bright=0.08)              # Vector .45 ACP, very fast cyclic
+gun("shot_aug", "AR-15/D_24P.wav", 0.68, pitch=1.03, bright=0.15)              # AUG A3 5.56, bullpup: crisper
+gun("shot_m249", "AR-15/D_32P.wav", 0.8, pitch=0.93, far="AR-15/D_24P.wav", far_dur=1.3)  # M249 5.56 belt-fed: heavier
 gun("shot_pistol", "Walther PPQ/X_39P.wav", 0.55)
 gun("shot_deagle", "1911/A_42P.wav", 0.75, pitch=0.9)
 gun("shot_revolver", "Smith & Wesson 642/V_27P.wav", 0.75, pitch=0.92)

@@ -372,8 +372,8 @@ func chat_help() -> void:
 	var v := UI.vbox(4)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(v)
-	v.add_child(UI.lbl("◆ SOHBET NASIL KULLANILIR", 18, UI.ACCENT, "Rajdhani-Bold"))
-	var rows := [["ENTER / T", "Herkese yazılı mesaj"], ["Y", "Sadece takımına yaz"], ["ESC", "Yazmayı iptal et"]]
+	v.add_child(UI.lbl("◆ İLETİŞİM TUŞLARI", 18, UI.ACCENT, "Rajdhani-Bold"))
+	var rows := [["ENTER", "Herkese yazılı mesaj"], ["Y", "Sadece takımına yaz"], ["T", "Duvara sprey boya"], ["B", "Telsiz mesajları"], ["G / E", "Silah at / yerden al"]]
 	if online:
 		rows.append(["V (basılı tut)", "Sesli konuş — bırakınca susar"])
 	for r in rows:
@@ -521,6 +521,65 @@ class ClawFx extends Control:
 				draw_line(p0, p1, Color(0.55, 0.02, 0.02, 0.45 * a), wd * 2.2, true)
 				draw_line(p0, p1, Color(1.0, 0.35, 0.22, 0.85 * a), wd, true)
 				draw_line(p0 + dir * 4.0, p1 - dir * 4.0, Color(1, 0.92, 0.85, 0.9 * a), maxf(wd * 0.3, 1.0), true)
+
+## v3.8 radio / info toasts (left side, stack of up to 4, fade after 4 s)
+var _toasts: VBoxContainer
+func radio_toast(who: String, msg: String, col: Color) -> void:
+	info_toast("📻", who, msg, col)
+
+func info_toast(icon: String, who: String, msg: String, col: Color) -> void:
+	if _toasts == null:
+		_toasts = VBoxContainer.new()
+		_toasts.set_anchors_preset(Control.PRESET_CENTER_LEFT)
+		_toasts.offset_left = 24; _toasts.offset_top = 40; _toasts.offset_right = 420
+		_toasts.add_theme_constant_override("separation", 6)
+		_toasts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(_toasts)
+	while _toasts.get_child_count() >= 4:
+		_toasts.get_child(0).free()
+	var pc := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.03, 0.035, 0.05, 0.72)
+	sb.set_corner_radius_all(6)
+	sb.border_width_left = 3; sb.border_color = col
+	sb.content_margin_left = 12; sb.content_margin_right = 14; sb.content_margin_top = 6; sb.content_margin_bottom = 6
+	pc.add_theme_stylebox_override("panel", sb)
+	pc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var h := UI.hbox(8)
+	pc.add_child(h)
+	if who != "":
+		h.add_child(UI.lbl(who, 16, col.lightened(0.2), "Rajdhani-Bold"))
+	h.add_child(UI.lbl(msg, 16, Color.WHITE, "Rajdhani-SemiBold"))
+	_toasts.add_child(pc)
+	pc.modulate.a = 0.0
+	var tw := pc.create_tween()
+	tw.tween_property(pc, "modulate:a", 1.0, 0.15)
+	tw.tween_interval(4.0)
+	tw.tween_property(pc, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(pc.queue_free)
+
+## v3.8 ground weapon prompt: "[E]  AK-47 AL"
+var _pick_lbl: Control
+func pickup_prompt(wid: String) -> void:
+	if _pick_lbl == null:
+		var pc := PanelContainer.new()
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.03, 0.035, 0.05, 0.72)
+		sb.set_corner_radius_all(6)
+		sb.content_margin_left = 14; sb.content_margin_right = 14; sb.content_margin_top = 6; sb.content_margin_bottom = 6
+		sb.border_width_left = 3; sb.border_color = UI.ACCENT
+		pc.add_theme_stylebox_override("panel", sb)
+		pc.set_anchors_preset(Control.PRESET_CENTER)
+		pc.offset_top = 70; pc.offset_left = -160; pc.offset_right = 160
+		pc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var l := UI.lbl("", 17, Color.WHITE, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+		l.name = "l"
+		pc.add_child(l)
+		root.add_child(pc)
+		_pick_lbl = pc
+	_pick_lbl.visible = wid != ""
+	if wid != "":
+		(_pick_lbl.get_node("l") as Label).text = "[%s]  %s AL" % [GS.bind_label("use"), str(GS.WEAPONS[wid]["name"]).to_upper()]
 
 func claw_fx(heavy: bool, delay: float = 0.0) -> void:
 	if _wolf_claw == null:

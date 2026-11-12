@@ -42,7 +42,7 @@ static func default_profile_base() -> Dictionary:
 		"owned": owned, "sets": sets, "active_set": 0, "chars": FREE_CHARS.duplicate(), "char": "",
 		"stats": {"kills": 0, "deaths": 0, "matches": 0, "wins": 0, "headshots": 0, "shots": 0, "hits": 0},
 		"missions": {"kills": 0, "head": 0, "matches": 0, "wins": 0, "claimed": {}},
-		"crates": 1, "crates2": {}, "parts": {}, "wparts": {}}
+		"crates": 1, "crates2": {}, "parts": {}, "wparts": {}, "gear": [], "gear_eq": {}}
 
 static func xp_for_level(l: int) -> int:
 	return int(1200 * pow(l, 1.35))
@@ -194,6 +194,36 @@ static func act(p: Dictionary, cat: Dictionary, a: String, args: Dictionary, now
 			p["chars"] = own
 			p["char"] = c
 			return _ok()
+		"buy_gear":
+			var gid := str(args.get("id", ""))
+			var gd: Dictionary = cat.get("gear", {}).get(gid, {})
+			if gd.is_empty():
+				return _err("Geçersiz ekipman")
+			var go: Array = p.get("gear", []) if p.get("gear", []) is Array else []
+			if go.has(gid):
+				return _err("Bu ekipmana zaten sahipsin")
+			if not _pay_gold(p, int(gd["price"])):
+				return _err("Yetersiz altın!")
+			go.append(gid)
+			p["gear"] = go
+			var eq: Dictionary = p.get("gear_eq", {}) if p.get("gear_eq", {}) is Dictionary else {}
+			eq[str(gd["slot"])] = gid
+			p["gear_eq"] = eq
+			return {"ok": true, "err": "", "res": {"id": gid}}
+		"equip_gear":
+			var sl := str(args.get("slot", ""))
+			var gid2 := str(args.get("id", ""))
+			var eq2: Dictionary = p.get("gear_eq", {}) if p.get("gear_eq", {}) is Dictionary else {}
+			if gid2 == "":
+				eq2.erase(sl)
+			else:
+				var gd2: Dictionary = cat.get("gear", {}).get(gid2, {})
+				var go2: Array = p.get("gear", []) if p.get("gear", []) is Array else []
+				if gd2.is_empty() or not go2.has(gid2) or str(gd2["slot"]) != sl:
+					return _err("Bu ekipmanı takamazsın")
+				eq2[sl] = gid2
+			p["gear_eq"] = eq2
+			return {"ok": true, "err": "", "res": {}}
 		"buy_crate":
 			var t := str(args.get("id", ""))
 			if not cat["crates"].has(t):

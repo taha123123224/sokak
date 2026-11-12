@@ -20,9 +20,9 @@ var WEAPONS := {
 	"kar98":  {"name": "Kar98", "cat": "ana", "cls": "Nişancı", "dmg": 105, "rpm": 48, "mag": 5, "reserve": 25, "reload": 3.0, "spread": 0.08, "ads_spread": 0.0005, "move": 0.1, "recoil": 0.07, "hrec": 0.01, "auto": false, "range": 400.0, "scope": true, "zoom": 4.0, "speed": 0.92, "price": 3500, "snd": "shot_kar", "head": 3.0, "bolt": true},
 	"scar":   {"name": "SCAR-H", "cat": "ana", "cls": "Makinalı", "dmg": 38, "rpm": 560, "mag": 20, "reserve": 100, "reload": 2.5, "spread": 0.026, "ads_spread": 0.003, "move": 0.05, "recoil": 0.024, "hrec": 0.008, "auto": true, "range": 180.0, "speed": 0.95, "price": 5200, "snd": "shot_scar", "zoom": 1.35, "head": 2.6},
 	"ump45":  {"name": "UMP-45", "cat": "ana", "cls": "Hafif Makinalı", "dmg": 27, "rpm": 650, "mag": 25, "reserve": 125, "reload": 2.1, "spread": 0.027, "ads_spread": 0.006, "move": 0.02, "recoil": 0.013, "hrec": 0.006, "auto": true, "range": 85.0, "speed": 1.04, "price": 2400, "snd": "shot_ump", "zoom": 1.25, "head": 2.2},
-	"aug":    {"name": "AUG A3", "cat": "ana", "cls": "Makinalı", "dmg": 31, "rpm": 700, "mag": 30, "reserve": 120, "reload": 2.6, "spread": 0.024, "ads_spread": 0.0022, "move": 0.045, "recoil": 0.017, "hrec": 0.006, "auto": true, "range": 180.0, "speed": 0.96, "price": 4400, "snd": "shot_m4", "zoom": 1.65, "head": 2.5},
-	"vector": {"name": "Vector .45", "cat": "ana", "cls": "Hafif Makinalı", "dmg": 19, "rpm": 1150, "mag": 25, "reserve": 150, "reload": 1.9, "spread": 0.028, "ads_spread": 0.007, "move": 0.018, "recoil": 0.009, "hrec": 0.008, "auto": true, "range": 70.0, "speed": 1.07, "price": 3800, "snd": "shot_ump", "zoom": 1.2, "head": 2.1},
-	"m249":   {"name": "M249 SAW", "cat": "ana", "cls": "Ağır Makinalı", "dmg": 30, "rpm": 760, "mag": 100, "reserve": 200, "reload": 5.2, "spread": 0.034, "ads_spread": 0.008, "move": 0.08, "recoil": 0.02, "hrec": 0.011, "auto": true, "range": 170.0, "speed": 0.84, "price": 6200, "snd": "shot_scar", "zoom": 1.25, "head": 2.3},
+	"aug":    {"name": "AUG A3", "cat": "ana", "cls": "Makinalı", "dmg": 31, "rpm": 700, "mag": 30, "reserve": 120, "reload": 2.6, "spread": 0.024, "ads_spread": 0.0022, "move": 0.045, "recoil": 0.017, "hrec": 0.006, "auto": true, "range": 180.0, "speed": 0.96, "price": 4400, "snd": "shot_aug", "zoom": 1.65, "head": 2.5},
+	"vector": {"name": "Vector .45", "cat": "ana", "cls": "Hafif Makinalı", "dmg": 19, "rpm": 1150, "mag": 25, "reserve": 150, "reload": 1.9, "spread": 0.028, "ads_spread": 0.007, "move": 0.018, "recoil": 0.009, "hrec": 0.008, "auto": true, "range": 70.0, "speed": 1.07, "price": 3800, "snd": "shot_vector", "zoom": 1.2, "head": 2.1},
+	"m249":   {"name": "M249 SAW", "cat": "ana", "cls": "Ağır Makinalı", "dmg": 30, "rpm": 760, "mag": 100, "reserve": 200, "reload": 5.2, "spread": 0.034, "ads_spread": 0.008, "move": 0.08, "recoil": 0.02, "hrec": 0.011, "auto": true, "range": 170.0, "speed": 0.84, "price": 6200, "snd": "shot_m249", "zoom": 1.25, "head": 2.3},
 	"revolver": {"name": "Magnum .357", "cat": "tabanca", "cls": "Tabanca", "dmg": 62, "rpm": 150, "mag": 6, "reserve": 36, "reload": 2.3, "spread": 0.02, "ads_spread": 0.003, "move": 0.04, "recoil": 0.06, "hrec": 0.012, "auto": false, "range": 120.0, "speed": 1.05, "price": 2600, "snd": "shot_revolver", "zoom": 1.25, "head": 2.7},
 	"glock":  {"name": "Glock 17", "cat": "tabanca", "cls": "Tabanca", "dmg": 24, "rpm": 420, "mag": 17, "reserve": 68, "reload": 1.6, "spread": 0.02, "ads_spread": 0.006, "move": 0.015, "recoil": 0.02, "hrec": 0.006, "auto": false, "range": 80.0, "speed": 1.08, "price": 0, "snd": "shot_pistol", "zoom": 1.15, "head": 2.5},
 	"deagle": {"name": "Deagle .50", "cat": "tabanca", "cls": "Tabanca", "dmg": 54, "rpm": 210, "mag": 7, "reserve": 35, "reload": 1.9, "spread": 0.022, "ads_spread": 0.004, "move": 0.04, "recoil": 0.055, "hrec": 0.012, "auto": false, "range": 120.0, "speed": 1.05, "price": 1800, "snd": "shot_deagle", "zoom": 1.2, "head": 2.6},
@@ -467,6 +467,7 @@ var MODES := {
 	"knife": {"name": "Bıçak Arenası", "desc": "Sadece bıçak ve el bombası. Saf refleks.", "teams": false},
 	"sniper": {"name": "Nişancı Düellosu", "desc": "Sadece keskin nişancı tüfekleri. Takımlı.", "teams": true},
 	"kurt": {"name": "Kurt Adam", "desc": "Ay Vadisinde alacakaranlık. Enerjin dolunca 3'e bas ve KURDA DÖNÜŞ: hızlı koşu, çift zıplama taklası, duvara tırmanma, ölümcül pençe!", "teams": true},
+	"bayrak": {"name": "Bayrak Savaşı", "desc": "Rakibin bayrağını çal, kendi üssüne getir: 1 sayı. Bayrağın üssündeyken sayı alınır. İlk 3 sayıyı alan kazanır.", "teams": true},
 	"sabotaj": {"name": "Sabotaj", "desc": "KARTAL bombayı A ya da B noktasına kurar, AKREP çözer. Turlu, ilk 6 turu alan kazanır.", "teams": true},
 }
 ## CC-BY 4.0 assets: [work, author, licence/link] — shown in Ayarlar > Lisanslar
@@ -475,6 +476,14 @@ const CREDITS := [
 	["Sniper animated (AWM birinci şahıs)", "DJMaesen", "CC-BY 4.0 · sketchfab.com/bumstrum"],
 	["Sniper (AWM)", "DJMaesen", "CC-BY 4.0 · sketchfab.com/bumstrum"],
 	["Shotgun (SPAS)", "DJMaesen", "CC-BY 4.0 · sketchfab.com/bumstrum"],
+	["Scar-H First Person FPS Animated (SCAR-H)", "Jainesh Pathak", "CC-BY 4.0 · sketchfab.com/spectraut2"],
+	["Kar98k with ZF4 (Kar98)", "FF_Morph", "CC-BY 4.0 · sketchfab.com"],
+	["MP5 (PBR) High Poly (MP5)", "Stein Games", "CC-BY 4.0 · sketchfab.com/jvitor17"],
+	["P90 Modular Game Ready (P90)", "TWORKS", "CC-BY 4.0 · sketchfab.com/trbrick"],
+	["Kriss Vector 45 ACP (Vector)", "vadimm", "CC-BY 4.0 · sketchfab.com/kravchukv123"],
+	["Desert Eagle (Deagle .50)", "drcrazzie", "CC-BY 4.0 · sketchfab.com/drcrazzie"],
+	["Low Poly M249 SAW (M249)", "Sketchfab sanatçısı", "CC-BY 4.0 · sketchfab.com"],
+	["Low Poly 3D Magnum Revolver (Magnum .357)", "Sketchfab sanatçısı", "CC-BY 4.0 · sketchfab.com"],
 	["Low Poly Uzi", "Duane's Mind", "CC-BY 4.0 · sketchfab.com"],
 	["PP-19-01 Vityaz", "suspensy", "CC-BY 4.0 · sketchfab.com"],
 	["Pistol 9mm - semi auto (Glock)", "Hitansh 3D", "CC-BY 4.0 · sketchfab.com"],
@@ -494,6 +503,41 @@ const CREDITS := [
 const TEAMS := {"a": "KARTAL", "b": "AKREP"}
 const TEAM_COLORS := {"a": Color("3d8bff"), "b": Color("ff4d3d")}
 const GUNGAME_ORDER := ["glock", "deagle", "uzi", "mp5", "vityaz", "spas", "m4a1", "ak47", "kuzgun", "kar98", "awm", "knife"]
+
+## v3.8 Ekipman: permanent gear, one per slot. Effects are small and stack across slots (balanced so that a
+## fully geared player is better but never untouchable: e.g. -15% body damage costs 4% move speed).
+const GEAR_SLOTS := [["yelek", "YELEK"], ["kask", "KASK"], ["eldiven", "ELDİVEN"], ["postal", "POSTAL"], ["canta", "ÇANTA"], ["kart", "TAKTİK KART"]]
+const GEAR := {
+	"kevlar": {"slot": "yelek", "name": "Kevlar Yelek", "price": 6000, "rar": 1, "fx": {"body_dr": 0.08}, "desc": "Gövdeye gelen hasar %8 azalır. Hız kaybı yok."},
+	"celik_yelek": {"slot": "yelek", "name": "Çelik Yelek", "price": 14000, "rar": 3, "fx": {"body_dr": 0.15, "speed": -0.04}, "desc": "Gövdeye gelen hasar %15 azalır, hareket hızı %4 düşer."},
+	"celik_kask": {"slot": "kask", "name": "Çelik Kask", "price": 9000, "rar": 2, "fx": {"head_dr": 0.18}, "desc": "Kafaya gelen hasar %18 azalır (keskin nişancı tüfekleri hariç)."},
+	"taktik_eld": {"slot": "eldiven", "name": "Taktik Eldiven", "price": 7000, "rar": 1, "fx": {"swap": 0.35, "reload": 0.08}, "desc": "Silah çıkarma %35, şarjör değiştirme %8 daha hızlı."},
+	"nisanci_eld": {"slot": "eldiven", "name": "Nişancı Eldiveni", "price": 11000, "rar": 2, "fx": {"recoil": 0.15}, "desc": "Silah tepmesi %15 azalır."},
+	"sessiz_postal": {"slot": "postal", "name": "Sessiz Postal", "price": 6500, "rar": 1, "fx": {"step": 0.55}, "desc": "Ayak seslerin %55 daha kısık, adımların zor duyulur."},
+	"kosu_postal": {"slot": "postal", "name": "Koşu Postalı", "price": 8500, "rar": 2, "fx": {"speed": 0.05}, "desc": "Hareket hızı %5 artar."},
+	"muhimmat": {"slot": "canta", "name": "Mühimmat Çantası", "price": 5000, "rar": 1, "fx": {"reserve": 0.5}, "desc": "Yedek mermin %50 fazla."},
+	"bomba_canta": {"slot": "canta", "name": "Bomba Çantası", "price": 8000, "rar": 2, "fx": {"nades": 1}, "desc": "Her doğuşta +1 el bombası."},
+	"hizli_dogma": {"slot": "kart", "name": "Hızlı Doğma Kartı", "price": 7500, "rar": 2, "fx": {"respawn": 0.4}, "desc": "Öldükten sonra %40 daha hızlı doğarsın."},
+	"adrenalin": {"slot": "kart", "name": "Adrenalin Kartı", "price": 9500, "rar": 3, "fx": {"kill_heal": 15}, "desc": "Her leşte +15 can."},
+	"toparlanma": {"slot": "kart", "name": "Toparlanma Kartı", "price": 10000, "rar": 3, "fx": {"regen": 4.0}, "desc": "5 sn hasar almazsan saniyede 4 can yenilenir."},
+}
+
+func gear_eq() -> Dictionary:
+	var g = profile.get("gear_eq", {})
+	return g if g is Dictionary else {}
+
+func gear_owned(id: String) -> bool:
+	var o = profile.get("gear", [])
+	return o is Array and o.has(id)
+
+## sum of one effect over everything the player has equipped (0 when nothing)
+func gear(key: String) -> float:
+	var v := 0.0
+	for sl in gear_eq().keys():
+		var id := str(gear_eq()[sl])
+		if GEAR.has(id) and gear_owned(id):
+			v += float(GEAR[id]["fx"].get(key, 0.0))
+	return v
 
 var CHARACTERS := {
 	"takim": {"name": "Ajan", "desc": "Takım elbiseli şehir ajanı", "team": "a", "price": 0},
@@ -656,7 +700,10 @@ func catalog() -> Dictionary:
 	var ch := {}
 	for id in CHARACTERS.keys():
 		ch[id] = {"price": int(CHARACTERS[id]["price"])}
-	_cat_cache = {"weapons": w, "skins": sk, "parts": parts, "crates": cr, "chars": ch, "missions": MISSIONS, "packs": Econ.PACKS, "featured": Econ.FEATURED}
+	var gr := {}
+	for id in GEAR.keys():
+		gr[id] = {"price": int(GEAR[id]["price"]), "slot": str(GEAR[id]["slot"])}
+	_cat_cache = {"weapons": w, "skins": sk, "parts": parts, "crates": cr, "chars": ch, "gear": gr, "missions": MISSIONS, "packs": Econ.PACKS, "featured": Econ.FEATURED}
 	return _cat_cache
 
 func act(a: String, args: Dictionary = {}) -> Dictionary:
@@ -793,7 +840,7 @@ func default_settings() -> Dictionary:
 		"quality": "high", "resolution_scale": 1.0, "upscaler": "fsr2", "fullscreen": true, "window_mode": "", "resolution": "auto", "ui_scale": 1.0, "vsync": false, "fps_cap": -1,
 		"msaa": 0, "taa": false, "fxaa": true, "shadows": 2, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false,
 		"dyn_res": true, "dyn_target": 75,
-		"motion_blur": false, "draw_distance": 1.0, "sharpen": 0.3, "brightness": 1.0, "color_pack": "canli", "show_fps": true, "perf_overlay": 1, "grass": true, "shadow_dist": 1.0, "announcer": true,
+		"motion_blur": false, "draw_distance": 1.0, "sharpen": 0.3, "brightness": 1.0, "color_pack": "canli", "spray": "gg", "show_fps": true, "perf_overlay": 1, "grass": true, "shadow_dist": 1.0, "announcer": true,
 		"vol_master": 0.8, "vol_sfx": 1.0, "vol_music": 0.5, "vol_amb": 0.6, "vol_voice": 1.0, "voice_on": true, "voice_mode": "ptt",
 		"xh_style": 0, "xh_color": "3dff8a", "xh_size": 7.0, "xh_gap": 5.0, "xh_thick": 2.0, "xh_dot": false, "xh_outline": true, "xh_dynamic": true, "xh_alpha": 1.0,
 		"hit_marker": true, "kill_feed": true, "blood": true, "minimap": true, "damage_numbers": true,
@@ -982,13 +1029,14 @@ func _set_bus(n: String, v: float) -> void:
 const DEFAULT_BINDS := {
 	"move_forward": [KEY_W], "move_back": [KEY_S], "move_left": [KEY_A], "move_right": [KEY_D],
 	"jump": [KEY_SPACE], "crouch": [KEY_CTRL, KEY_C], "walk": [KEY_SHIFT], "reload": [KEY_R], "use": [KEY_E],
-	"slot1": [KEY_1], "slot2": [KEY_2], "slot3": [KEY_3], "slot4": [KEY_4], "grenade": [KEY_G], "inspect": [KEY_F], "voice": [KEY_V], "team_chat": [KEY_Y],
-	"scoreboard": [KEY_TAB], "pause": [KEY_ESCAPE], "chat": [KEY_T], "last_weapon": [KEY_Q], "buy_menu": [KEY_B], "ping": [KEY_Z],
+	"slot1": [KEY_1], "slot2": [KEY_2], "slot3": [KEY_3], "slot4": [KEY_4], "grenade": [KEY_X], "drop": [KEY_G], "spray": [KEY_T], "radio": [KEY_B], "inspect": [KEY_F], "voice": [KEY_V], "team_chat": [KEY_Y],
+	"scoreboard": [KEY_TAB], "pause": [KEY_ESCAPE], "chat": [KEY_ENTER], "last_weapon": [KEY_Q], "buy_menu": [KEY_F1], "ping": [KEY_Z],
 }
 const BIND_NAMES := {
 	"move_forward": "İleri", "move_back": "Geri", "move_left": "Sol", "move_right": "Sağ", "jump": "Zıpla", "crouch": "Eğil",
 	"walk": "Yürü (sessiz)", "reload": "Şarjör Değiştir", "use": "Kullan", "slot1": "Ana Silah", "slot2": "Tabanca", "slot3": "Bıçak",
 	"slot4": "Bomba", "grenade": "Hızlı Bomba", "inspect": "Silahı İncele", "voice": "Sesli Konuş (bas-konuş)", "team_chat": "Takım Sohbeti", "chat": "Sohbet", "scoreboard": "Skor Tablosu", "last_weapon": "Son Silah", "buy_menu": "Silah Menüsü", "ping": "İşaret Koy (takıma göster)",
+	"drop": "Silahı Yere At", "spray": "Sprey Boya", "radio": "Telsiz Mesajları",
 }
 
 func setup_input() -> void:
@@ -1005,6 +1053,12 @@ func setup_input() -> void:
 
 func apply_binds() -> void:
 	var b: Dictionary = settings.get("binds", {})
+	# v3.8 key migration: G = drop weapon, T = spray, B = radio (old saves had grenade on G / chat on T / buy on B)
+	if not settings.get("binds_v38", false):
+		settings["binds_v38"] = true
+		for a in ["grenade", "chat", "buy_menu"]:
+			b.erase(a)
+		settings["binds"] = b
 	for a in DEFAULT_BINDS.keys():
 		InputMap.action_erase_events(a)
 		var keys: Array = b.get(a, DEFAULT_BINDS[a])

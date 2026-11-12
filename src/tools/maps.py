@@ -824,7 +824,7 @@ def _uv_world(bm_, sign=False):
             l[uvl].uv = uv
 
 
-def finalize(mapid, env, bounds):
+def finalize(mapid, env, bounds, extra=None):
     import time
     t0 = time.time()
     bpy.context.view_layer.update()
@@ -867,11 +867,13 @@ def finalize(mapid, env, bounds):
         # area -> 'far' chunks (no shadows). Keeps draw calls and shadow passes down.
         dims = o.dimensions
         cls = ''
-        if bounds and (p.x < bounds[0] - 1 or p.x > bounds[2] + 1 or p.y < bounds[1] - 1 or p.y > bounds[3] + 1):
+        if o.get('terrain'):
+            cls = 'terrain'
+        elif bounds and (p.x < bounds[0] - 1 or p.x > bounds[2] + 1 or p.y < bounds[1] - 1 or p.y > bounds[3] + 1):
             cls = 'far'
         elif max(dims.x, dims.y, dims.z) < 1.0 and not is_sign:
             cls = 'det'
-        g = 36 if cls else 18
+        g = 48 if cls == 'terrain' else (36 if cls else 18)
         key = (cls, int(math.floor(p.x / g)), int(math.floor(p.y / g)))
         if key not in chunks:
             chunks[key] = (bmesh.new(), [])
@@ -904,6 +906,8 @@ def finalize(mapid, env, bounds):
     print('chunks', len(chunk_objs), flush=True)
     export_glb(os.path.join(OUTD, mapid + '.glb'), chunk_objs)
     data = dict(colliders=COL, spawns=SPAWNS, env=env, bounds=bounds)
+    if extra:
+        data.update(extra)
     with open(os.path.join(OUTD, mapid + '.json'), 'w') as f:
         json.dump(data, f)
     print(mapid, 'colliders', len(COL), 'spawns', len(SPAWNS), 'time', round(time.time() - t0, 1), flush=True)
@@ -2246,87 +2250,285 @@ def map_canakkale():
 
 
 def map_ayvadisi():
-    """v3.5.2 Kurt Adam map: a ruined mountain village in a glowing violet-orange twilight.
-    Tall broken stone walls and towers to climb as a wolf, a rune-lit stone circle in the middle, timber houses."""
+    """v3.8 Kurt Adam map, rebuilt: AY VADİSİ is a mountain valley. Snow-capped peaks ring a green meadow; a
+    river runs north-south through the middle and splits the map into two mirrored clan camps (KARTAL west,
+    AKREP east). Three lanes cross the river: a stone arch bridge in the north, a rune island with a shallow
+    ford in the centre, a wooden bridge through the pine forest in the south. Walls, towers and rock ledges
+    are placed on purpose for wolf climbing and flanking. Real terrain (trimesh collision)."""
     mm = begin()
     RR = random.Random(77)
-    X0, X1, Y0, Y1 = -54, 54, -42, 42
-    moss = M('moss_ground', (0.24, 0.3, 0.2), 0.95)
-    ground('land', X0 - 300, Y0 - 300, X1 + 300, Y1 + 300, 0, moss)
-    box('path_ring', (9, 9, 0.04), (0, 0, 0.02), m=M('path_stone', (0.48, 0.46, 0.44), 0.9))
-    for (a, b) in [((-50, 0), (-6, 0)), ((6, 0), (50, 0)), ((0, -38), (0, -6)), ((0, 6), (0, 38))]:
-        cx, cy = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
-        L = math.hypot(b[0] - a[0], b[1] - a[1])
-        box('path', (L, 3.6, 0.04), (cx, cy, 0.021), (0, 0, math.degrees(math.atan2(b[1] - a[1], b[0] - a[0]))), m=M('path_dirt', (0.42, 0.34, 0.25), 0.95))
-    # distant mountains around the valley
-    rock = M('mountain_rock', (0.36, 0.33, 0.36), 0.95)
-    for i in range(16):
-        ang = i / 16 * math.tau
-        r = RR.uniform(170, 230)
-        h = RR.uniform(45, 95)
-        sphere('mountain', 60, (math.cos(ang) * r, math.sin(ang) * r, -10), m=rock, scale=(RR.uniform(1.2, 1.9), RR.uniform(1.2, 1.9), h / 60))
+    X0, X1, Y0, Y1 = -58, 58, -42, 42
+
+    def nz(x, y):
+        return (math.sin(x * 0.11 + 1.3) * math.cos(y * 0.13 - 0.7) + 0.5 * math.sin(x * 0.27 + y * 0.21) + 0.25 * math.cos(x * 0.53 - y * 0.47))
+
+    def river_x(y):
+        return 2.2 * math.sin(y / 13.0)
+
+    def sm(a, b, x):
+        t = max(0.0, min(1.0, (x - a) / (b - a)))
+        return t * t * (3 - 2 * t)
+
+    def H(x, y):
+        # meadow: gentle rolls, flatter on the camps and lanes
+        h = 0.55 * nz(x, y) * (1 - sm(36, 44, abs(x)) * 0.8)
+        # river channel (shallow at the ford y≈0)
+        d = abs(x - river_x(y))
+        depth = 1.9 * (1 - sm(-12, -4, -abs(y)) * 0.0)
+        depth = 1.9 - 1.25 * (1 - sm(3.5, 9.0, abs(y)))
+        h -= depth * (1 - sm(2.4, 6.0, d))
+        # rune island in the middle of the ford
+        h += 1.6 * (1 - sm(4.0, 7.5, math.hypot(x, y)))
+        # the valley walls: hills inside the edge, high peaks beyond it
+        ox = max(0.0, abs(x) - (X1 - 8)); oy = max(0.0, abs(y) - (Y1 - 7))
+        out = math.hypot(ox, oy)
+        h += 4.0 * sm(0, 8, out) + 52.0 * sm(6, 60, out) * (0.7 + 0.3 * nz(x * 0.5, y * 0.5)) + 14.0 * sm(30, 90, out) * nz(x * 0.2 + 4, y * 0.2)
+        return h
+
+    grass = M('moss_ground', (0.24, 0.3, 0.2), 0.95)
+    rock = M('mountain_rock', (0.36, 0.34, 0.33), 0.95)
+    snow = M('snow', (0.9, 0.92, 0.96), 0.7)
+    mud = M('river_bed', (0.3, 0.26, 0.22), 0.9)
+    # ---- terrain grid
+    bm = bmesh.new()
+    TX0, TX1, TY0, TY1 = -190, 190, -170, 170
+    def step_at(v):
+        return 2.0 if abs(v) < 70 else 6.0
+    xs = []; v = TX0
+    while v <= TX1:
+        xs.append(v); v += step_at(v)
+    ys = []; v = TY0
+    while v <= TY1:
+        ys.append(v); v += step_at(v)
+    grid = [[bm.verts.new((x, y, H(x, y))) for x in xs] for y in ys]
+    for j in range(len(ys) - 1):
+        for i in range(len(xs) - 1):
+            f = bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
+            zc = sum(vv.co.z for vv in f.verts) / 4
+            f.normal_update()
+            slope = 1 - abs(f.normal.z)
+            f.material_index = 2 if zc > 34 + 6 * nz(xs[i] * 0.3, ys[j] * 0.3) else (1 if slope > 0.28 or zc > 9 else (3 if zc < -0.5 else 0))
+            f.smooth = True
+    me = bpy.data.meshes.new('terrain')
+    bm.to_mesh(me); bm.free()
+    for m_ in (grass, rock, snow, mud):
+        me.materials.append(m_)
+    ter = bpy.data.objects.new('terrain', me)
+    bpy.context.scene.collection.objects.link(ter)
+    ter['terrain'] = True
+    for pl in me.polygons:
+        pl.use_smooth = True
+    # river water (no collision): wading depth
+    box('river', (14, 400, 0.05), (0, 0, -0.72), m=mm['water'])
+
+    def put(x, y):
+        return H(x, y)
+
     stone = M('ruin_stone', (0.6, 0.57, 0.54), 0.9)
     dark = M('ruin_stone_dark', (0.42, 0.4, 0.39), 0.92)
-    rune = M('rune_glow', (0.55, 0.2, 1.0), 0.4, emission=(0.6, 0.25, 1.0), emit_strength=5)
-    ember = M('ember_glow', (1.0, 0.45, 0.15), 0.4, emission=(1.0, 0.45, 0.15), emit_strength=4)
-    # ---- stone circle (menhirs) with a rune altar at the centre
-    for i in range(10):
-        ang = i / 10 * math.tau
-        h = RR.uniform(3.2, 5.2)
-        box('menhir', (1.2, 0.8, h), (math.cos(ang) * 8.5, math.sin(ang) * 8.5, h / 2), (RR.uniform(-4, 4), RR.uniform(-4, 4), math.degrees(ang) + 90), m=dark)
-        col((math.cos(ang) * 8.5, math.sin(ang) * 8.5, h / 2), (1.2, 1.2, h))
-        box('rune_line', (0.06, 0.82, h * 0.7), (math.cos(ang) * 8.5 - math.cos(ang) * 0.62, math.sin(ang) * 8.5 - math.sin(ang) * 0.62, h * 0.45), (0, 0, math.degrees(ang) + 90), m=rune)
-    cyl('altar', 1.6, 1.0, (0, 0, 0.5), m=stone, axis='Z', verts=16)
-    col((0, 0, 0.5), (3.2, 3.2, 1.0))
-    cyl('altar_rune', 1.25, 0.06, (0, 0, 1.03), m=rune, axis='Z', verts=16)
-    # ---- ruined walls: broken segments of different heights (wolf climbing)
-    for (x, y, sx, sy, h) in [(-26, -18, 16, 1.6, 6.5), (-34, -10, 1.6, 14, 8.0), (-18, -26, 1.6, 10, 4.5), (26, 18, 16, 1.6, 6.5),
-                             (34, 10, 1.6, 14, 8.0), (18, 26, 1.6, 10, 4.5), (-22, 22, 12, 1.6, 5.0), (22, -22, 12, 1.6, 5.0),
-                             (-8, 30, 8, 1.6, 3.2), (8, -30, 8, 1.6, 3.2), (-40, 26, 1.6, 10, 6.0), (40, -26, 1.6, 10, 6.0)]:
-        wall('ruin_wall', x, y, 0, sx, sy, h, stone, uv=0.3)
-        # jagged broken top
-        for k in range(int(max(sx, sy) / 2.2)):
-            t = -max(sx, sy) / 2 + 1.1 + k * 2.2
+    logm = M('log_wood', (0.32, 0.22, 0.14), 0.9)
+    rune = M('rune_glow', (0.55, 0.2, 1.0), 0.4, emission=(0.6, 0.25, 1.0), emit_strength=4)
+    ember = M('ember_glow', (1.0, 0.45, 0.15), 0.4, emission=(1.0, 0.45, 0.15), emit_strength=5)
+    pine_m = M('pine_needles', (0.1, 0.22, 0.12), 0.9)
+
+    def pine(x, y, h, seed=0):
+        z = put(x, y)
+        rr = random.Random(seed)
+        cyl('pine_trunk', 0.22, h * 0.35, (x, y, z + h * 0.17), m=mm['bark'], axis='Z', verts=8, r2=0.16)
+        for k in range(4):
+            t = k / 4
+            r0 = h * (0.24 - t * 0.045) * rr.uniform(0.9, 1.1)
+            cyl('pine_cone', r0, h * 0.34, (x, y, z + h * (0.28 + t * 0.19)), m=pine_m, axis='Z', verts=9, r2=0.02)
+        col((x, y, z + h * 0.3), (0.5, 0.5, h * 0.6))
+
+    def log_wall(x, y, length, rot, h=3.2):
+        # palisade of sharpened logs
+        z = put(x, y)
+        n = int(length / 0.42)
+        ca, sa = math.cos(math.radians(rot)), math.sin(math.radians(rot))
+        for k in range(n):
+            t = -length / 2 + 0.21 + k * 0.42
+            px, py = x + ca * t, y + sa * t
+            hh = h + RR.uniform(-0.25, 0.25)
+            pz = put(px, py)
+            cyl('palisade', 0.2, hh, (px, py, pz + hh / 2 - 0.3), m=logm, axis='Z', verts=7)
+            cyl('palisade_tip', 0.2, 0.45, (px, py, pz + hh - 0.08), m=logm, axis='Z', verts=7, r2=0.01)
+        col((x, y, z + h / 2 - 0.3), (length, 0.45, h + 0.6), rotz=rot)
+
+    def boulder(x, y, sz, seed=0):
+        z = put(x, y)
+        rr = random.Random(seed)
+        sphere('boulder', sz, (x, y, z + sz * 0.35), m=dark, scale=(rr.uniform(1.1, 1.5), rr.uniform(0.9, 1.2), rr.uniform(0.7, 0.95)))
+        col((x, y, z + sz * 0.4), (sz * 2.3, sz * 1.9, sz * 1.5))
+
+    def ruin(x, y, sx, sy, h, seed=0):
+        z = put(x, y) - 0.3
+        wall('ruin_wall', x, y, z, sx, sy, h + 0.3, stone, uv=0.3)
+        rr = random.Random(seed)
+        L = max(sx, sy)
+        for k in range(int(L / 2.2)):
+            t = -L / 2 + 1.1 + k * 2.2
             bx, by = (x + t, y) if sx > sy else (x, y + t)
-            hh = RR.uniform(0.3, 1.6)
-            box('ruin_cap', (1.6 if sx > sy else 1.7, 1.7 if sx > sy else 1.6, hh), (bx, by, h + hh / 2), m=stone)
-    # ---- watch towers at the corners (climb to the top for the view)
-    for (tx, ty) in [(-44, -32), (44, 32), (-44, 32), (44, -32)]:
-        cyl('tower', 3.4, 13, (tx, ty, 6.5), m=dark, axis='Z', verts=20, uv=0.25)
-        col((tx, ty, 6.5), (6.4, 6.4, 13))
+            hh = rr.uniform(0.2, 1.4)
+            box('ruin_cap', (1.6 if sx > sy else min(sx, 1.7), min(sy, 1.7) if sx > sy else 1.6, hh), (bx, by, z + h + 0.3 + hh / 2), m=stone)
+
+    def torch(x, y):
+        z = put(x, y)
+        cyl('torch_pole', 0.07, 2.2, (x, y, z + 1.1), m=logm, axis='Z', verts=6)
+        cyl('torch_bowl', 0.22, 0.18, (x, y, z + 2.25), m=mm['metal'], axis='Z', verts=8, r2=0.12)
+        sphere('torch_fire', 0.16, (x, y, z + 2.42), m=ember, scale=(1, 1, 1.5))
+
+    # ---- the two clan camps (mirrored: KARTAL west x<0, AKREP east x>0)
+    for sgn in (-1, 1):
+        cx = 44 * sgn
+        # palisade: back wall + side walls with a gap (gate) facing the river
+        log_wall(cx + 7 * sgn, 0, 40, 90)
+        log_wall(cx - 2 * sgn, 19.5, 18, 0)
+        log_wall(cx - 2 * sgn, -19.5, 18, 0)
+        log_wall(cx - 11.5 * sgn, 13.5, 9, 90)
+        log_wall(cx - 11.5 * sgn, -13.5, 9, 90)
+        # gate towers (climbable for wolves: 7 m)
+        for gy in (8.0, -8.0):
+            tz = put(cx - 11.5 * sgn, gy)
+            box('gate_tower', (2.6, 2.6, 7.0), (cx - 11.5 * sgn, gy, tz + 3.2), m=logm)
+            col((cx - 11.5 * sgn, gy, tz + 3.2), (2.6, 2.6, 7.0))
+            box('gate_roof', (3.2, 3.2, 0.4), (cx - 11.5 * sgn, gy, tz + 6.9), m=mm['roof'])
+            torch(cx - 13.2 * sgn, gy - 1.8 * (1 if gy > 0 else -1))
+        # houses inside, around a campfire
+        for i, (hx, hy, r) in enumerate([(cx + 1 * sgn, 13, 180), (cx + 1 * sgn, -13, 0), (cx + 2.5 * sgn, 0, 90 if sgn < 0 else 270)]):
+            hz = put(hx, hy)
+            n0 = set(bpy.context.scene.objects); c0 = len(COL)
+            konak('wolf_house', hx, hy, r, 8, 7, mm, seed=i + (40 if sgn < 0 else 50), floors=2, cumba=(i == 2), color='p_white' if i % 2 == 0 else 'p_cream')
+            for o in [o for o in bpy.context.scene.objects if o not in n0]:
+                if o.parent is None:
+                    o.location.z += hz
+            for cc in COL[c0:]:
+                cc['c'][1] += hz
+        fz = put(cx - 5 * sgn, 0)
+        cyl('fire_ring', 1.2, 0.35, (cx - 5 * sgn, 0, fz + 0.15), m=stone, axis='Z', verts=12)
+        sphere('campfire', 0.6, (cx - 5 * sgn, 0, fz + 0.5), m=ember, scale=(1, 1, 1.4))
+        for k in range(5):
+            a = k / 5 * math.tau
+            box('fire_log', (1.6, 0.25, 0.25), (cx - 5 * sgn + math.cos(a) * 0.5, math.sin(a) * 0.5, fz + 0.35), (0, 20, math.degrees(a)), m=logm)
+        # big watch tower behind the camp (13 m, wolves climb it)
+        tx = cx + 3 * sgn; ty = 24.0 * (1 if sgn < 0 else -1)
+        tz = put(tx, ty)
+        cyl('tower', 3.2, 13, (tx, ty, tz + 6.3), m=dark, axis='Z', verts=18, uv=0.25)
+        col((tx, ty, tz + 6.3), (6.0, 6.0, 13))
         for k in range(8):
-            ang = k / 8 * math.tau
-            box('tower_merlon', (1.1, 1.1, 1.2), (tx + math.cos(ang) * 3.0, ty + math.sin(ang) * 3.0, 13.6), m=dark)
-        box('tower_fire', (0.9, 0.9, 0.5), (tx, ty, 13.3), m=ember)
-    # ---- timber houses
-    for i, (hx, hy, r) in enumerate([(-30, 4, 90), (30, -4, 270), (-12, -36, 0), (12, 36, 180), (-46, -8, 90), (46, 8, 270)]):
-        konak('wolf_house', hx, hy, r, 9, 8, mm, seed=i + 40, floors=2, cumba=(i % 2 == 0), color='p_white')
-    # lanterns along the paths (warm light pools in the twilight)
-    for (lx, ly, r) in [(-14, 3, 0), (14, -3, 180), (-3, -16, 90), (3, 16, 270), (-30, -3, 0), (30, 3, 180), (-3, -30, 90), (3, 30, 270)]:
-        street_lamp(lx, ly, r, mm, ottoman=True)
-    # crates, barrels and carts as cover
-    for (cx, cy) in [(-16, -10), (16, 10), (-10, 16), (10, -16), (-24, 10), (24, -10), (-38, 16), (38, -16)]:
-        crate(cx, cy, 0, 1.2, mm, rot=RR.uniform(-25, 25))
-        wood_barrel(cx + 1.5, cy + 0.4, mm)
-    # pines and rocks
-    for i in range(34):
-        tx, ty = RR.uniform(X0 + 3, X1 - 3), RR.uniform(Y0 + 3, Y1 - 3)
-        if math.hypot(tx, ty) < 13 or abs(tx) < 3 or abs(ty) < 3:
+            a = k / 8 * math.tau
+            box('tower_merlon', (1.0, 1.0, 1.1), (tx + math.cos(a) * 2.8, ty + math.sin(a) * 2.8, tz + 13.3), m=dark)
+        box('tower_fire', (0.9, 0.9, 0.5), (tx, ty, tz + 13.05), m=ember)
+        # crates, barrels, a cart of logs as cover at the gate
+        for (ox, oy) in [(-15, 4), (-15, -4), (-9, 15), (-9, -15)]:
+            px, py = cx + ox * sgn, oy
+            pz = put(px, py)
+            n0 = set(bpy.context.scene.objects); c0 = len(COL)
+            crate(px, py, 0, 1.2, mm, rot=RR.uniform(-20, 20))
+            wood_barrel(px + 1.4 * sgn, py + 0.5, mm)
+            for o in [o for o in bpy.context.scene.objects if o not in n0]:
+                if o.parent is None:
+                    o.location.z += pz
+            for cc in COL[c0:]:
+                cc['c'][1] += pz
+        for (ox, oy) in [(-6, 6), (-6, -6), (4, 8), (4, -8)]:
+            torch(cx + ox * sgn, oy)
+
+    # ---- NORTH lane: stone arch bridge over the river, guarded by ruined walls
+    by = 24.0
+    bx = river_x(by)
+    deck = 1.25
+    box('bridge_deck', (16, 5, 0.6), (bx, by, deck - 0.3), m=stone)
+    col((bx, by, deck - 0.3), (16, 5, 0.6))
+    for side in (-1, 1):
+        box('bridge_parapet', (16, 0.5, 1.0), (bx, by + side * 2.3, deck + 0.5), m=dark)
+        col((bx, by + side * 2.3, deck + 0.5), (16, 0.5, 1.0))
+    for k in (-1, 1):
+        cyl('bridge_pier', 1.2, 3.2, (bx + k * 3.5, by, -1.0), m=dark, axis='Z', verts=12)
+    for side in (-1, 1):
+        ramp('bridge_ramp', bx + side * 10.5, by, deck, put(bx + side * 13.5, by) + 0.05, 5.0, 5.0, stone, axis='X', direction=-side)
+    for sgn in (-1, 1):
+        ruin(14 * sgn, 30, 1.4, 9, 4.5, seed=3)
+        ruin(20 * sgn, 18, 8, 1.4, 3.2, seed=4)
+        ruin(26 * sgn, 31, 6, 1.4, 6.0, seed=5)
+        boulder(11 * sgn, 17, 1.4, seed=6)
+        torch(9.5 * sgn, 21.5)
+
+    # ---- CENTRE: rune island in the ford (stone circle + altar), stepping stones
+    for i in range(10):
+        a = i / 10 * math.tau
+        hgt = 3.4 + 1.6 * ((i * 7) % 5) / 4
+        x, y = math.cos(a) * 5.6, math.sin(a) * 5.6
+        z = put(x, y)
+        if i % 5 == 2:
+            continue   # two gaps east-west so the lane runs through
+        box('menhir', (1.1, 0.75, hgt), (x, y, z + hgt / 2 - 0.2), (0, 0, math.degrees(a) + 90), m=dark)
+        col((x, y, z + hgt / 2 - 0.2), (1.1, 1.1, hgt))
+        box('rune_line', (0.06, 0.78, hgt * 0.65), (x * 0.89, y * 0.89, z + hgt * 0.45), (0, 0, math.degrees(a) + 90), m=rune)
+    az = put(0, 0)
+    cyl('altar', 1.4, 0.9, (0, 0, az + 0.35), m=stone, axis='Z', verts=16)
+    col((0, 0, az + 0.35), (2.8, 2.8, 0.9))
+    cyl('altar_rune', 1.1, 0.06, (0, 0, az + 0.82), m=rune, axis='Z', verts=16)
+    for sgn in (-1, 1):
+        for k in range(3):
+            sx_, sy_ = sgn * (8.5 + k * 1.6), (k - 1) * 1.2
+            cyl('step_stone', 0.75, 0.6, (sx_, sy_, put(sx_, sy_) + 0.1), m=dark, axis='Z', verts=9)
+            col((sx_, sy_, put(sx_, sy_) + 0.1), (1.4, 1.4, 0.6))
+        ruin(17 * sgn, 6, 1.4, 6, 2.2, seed=7)
+        ruin(17 * sgn, -6, 1.4, 6, 2.2, seed=8)
+        boulder(23 * sgn, 0, 1.6, seed=9)
+        torch(12 * sgn, 4)
+        torch(12 * sgn, -4)
+
+    # ---- SOUTH lane: wooden bridge through the pine forest
+    by2 = -24.0
+    bx2 = river_x(by2)
+    plank = mm['planks']
+    box('wbridge_deck', (15, 4, 0.35), (bx2, by2, 0.95), m=plank)
+    col((bx2, by2, 0.95), (15, 4, 0.35))
+    for k in range(-3, 4):
+        cyl('wbridge_post', 0.15, 3.0, (bx2 + k * 2.2, by2 + 2.1, 0.2), m=logm, axis='Z', verts=6)
+        cyl('wbridge_post', 0.15, 3.0, (bx2 + k * 2.2, by2 - 2.1, 0.2), m=logm, axis='Z', verts=6)
+    for side in (-1, 1):
+        box('wbridge_rail', (15, 0.12, 0.12), (bx2, by2 + side * 2.1, 1.75), m=logm)
+        col((bx2, by2 + side * 2.1, 1.4), (15, 0.25, 0.9))
+        ramp('wbridge_ramp', bx2 + side * 9.5, by2, 1.1, put(bx2 + side * 12.5, by2) + 0.05, 4.5, 4.0, plank, axis='X', direction=-side)
+    for sgn in (-1, 1):
+        # forest: placed on a loose grid (both sides mirrored), the lane itself kept clear
+        k = 0
+        for gx in range(10, 36, 5):
+            for gy in range(-38, -12, 5):
+                if abs(gy - by2) < 3.5 and gx < 16:
+                    continue
+                jx = ((gx * 7 + gy * 3) % 5) * 0.5 - 1.0
+                jy = ((gx * 3 + gy * 11) % 5) * 0.5 - 1.0
+                if (gx + gy) % 3 == 0:
+                    continue
+                pine(sgn * (gx + jx), gy + jy, 8.5 + ((gx * gy) % 4), seed=k)
+                k += 1
+        boulder(14 * sgn, -16, 1.5, seed=10)
+        boulder(28 * sgn, -30, 1.8, seed=11)
+        ruin(22 * sgn, -18, 1.4, 7, 3.0, seed=12)
+        torch(9.5 * sgn, -21.5)
+
+    # ---- pines and rocks on the slopes outside the play area (scenery)
+    for i in range(160):
+        a = RR.uniform(0, math.tau)
+        r = RR.uniform(66, 120)
+        x, y = math.cos(a) * r * 1.15, math.sin(a) * r * 0.95
+        if abs(x) < X1 + 4 and abs(y) < Y1 + 4:
             continue
-        tree(tx, ty, mm, h=RR.uniform(7, 11), r=RR.uniform(2.0, 2.8), seed=i + 3)
-    for i in range(22):
-        rx, ry = RR.uniform(X0 + 4, X1 - 4), RR.uniform(Y0 + 4, Y1 - 4)
-        if math.hypot(rx, ry) < 12:
+        if put(x, y) > 30:
             continue
-        sz = RR.uniform(0.7, 1.7)
-        sphere('rock', sz, (rx, ry, 0.25), m=dark, scale=(1.3, 1.0, 0.75))
-        col((rx, ry, sz * 0.5), (sz * 2.2, sz * 1.8, sz * 1.2))
-    spawns_a = [(-48, -20, 70), (-48, -2, 90), (-48, 14, 110), (-40, -36, 50), (-36, 36, 130), (-50, 6, 90)]
-    spawns_b = [(48, 20, 250), (48, 2, 270), (48, -14, 290), (40, 36, 230), (36, -36, 310), (50, -6, 270)]
-    for i, (x, y, yaw) in enumerate(spawns_a + spawns_b):
-        spawn(x, y, 0.1, yaw, 'a' if i < 6 else 'b')
-    bounds_walls(X0, Y0, X1, Y1, 30)
-    finalize('ayvadisi', dict(preset='twilight', sun=[-16, 250], fog=0.0025, sky='sunset'), [X0, Y0, X1, Y1])
+        pine(x, y, RR.uniform(8, 14), seed=200 + i)
+    # spawns inside each camp
+    for sgn, team in ((-1, 'a'), (1, 'b')):
+        cx = 44 * sgn
+        for (ox, oy) in [(2, 5), (2, -5), (-2, 9), (-2, -9), (4, 2), (4, -2)]:
+            x, y = cx + ox * sgn, oy
+            spawn(x, y, put(x, y) + 0.1, 90 if sgn < 0 else 270, team)
+    bounds_walls(X0, Y0, X1, Y1, 40)
+    finalize('ayvadisi', dict(preset='alaca', sun=[-14, 235], fog=0.0022, sky='sunset'), [X0, Y0, X1, Y1], extra=dict(trimesh=['terrain']))
 
 
 ALL = dict(ayvadisi=map_ayvadisi, mahalle=map_mahalle, safranbolu=map_safranbolu, gemi=map_gemi, liman=map_liman, insaat=map_insaat, canakkale=map_canakkale)

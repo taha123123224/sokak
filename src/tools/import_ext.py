@@ -134,6 +134,48 @@ SPECS.update({
 })
 
 
+# v3.8: user-supplied higher quality models (Sketchfab / free-fire packs) replace the older ones
+V39 = '/home/claude/ext3d/v39/'
+SPECS.update({
+    'scar': dict(file=V39 + 'Scar-H_First-Person_FPS_Animated/x/scene.usdc', axis='Y', real=0.97, perm=(0, 2, 1), perm_flip=True,
+                 drop=['FPS_Hands'], keep_mats=True,
+                 rhand=(-1.55, -0.2), muzzle=(3.15, 0.25), sight=(-0.5, 0.66), lhand=(0.6, 0.05), eject=(-0.5, 0.3),
+                 split_mag=((-0.75, -0.2), (-0.92, -0.1))),
+    'kar98': dict(file=V39 + 'Kar98k_with_ZF4/x/scene.usdc', axis='Y', real=1.11, drop=['Cube_027', 'Cylinder_017'], keep_mats=True,
+                  rhand=(-0.25, 0.3), muzzle=(10.95, 0.73), sight=(3.6, 1.22), lhand=(5.5, 0.55), eject=(1.4, 0.78),
+                  parts={'bolt': ['Zatvor_LP', 'Viper_LP']}),
+    'mp5': dict(file=V39 + 'MP5__PBR__High_Poly/x/scene.usdc', axis='Y', real=0.68, keep_mats=True,
+                rhand=(-0.01, 0.03), muzzle=(0.415, 0.125), sight=(0.05, 0.172), lhand=(0.24, 0.1), eject=(0.06, 0.135),
+                split_mag=((0.12, 0.25), (-0.09, 0.065))),
+    'p90': dict(file=V39 + 'P90_Modular_Game_Ready/x/scene.usdc', axis='Y', flip=True, real=0.50,
+                tex_all=(V39 + 'P90_Modular_Game_Ready/x/0/None_diffuse.jpg', V39 + 'P90_Modular_Game_Ready/x/0/None_normal.jpg',
+                         V39 + 'P90_Modular_Game_Ready/x/0/p90_rough.png', V39 + 'P90_Modular_Game_Ready/x/0/p90_metal.png'),
+                rhand=(2.3, 0.9), muzzle=(6.15, 1.65), sight=(3.3, 2.75), lhand=(4.3, 0.85), eject=(1.5, 0.6)),
+    '_skip_ump45': dict(file=V39 + 'ump-freefire/source/UMP.fbx', axis='X', real=0.69,
+                  tex_all=(V39 + 'ump-freefire/textures/1P_PW_4100_UMP45_D.png', V39 + 'ump-freefire/textures/1P_PW_4100_UMP45_N.png',
+                           V39 + 'ump-freefire/textures/ump_rough.png', V39 + 'ump-freefire/textures/ump_metal.png'),
+                  rhand=(-0.05, 0.005), muzzle=(0.16, 0.035), sight=(-0.02, 0.07), lhand=(0.08, 0.025), eject=(0.02, 0.05),
+                  split_mag=((0.02, 0.066), (-0.086, 0.01))),
+    '_skip_aug': dict(file=V39 + 'AUG_Counter_Strike_2/x/scene.usdc', axis='Y', flip=True, real=0.79, keep_mats=True, split_obj='weapon_rif_aug',
+                rhand=(0.01, 0.01), muzzle=(0.44, 0.092), sight=(-0.02, 0.158), lhand=(0.225, 0.03), eject=(-0.1, 0.095),
+                split_mag=((-0.15, -0.02), (-0.155, 0.03))),
+    'vector': dict(file=V39 + 'Kriss_Vector_45_ACP/x/scene.usdc', axis='Y', flip=True, real=0.70, keep_mats=True,
+                   rhand=(-0.3, 0.38), muzzle=(1.36, 0.52), sight=(0.0, 0.75), lhand=(0.72, 0.42), eject=(0.2, 0.55),
+                   parts={'mag': ['kriss_vector_001']}),
+    'm249': dict(file=V39 + 'low-poly-m249-saw/source/M249 SAW.fbx', axis='X', real=1.04, all_flat=((0.055, 0.057, 0.062), 0.65, 0.42),
+                 rhand=(-1.65, -0.25), muzzle=(4.56, 0.42), sight=(-1.6, 0.92), lhand=(1.0, -0.2), eject=(-0.6, 0.45),
+                 split_mag=((-0.78, 0.02), (-1.4, -0.12))),
+    'revolver': dict(file=V39 + 'low-poly-3d-magnum-revolver/source/x.obj', axis='Y', real=0.30,
+                     tex_all=(V39 + 'low-poly-3d-magnum-revolver/textures/MT_Base_Color.png', V39 + 'low-poly-3d-magnum-revolver/textures/MT_Normalpng.png',
+                              V39 + 'low-poly-3d-magnum-revolver/textures/MT_Roughness.png', V39 + 'low-poly-3d-magnum-revolver/textures/MT_Metallic.png'),
+                     rhand=(-2.6, -0.5), muzzle=(6.15, 1.2), sight=(-1.0, 2.15), lhand=(-2.6, -1.6), eject=(0.0, 0.9)),
+    'deagle': dict(file=V39 + 'Desert_Eagle/x/scene.usdc', axis='Y', flip=True, real=0.27, keep_mats=True,
+                   drop=['DE_BODY_CLIP_Low_002', 'DE_BODY_CLIP_Low_003', 'DE_BODY_CLIP_Low_004', 'DE_BODY_CLIP_Low_005', 'DE_BODY_CLIP_Low_Body'],
+                   rhand=(-0.85, 2.2), muzzle=(1.25, 2.72), sight=(-0.85, 2.96), lhand=(-0.85, 1.7), eject=(-0.3, 2.8),
+                   parts={'slide': ['DE_TOP_SLIDER', 'DE_TOP_PARTSA'], 'mag': ['DE_BODY_CLIP_Low_001']}),
+})
+
+
 def load(spec):
     for o in list(bpy.data.objects):
         bpy.data.objects.remove(o)
@@ -149,6 +191,9 @@ def load(spec):
     elif f.endswith('.stl'):
         bpy.ops.wm.read_factory_settings(use_empty=True)
         bpy.ops.wm.stl_import(filepath=f)
+    elif f.endswith('.obj'):
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        bpy.ops.wm.obj_import(filepath=f)
     elif f.endswith('.glb') or f.endswith('.gltf'):
         bpy.ops.wm.read_factory_settings(use_empty=True)
         bpy.ops.import_scene.gltf(filepath=f)
@@ -285,6 +330,14 @@ def build(wid):
                     if nm not in bpy.data.materials:
                         make_mat(nm, flat=spec['flat_mat'][key])
                     slot.material = bpy.data.materials[nm]
+    if 'all_flat' in spec:
+        nm = 'gun_paint_ext_%s_0' % wid
+        make_mat(nm, flat=spec['all_flat'])
+        for o in meshes:
+            for slot in o.material_slots:
+                slot.material = bpy.data.materials[nm]
+            if not o.material_slots:
+                o.data.materials.append(bpy.data.materials[nm])
     if 'tex_all' in spec:
         nm = 'gun_paint_ext_%s_0' % wid
         make_mat(nm, spec['tex_all'])
@@ -357,7 +410,7 @@ def build(wid):
             groups[part] = [o for o in meshes if any(o.name.startswith(nm.strip()) or o.name.strip() == nm.strip() for nm in names)]
     if 'split_mag' in spec:
         (y0, y1), (z0, z1) = spec['split_mag']
-        body = meshes[0]
+        body = next((o for o in meshes if spec.get('split_obj', '\0') in o.name), meshes[0])
         bpy.ops.object.select_all(action='DESELECT'); body.select_set(True); bpy.context.view_layer.objects.active = body
         bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
         bpy.ops.mesh.separate(type='LOOSE'); bpy.ops.object.mode_set(mode='OBJECT')
