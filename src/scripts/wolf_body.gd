@@ -20,10 +20,10 @@ func _ready() -> void:
 	mdl = (load(MODEL) if ResourceLoader.exists(MODEL) else load("res://assets/models/wolf.glb")).instantiate()
 	mdl.scale = Vector3.ONE * SCALE
 	mesh_root = Node3D.new()      # pivot at the body centre so the flip turns around the middle
-	mesh_root.position.y = 0.95 * SCALE
+	mesh_root.position.y = 1.0 * SCALE
 	add_child(mesh_root)
 	mesh_root.add_child(mdl)
-	mdl.position.y = -0.95 * SCALE
+	mdl.position.y = -1.0 * SCALE
 	for mi in mdl.find_children("*", "MeshInstance3D", true, false):
 		var m: MeshInstance3D = mi
 		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
@@ -56,7 +56,7 @@ func _ready() -> void:
 	var aps := mdl.find_children("*", "AnimationPlayer", true, false)
 	if aps.size() > 0:
 		ap = aps[0]
-		for n in ["idle", "run"]:
+		for n in ["idle", "run", "walk"]:
 			if ap.has_animation(n):
 				ap.get_animation(n).loop_mode = Animation.LOOP_LINEAR
 		ap.play("idle")
@@ -73,15 +73,24 @@ func add_fill() -> void:
 	l.position = Vector3(0, 2.4, 1.6)
 	add_child(l)
 
-func attack() -> void:
-	if ap and ap.has_animation("attack"):
-		_act_t = 0.42
-		ap.play("attack", 0.06, 1.25)
+var _alt := false
+func attack(heavy: bool = false) -> void:
+	if ap == null:
+		return
+	var nm := "attack3" if heavy and ap.has_animation("attack3") else ("attack2" if _alt and ap.has_animation("attack2") else "attack")
+	_alt = not _alt
+	if not ap.has_animation(nm):
+		return
+	var sp := 1.35 if heavy else 1.45
+	ap.speed_scale = 1.0
+	ap.play(nm, 0.05, sp)
+	_act_t = ap.get_animation(nm).length / sp - 0.06
 
 func howl() -> void:
 	if ap and ap.has_animation("howl"):
-		_act_t = 1.4
-		ap.play("howl", 0.15, 1.0)
+		ap.speed_scale = 1.0
+		ap.play("howl", 0.12, 1.0)
+		_act_t = ap.get_animation("howl").length - 0.1
 
 func set_flip(f: float) -> void:
 	_flip = f
@@ -93,30 +102,42 @@ func _process(delta: float) -> void:
 	var hs := Vector2(v.x, v.z).length()
 	if hs > 40.0:                  # teleport / respawn
 		hs = 0.0
+		v = Vector3.ZERO
 	_spd = lerpf(_spd, hs, minf(delta * 8.0, 1.0))
-	mesh_root.rotation.x = -TAU * smoothstep(0.0, 1.0, _flip) if _flip > 0.0 else 0.0
+	# double-jump flip: a full forward somersault around the body's centre, eased in and out
+	if _flip > 0.0:
+		mesh_root.rotation.x = -TAU * (0.5 - 0.5 * cos(PI * clampf(_flip, 0.0, 1.0)))
+	else:
+		mesh_root.rotation.x = lerp_angle(mesh_root.rotation.x, 0.0, minf(delta * 12.0, 1.0))
 	if ap == null:
 		return
 	_act_t = maxf(_act_t - delta, 0.0)
+	if _flip > 0.0 and ap.has_animation("tuck"):
+		if ap.current_animation != "tuck":
+			ap.play("tuck", 0.08)
+		ap.speed_scale = 0.0
+		ap.seek(ap.current_animation_length * clampf(0.15 + _flip * 0.75, 0.0, 0.95), true)
+		return
 	if _act_t > 0.0:
+		return
+	if not on_floor and absf(v.y) > 0.8:
+		# airborne: the jump pose follows the vertical speed (stretch up, tuck at the top, reach down)
+		if ap.current_animation != "jump":
+			ap.play("jump", 0.12)
+		ap.speed_scale = 0.0
+		ap.seek(ap.current_animation_length * clampf(0.45 - v.y / 18.0, 0.05, 0.95), true)
 		return
 	var want := "idle"
 	var rate := 1.0
-	if not on_floor and absf(v.y) > 1.0:
-		want = "jump"
-		rate = 0.0 if v.y < -2.0 else 1.0
-	elif _spd > 1.2:
+	if _spd > 4.6 or (_spd > 1.0 and not ap.has_animation("walk")):
 		want = "run"
-		rate = clampf(_spd / 7.5, 0.55, 1.6)
+		rate = clampf(_spd / 8.5, 0.7, 1.5)
+	elif _spd > 0.6:
+		want = "walk"
+		rate = clampf(_spd / 2.6, 0.6, 1.6)
 	if ap.current_animation != want:
-		ap.play(want, 0.18)
-	if want == "jump":
-		if rate == 0.0 and ap.current_animation_position < ap.current_animation_length * 0.5:
-			ap.speed_scale = 1.0
-		else:
-			ap.speed_scale = rate if rate > 0.0 else 0.0
-	else:
-		ap.speed_scale = rate
+		ap.play(want, 0.22)
+	ap.speed_scale = rate
 
 static func _fur_shader() -> Shader:
 	var sh := Shader.new()

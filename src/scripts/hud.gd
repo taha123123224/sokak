@@ -417,46 +417,146 @@ func _voice_ui() -> void:
 		voice_lbl.text += "   " + "▮".repeat(int(clampf(Voice.level * 40.0, 0, 10))) + "▯".repeat(10 - int(clampf(Voice.level * 40.0, 0, 10)))
 
 ## v3.5.1 Kurt Adam: wolf gauge above the health panel + transform screen effects
-var _wolf_ui: PanelContainer
-var _wolf_bar: ProgressBar
-var _wolf_lbl: Label
+## ---------------------------------------------------------------- v3.7.1 Kurt Adam HUD
+var _wolf_ui: WolfGauge
 var _wolf_ov: ColorRect
+var _wolf_claw: ClawFx
+
+class WolfGauge extends Control:
+	## bottom-centre gauge: moon emblem, 12 slanted segments, title + value, key hint when ready
+	var energy := 0.0          # 0..100
+	var wolf := false
+	var secs := 0.0
+	var frac := 0.0            # wolf time left 0..1
+	var t := 0.0
+	var hint_t := 0.0
+	var _shown := 0.0
+	func _process(d: float) -> void:
+		t += d
+		hint_t = maxf(hint_t - d, 0.0)
+		var target := frac if wolf else energy / 100.0
+		_shown = lerpf(_shown, target, minf(d * 10.0, 1.0))
+		queue_redraw()
+	func _draw() -> void:
+		var f: Font = UI.font("Rajdhani-Bold")
+		var fb: Font = UI.font("RussoOne-Regular")
+		var w := size.x
+		var ready := (not wolf) and energy >= 100.0
+		var hot := Color(1.0, 0.36, 0.16) if wolf else (Color(1.0, 0.62, 0.2) if ready else Color(0.95, 0.66, 0.32))
+		var pulse := 0.5 + 0.5 * sin(t * 6.0)
+		# backdrop: a soft dark pill so it reads on any map
+		var bh := 46.0
+		_pill(Rect2(0, 18, w, bh), Color(0.02, 0.02, 0.03, 0.62))
+		# moon emblem
+		var mc := Vector2(26, 18 + bh * 0.5)
+		draw_circle(mc, 15.0, Color(hot.r, hot.g, hot.b, 0.18 + (0.25 * pulse if ready or wolf else 0.0)))
+		draw_circle(mc, 11.0, Color(0.96, 0.9, 0.8))
+		draw_circle(mc + Vector2(4.5, -3.0), 9.5, Color(0.05, 0.05, 0.07))
+		# title + value
+		var title := "KURT FORMU" if wolf else ("DÖNÜŞÜME HAZIR" if ready else "KURT ENERJİSİ")
+		draw_string(f, Vector2(50, 36), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(1, 1, 1, 0.9))
+		var val := ("%d" % int(ceil(secs))) + " sn" if wolf else "%d%%" % int(energy)
+		var vw := f.get_string_size(val, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+		draw_string(f, Vector2(w - 14 - vw, 36), val, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, hot)
+		# segmented bar
+		var n := 12
+		var x0 := 50.0
+		var x1 := w - 14.0
+		var sw := (x1 - x0) / n
+		var y := 44.0
+		for i in n:
+			var sx := x0 + i * sw
+			var fill := clampf(_shown * n - i, 0.0, 1.0)
+			_seg(Rect2(sx, y, sw - 3.0, 9.0), Color(1, 1, 1, 0.09))
+			if fill > 0.0:
+				var c := Color(1.0, 0.75, 0.3).lerp(hot, float(i) / n)
+				if ready:
+					c = c.lightened(0.25 * pulse)
+				_seg(Rect2(sx, y, (sw - 3.0) * fill, 9.0), c)
+		# key chip when ready
+		if ready:
+			var txt := "[ 3 ]  KURDA DÖNÜŞ"
+			var tw2 := f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+			draw_string(f, Vector2(w * 0.5 - tw2 * 0.5, 12), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1.0, 0.75, 0.35, 0.6 + 0.4 * pulse))
+		# control hints for the first seconds in wolf form
+		if wolf and hint_t > 0.0:
+			var ha := clampf(hint_t, 0.0, 1.0)
+			var ht := "Sol tık: pençe   ·   Sağ tık: ağır darbe   ·   Çift zıpla: takla   ·   İleri + duvar: tırman"
+			var hw := f.get_string_size(ht, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+			draw_string(f, Vector2(w * 0.5 - hw * 0.5, 86), ht, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 1, 1, 0.55 * ha))
+	func _seg(r: Rect2, c: Color) -> void:
+		var k := 4.0
+		draw_colored_polygon(PackedVector2Array([r.position + Vector2(k, 0), r.position + Vector2(r.size.x + k, 0), r.position + Vector2(r.size.x, r.size.y), r.position + Vector2(0, r.size.y)]), c)
+	func _pill(r: Rect2, c: Color) -> void:
+		var rr := r.size.y * 0.5
+		draw_rect(Rect2(r.position + Vector2(rr, 0), Vector2(r.size.x - rr * 2.0, r.size.y)), c)
+		draw_circle(r.position + Vector2(rr, rr), rr, c)
+		draw_circle(r.position + Vector2(r.size.x - rr, rr), rr, c)
+
+class ClawFx extends Control:
+	## three claw slashes across the screen when the wolf strikes
+	var marks: Array = []      # [t, dir_sign, heavy]
+	func add(heavy: bool, sgn: float) -> void:
+		marks.append([0.0, sgn, heavy])
+	func _process(d: float) -> void:
+		for m in marks:
+			m[0] += d
+		marks = marks.filter(func(m): return m[0] < 0.32)
+		queue_redraw()
+	func _draw() -> void:
+		var c := size * 0.5
+		for m in marks:
+			var u: float = m[0] / 0.32
+			var grow := clampf(u / 0.25, 0.0, 1.0)
+			var a := 1.0 - smoothstep(0.35, 1.0, u)
+			var heavy: bool = m[2]
+			var L := size.y * (0.55 if heavy else 0.42)
+			for i in 3:
+				var off := (i - 1) * size.y * (0.06 if heavy else 0.045)
+				var dir := Vector2(m[1] * 0.55, 1.0).normalized() if not heavy else Vector2(0.12 * (i - 1), 1.0).normalized()
+				var nrm := Vector2(-dir.y, dir.x)
+				var p0: Vector2 = c - dir * L * 0.5 + nrm * off
+				var p1 := p0 + dir * L * grow
+				var wd := (9.0 if heavy else 6.0) * (1.0 - u * 0.6)
+				draw_line(p0, p1, Color(0.55, 0.02, 0.02, 0.45 * a), wd * 2.2, true)
+				draw_line(p0, p1, Color(1.0, 0.35, 0.22, 0.85 * a), wd, true)
+				draw_line(p0 + dir * 4.0, p1 - dir * 4.0, Color(1, 0.92, 0.85, 0.9 * a), maxf(wd * 0.3, 1.0), true)
+
+func claw_fx(heavy: bool, delay: float = 0.0) -> void:
+	if _wolf_claw == null:
+		return
+	var sgn := 1.0 if randf() < 0.5 else -1.0
+	get_tree().create_timer(delay).timeout.connect(func(): if is_instance_valid(_wolf_claw): _wolf_claw.add(heavy, sgn))
+
 func _wolf_update() -> void:
 	if player == null or not ("wolf_ctl" in player) or player.wolf_ctl == null:
 		return
 	var wc = player.wolf_ctl
 	if _wolf_ui == null:
-		_wolf_ui = PanelContainer.new()
-		_wolf_ui.add_theme_stylebox_override("panel", UI.sb(Color(0.03, 0.02, 0.03, 0.78), Color(1, 0.3, 0.2, 0.5), 1, 6, 8))
+		_wolf_ui = WolfGauge.new()
 		_wolf_ui.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-		_wolf_ui.grow_horizontal = Control.GROW_DIRECTION_BOTH
-		_wolf_ui.grow_vertical = Control.GROW_DIRECTION_BEGIN
-		_wolf_ui.offset_bottom = -96
-		_wolf_ui.custom_minimum_size = Vector2(340, 0)
+		_wolf_ui.offset_left = -190; _wolf_ui.offset_right = 190
+		_wolf_ui.offset_top = -190; _wolf_ui.offset_bottom = -90
 		_wolf_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		root.add_child(_wolf_ui)
-		var v := UI.vbox(3)
-		_wolf_ui.add_child(v)
-		_wolf_lbl = UI.lbl("", 15, Color(1, 0.6, 0.45), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
-		v.add_child(_wolf_lbl)
-		_wolf_bar = UI.bar(0, 100, Color(1, 0.3, 0.15), 10)
-		v.add_child(_wolf_bar)
 		_wolf_ov = ColorRect.new()
 		_wolf_ov.set_anchors_preset(Control.PRESET_FULL_RECT)
 		_wolf_ov.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var sh := Shader.new()
-		sh.code = "shader_type canvas_item; uniform float k = 0.0; uniform float flash = 0.0; void fragment(){ vec2 d = UV - 0.5; float v = smoothstep(0.25, 0.75, length(d * vec2(1.2, 1.0))); COLOR = vec4(mix(vec3(0.35, 0.0, 0.0), vec3(1.0, 0.25, 0.1), flash), (v * 0.55 * k) + flash * 0.45); }"
+		sh.code = "shader_type canvas_item; uniform float k = 0.0; uniform float flash = 0.0; void fragment(){ vec2 d = UV - 0.5; float v = smoothstep(0.38, 0.85, length(d * vec2(1.25, 1.0))); COLOR = vec4(mix(vec3(0.22, 0.0, 0.02), vec3(1.0, 0.4, 0.15), flash), (v * 0.38 * k) + flash * 0.22 * (0.4 + v)); }"
 		var sm := ShaderMaterial.new(); sm.shader = sh
 		_wolf_ov.material = sm
 		root.add_child(_wolf_ov)
 		root.move_child(_wolf_ov, 1)
-	if wc.wolf:
-		_wolf_bar.value = wc.wolf_t / wc.WOLF_TIME * 100.0
-		_wolf_lbl.text = "KURT FORMU  •  %d sn   [ÇİFT ZIPLA: TAKLA • İLERİ+DUVAR: TIRMAN]" % int(ceil(wc.wolf_t))
-	else:
-		_wolf_bar.value = wc.energy
-		_wolf_lbl.text = ("[3] KURDA DÖNÜŞ HAZIR!" if wc.energy >= 100.0 else "KURT ENERJİSİ  %%%d" % int(wc.energy))
-		_wolf_lbl.modulate = Color(1, 1, 1, 0.6 + 0.4 * sin(Time.get_ticks_msec() * 0.008)) if wc.energy >= 100.0 else Color.WHITE
+		_wolf_claw = ClawFx.new()
+		_wolf_claw.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_wolf_claw.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(_wolf_claw)
+	_wolf_ui.wolf = wc.wolf
+	_wolf_ui.energy = wc.energy
+	_wolf_ui.secs = wc.wolf_t
+	_wolf_ui.frac = wc.wolf_t / wc.WOLF_TIME
+	_wolf_ui.visible = player.alive
 	(_wolf_ov.material as ShaderMaterial).set_shader_parameter("k", 1.0 if wc.wolf else 0.0)
 
 func wolf_fx(on: bool) -> void:
@@ -465,9 +565,41 @@ func wolf_fx(on: bool) -> void:
 		var sm := _wolf_ov.material as ShaderMaterial
 		var tw := _wolf_ov.create_tween()
 		tw.tween_method(func(x): sm.set_shader_parameter("flash", x), 1.0, 0.0, 0.9).set_ease(Tween.EASE_OUT)
-	center_msg("KURDA DÖNÜŞTÜN!" if on else "İNSAN FORMUNA DÖNDÜN", Color(1, 0.35, 0.2) if on else Color(0.8, 0.85, 1.0))
+	if on and _wolf_ui:
+		_wolf_ui.hint_t = 5.0
+	_wolf_banner("KURT FORMU" if on else "İNSAN FORMU", ("%d SANİYE  ·  PENÇELERİN HAZIR" % int(player.wolf_ctl.WOLF_TIME)) if on else "SİLAHINA GERİ DÖNDÜN", Color(1, 0.4, 0.2) if on else Color(0.75, 0.85, 1.0))
 	if player and "shake" in player:
 		player.shake = maxf(player.shake, 0.9 if on else 0.4)
+
+func _wolf_banner(title: String, sub: String, col: Color) -> void:
+	var b := VBoxContainer.new()
+	b.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	b.offset_left = -400; b.offset_right = 400; b.offset_top = 150
+	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_theme_constant_override("separation", 2)
+	root.add_child(b)
+	var t := UI.lbl(title, 44, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
+	t.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	t.add_theme_constant_override("outline_size", 6)
+	b.add_child(t)
+	var ln := ColorRect.new()
+	ln.color = col
+	ln.custom_minimum_size = Vector2(0, 3)
+	ln.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	b.add_child(ln)
+	var st := UI.lbl(sub, 17, Color(col.r, col.g, col.b, 0.95), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+	b.add_child(st)
+	b.modulate.a = 0.0
+	b.pivot_offset = Vector2(400, 30)
+	b.scale = Vector2(1.15, 1.15)
+	var tw := b.create_tween()
+	tw.set_parallel()
+	tw.tween_property(b, "modulate:a", 1.0, 0.18)
+	tw.tween_property(b, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(ln, "custom_minimum_size:x", 220.0, 0.45).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_interval(1.6)
+	tw.chain().tween_property(b, "modulate:a", 0.0, 0.4)
+	tw.chain().tween_callback(b.queue_free)
 
 func _process(delta: float) -> void:
 	_wolf_update()

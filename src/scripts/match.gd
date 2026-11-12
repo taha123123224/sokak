@@ -50,57 +50,30 @@ func _ready() -> void:
 	call_deferred("_build")
 
 class LoadFx extends Control:
-	## loading screen overlay: scanline sweep, corner brackets, hexagon spinner, glowing progress bar
-	var col := Color(1.0, 0.55, 0.12)
+	## v3.7.1 loading bar: one thin line along the bottom with a soft glowing head — nothing else
+	var col := Color(1.0, 0.56, 0.16)
 	var prog := 0.0
 	var shown := 0.0
 	var t := 0.0
 	func _process(d: float) -> void:
 		t += d
-		shown = lerpf(shown, prog, minf(d * 6.0, 1.0))
+		shown = lerpf(shown, prog, minf(d * 5.0, 1.0))
 		queue_redraw()
 	func _draw() -> void:
 		var w := size.x
 		var h := size.y
-		# soft scan line moving down the screen
-		var sy := fmod(t * 140.0, h + 200.0) - 100.0
-		for k in 6:
-			draw_rect(Rect2(0, sy + k * 3.0, w, 3.0), Color(col.r, col.g, col.b, 0.018 * (6 - k)))
-		# corner brackets
-		var m := 34.0
-		var L := 60.0
-		var bc := Color(1, 1, 1, 0.35)
-		for c in [[Vector2(m, m), Vector2(1, 1)], [Vector2(w - m, m), Vector2(-1, 1)], [Vector2(m, h - m), Vector2(1, -1)], [Vector2(w - m, h - m), Vector2(-1, -1)]]:
-			var o: Vector2 = c[0]
-			var dd: Vector2 = c[1]
-			draw_line(o, o + Vector2(L * dd.x, 0), bc, 2.0)
-			draw_line(o, o + Vector2(0, L * dd.y), bc, 2.0)
-		# progress bar along the bottom
-		var by := h - 92.0
-		var bx0 := 70.0
-		var bx1 := w - 70.0
-		draw_rect(Rect2(bx0, by, bx1 - bx0, 4), Color(1, 1, 1, 0.08))
+		var by := h - 64.0
+		var bx0 := 80.0
+		var bx1 := w - 80.0
+		draw_rect(Rect2(bx0, by, bx1 - bx0, 2), Color(1, 1, 1, 0.12))
 		var px := lerpf(bx0, bx1, clampf(shown / 100.0, 0.0, 1.0))
-		draw_rect(Rect2(bx0, by - 1, px - bx0, 6), col)
-		draw_rect(Rect2(bx0, by - 5, px - bx0, 14), Color(col.r, col.g, col.b, 0.12))
-		for k in 5:
-			draw_circle(Vector2(px, by + 2), 14.0 - k * 2.5, Color(col.r, col.g, col.b, 0.07 + k * 0.05))
-		draw_circle(Vector2(px, by + 2), 3.5, Color(1, 1, 1, 0.95))
-		# ticks every 10 %
-		for i in 11:
-			var tx := lerpf(bx0, bx1, i / 10.0)
-			draw_line(Vector2(tx, by + 10), Vector2(tx, by + 16), Color(1, 1, 1, 0.18 if tx > px else 0.5), 1.0)
-		# hexagon spinner (bottom right, beside the percentage)
-		var c0 := Vector2(w - 92.0, h - 150.0)
-		for i in 6:
-			var a := t * 2.2 + i * TAU / 6.0
-			var al := 0.15 + 0.85 * fposmod(1.0 - (i / 6.0) + t * 0.0, 1.0)
-			var pts := PackedVector2Array()
-			for k in 7:
-				pts.append(c0 + Vector2.from_angle(a + k * TAU / 6.0) * (18.0 - i * 1.6))
-			draw_polyline(pts, Color(col.r, col.g, col.b, al * 0.5), 1.5, true)
-		draw_arc(c0, 26.0, t * 3.0, t * 3.0 + 1.8, 24, col, 3.0, true)
-		draw_arc(c0, 26.0, t * 3.0 + PI, t * 3.0 + PI + 0.9, 24, Color(1, 1, 1, 0.6), 3.0, true)
+		draw_rect(Rect2(bx0, by, px - bx0, 2), col)
+		# soft head glow + a slow shimmer travelling along the filled part
+		for k in 4:
+			draw_rect(Rect2(px - 40.0 + k * 10.0, by - 1, 40.0 - k * 10.0, 4), Color(1, 0.85, 0.6, 0.08 + k * 0.06))
+		var sx := bx0 + fmod(t * 260.0, maxf(px - bx0, 1.0))
+		if px - bx0 > 60.0:
+			draw_rect(Rect2(sx - 30.0, by, 60.0, 2), Color(1, 1, 1, 0.35))
 
 var _load_tips := ["Z tuşu ile nişangahın altını takımına işaretle.", "Eğilerek ateş etmek isabeti artırır.", "Nişancı tüfeklerinde nefesini tut: hareket etme!", "Tab tuşu ile skor tablosunu aç.",
 	"F tuşu ile silahını incele.", "Kafadan vuruşlar 2.5 kat hasar verir.", "Shift ile yürürsen adım sesin duyulmaz.",
@@ -110,16 +83,17 @@ var _load_fx: LoadFx
 var _load_pct: Label
 
 func _show_loading() -> void:
+	## v3.7.1 clean loading screen: full-bleed map art, map name + one line of info bottom-left,
+	## a thin progress line, a single tip. No panels, chips or brackets.
 	var cl := CanvasLayer.new()
 	cl.layer = 50
 	add_child(cl)
 	loading = ColorRect.new()
-	(loading as ColorRect).color = Color(0.015, 0.018, 0.026)
+	(loading as ColorRect).color = Color(0.012, 0.014, 0.02)
 	loading.set_anchors_preset(Control.PRESET_FULL_RECT)
 	cl.add_child(loading)
 	var minfo: Dictionary = GS.MAPS.get(map_id, {})
 	var minf: Dictionary = GS.MODES.get(mode, {})
-	# map artwork, slowly zooming (Ken Burns)
 	var ip := "res://assets/ui/load_%s.jpg" % map_id
 	if not ResourceLoader.exists(ip):
 		ip = "res://assets/ui/map_%s.jpg" % map_id
@@ -129,152 +103,93 @@ func _show_loading() -> void:
 		bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 		bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-		bg.modulate = Color(0.72, 0.72, 0.76)
+		bg.modulate = Color(0.86, 0.86, 0.9)
 		loading.add_child(bg)
-		bg.resized.connect(func(): bg.pivot_offset = bg.size * Vector2(0.6, 0.45))
+		bg.resized.connect(func(): bg.pivot_offset = bg.size * Vector2(0.55, 0.45))
 		var kb := bg.create_tween()
-		kb.tween_property(bg, "scale", Vector2(1.12, 1.12), 14.0).from(Vector2(1.0, 1.0)).set_trans(Tween.TRANS_SINE)
-	# shading: left + bottom gradients and a vignette so the text always reads
-	for gdef in [[Vector2(0, 0.5), Vector2(0.75, 0.5), Color(0.01, 0.012, 0.02, 0.96)], [Vector2(0.5, 1.0), Vector2(0.5, 0.45), Color(0.01, 0.012, 0.02, 0.98)]]:
-		var gt := GradientTexture2D.new()
-		var gr := Gradient.new()
-		gr.set_color(0, gdef[2]); gr.set_color(1, Color(gdef[2].r, gdef[2].g, gdef[2].b, 0.0))
-		gt.gradient = gr
-		gt.fill_from = gdef[0]; gt.fill_to = gdef[1]
-		gt.width = 256; gt.height = 256
-		var gtr := TextureRect.new()
-		gtr.texture = gt
-		gtr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		gtr.stretch_mode = TextureRect.STRETCH_SCALE
-		gtr.set_anchors_preset(Control.PRESET_FULL_RECT)
-		loading.add_child(gtr)
+		kb.tween_property(bg, "scale", Vector2(1.06, 1.06), 16.0).from(Vector2(1.0, 1.0)).set_trans(Tween.TRANS_SINE)
+	# one soft gradient from the bottom so the text reads, plus a light vignette
+	var gt := GradientTexture2D.new()
+	var gr := Gradient.new()
+	gr.offsets = PackedFloat32Array([0.0, 0.45, 1.0])
+	gr.colors = PackedColorArray([Color(0.01, 0.012, 0.018, 0.96), Color(0.01, 0.012, 0.018, 0.66), Color(0.01, 0.012, 0.018, 0.0)])
+	gt.gradient = gr
+	gt.fill_from = Vector2(0.5, 1.0); gt.fill_to = Vector2(0.5, 0.35)
+	gt.width = 64; gt.height = 256
+	var gtr := TextureRect.new()
+	gtr.texture = gt
+	gtr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	gtr.stretch_mode = TextureRect.STRETCH_SCALE
+	gtr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	loading.add_child(gtr)
 	_load_fx = LoadFx.new()
 	_load_fx.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_load_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	loading.add_child(_load_fx)
-	# top-left: logo + "operation briefing"
-	var tl := UI.hbox(14)
-	tl.position = Vector2(70, 54)
-	loading.add_child(tl)
-	if ResourceLoader.exists("res://assets/ui/logo_bar.png"):
-		var lg := TextureRect.new()
-		lg.texture = load("res://assets/ui/logo_bar.png")
-		lg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		lg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
-		lg.custom_minimum_size = Vector2(170, 40)
-		tl.add_child(lg)
-	var tlv := UI.vbox(-4)
-	tl.add_child(tlv)
-	tlv.add_child(UI.lbl("OPERASYON BRİFİNGİ", 14, UI.ACCENT2, "Rajdhani-Bold"))
-	tlv.add_child(UI.lbl("ONLINE MAÇ" if cfg.get("net", false) else "BOTLARLA MAÇ", 18, Color(1, 1, 1, 0.8), "Rajdhani-Bold"))
-	# bottom-left: mode chip, huge map name, description, info chips
-	var bl := UI.vbox(6)
+	var bl := UI.vbox(2)
 	bl.anchor_top = 1.0; bl.anchor_bottom = 1.0
-	bl.offset_left = 70; bl.offset_top = -440; bl.offset_right = 900; bl.offset_bottom = -138
+	bl.offset_left = 80; bl.offset_top = -420; bl.offset_right = 1000; bl.offset_bottom = -112
 	bl.alignment = BoxContainer.ALIGNMENT_END
 	loading.add_child(bl)
-	var chip := PanelContainer.new()
-	var csb := UI.sb(Color(1.0, 0.55, 0.12, 0.92), Color(0, 0, 0, 0), 0, 3, 0)
-	csb.skew = Vector2(-0.25, 0)
-	csb.content_margin_left = 14; csb.content_margin_right = 16; csb.content_margin_top = 2; csb.content_margin_bottom = 2
-	chip.add_theme_stylebox_override("panel", csb)
-	chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	chip.add_child(UI.lbl(str(minf.get("name", mode)).to_upper(), 18, Color(0.05, 0.04, 0.03), "RussoOne-Regular"))
-	bl.add_child(chip)
-	var title := UI.lbl(str(minfo.get("name", map_id)).to_upper(), 96, Color.WHITE, "RussoOne-Regular")
-	title.add_theme_constant_override("outline_size", 0)
-	title.visible_ratio = 0.0
+	var md := UI.lbl("  ".join(str(minf.get("name", mode)).to_upper().split("")), 15, UI.ACCENT, "Rajdhani-Bold")
+	bl.add_child(md)
+	var title := UI.lbl(str(minfo.get("name", map_id)).to_upper(), 76, Color.WHITE, "RussoOne-Regular")
+	title.modulate.a = 0.0
 	bl.add_child(title)
-	var trw := title.create_tween()
-	trw.tween_property(title, "visible_ratio", 1.0, 0.7).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	var line := ColorRect.new()
-	line.color = UI.ACCENT
-	line.custom_minimum_size = Vector2(0, 3)
-	line.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	bl.add_child(line)
-	var lw := line.create_tween()
-	lw.tween_property(line, "custom_minimum_size:x", 260.0, 0.8).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	var desc := UI.lbl(str(minfo.get("desc", "")), 21, Color(1, 1, 1, 0.75), "Rajdhani-SemiBold")
+	var tin := title.create_tween()
+	tin.tween_property(title, "modulate:a", 1.0, 0.6).set_trans(Tween.TRANS_SINE)
+	var desc := UI.lbl(str(minfo.get("desc", "")), 19, Color(1, 1, 1, 0.68), "Rajdhani-SemiBold")
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.custom_minimum_size = Vector2(720, 0)
+	desc.custom_minimum_size = Vector2(700, 0)
 	bl.add_child(desc)
-	var ch := UI.hbox(10)
-	bl.add_child(ch)
-	var infos := []
+	var infos: Array[String] = []
 	if mode == "sabotaj":
-		infos.append(["⏱", "%d TUR" % int(cfg.get("target", 5))])
+		infos.append("%d TUR" % int(cfg.get("target", 5)))
 	else:
-		infos.append(["⏱", "%d DK" % int(cfg.get("time", 8))])
-		infos.append(["◎", "HEDEF %d" % int(cfg.get("target", 40))])
+		infos.append("%d DK" % int(cfg.get("time", 8)))
+		infos.append("HEDEF %d" % int(cfg.get("target", 40)))
 	if not cfg.get("net", false):
-		infos.append(["☻", "%d BOT" % int(cfg.get("bots", 9))])
-		infos.append(["★", ["KOLAY", "NORMAL", "ZOR", "UZMAN"][clampi(int(cfg.get("diff", 1)), 0, 3)]])
-	for inf in infos:
-		var ip2 := PanelContainer.new()
-		var isb := UI.sb(Color(1, 1, 1, 0.07), Color(1, 1, 1, 0.14), 1, 6, 0)
-		isb.content_margin_left = 12; isb.content_margin_right = 12; isb.content_margin_top = 3; isb.content_margin_bottom = 3
-		ip2.add_theme_stylebox_override("panel", isb)
-		var ih := UI.hbox(6)
-		ip2.add_child(ih)
-		ih.add_child(UI.lbl(inf[0], 16, UI.ACCENT2, "Rajdhani-Bold"))
-		ih.add_child(UI.lbl(inf[1], 16, Color(1, 1, 1, 0.9), "Rajdhani-Bold"))
-		ch.add_child(ip2)
+		infos.append("%d BOT" % int(cfg.get("bots", 9)))
+		infos.append(["KOLAY", "NORMAL", "ZOR", "UZMAN"][clampi(int(cfg.get("diff", 1)), 0, 3)])
+	else:
+		infos.append("ONLINE")
+	var meta := UI.hbox(14)
+	meta.add_theme_constant_override("separation", 14)
+	bl.add_child(meta)
+	meta.add_child(UI.lbl("   ·   ".join(infos), 16, Color(1, 1, 1, 0.5), "Rajdhani-Bold"))
 	if teams:
-		var tm := UI.hbox(12)
-		tm.add_theme_constant_override("separation", 12)
-		bl.add_child(tm)
 		var my: String = str(cfg.get("team", "a"))
-		for td in [["a", "KARTAL"], ["b", "AKREP"]]:
-			var c: Color = GS.TEAM_COLORS[td[0]]
-			var tp := PanelContainer.new()
-			var tsb := UI.sb(Color(c.r * 0.25, c.g * 0.25, c.b * 0.25, 0.85), c, 0, 4, 0)
-			tsb.border_width_left = 4
-			tsb.content_margin_left = 14; tsb.content_margin_right = 18; tsb.content_margin_top = 4; tsb.content_margin_bottom = 4
-			tp.add_theme_stylebox_override("panel", tsb)
-			var th := UI.hbox(8)
-			tp.add_child(th)
-			th.add_child(UI.lbl(td[1], 22, Color.WHITE, "RussoOne-Regular"))
-			if td[0] == my:
-				th.add_child(UI.lbl("SENİN TAKIMIN", 13, c.lightened(0.4), "Rajdhani-Bold"))
-			tm.add_child(tp)
-			if td[0] == "a":
-				tm.add_child(UI.lbl("VS", 22, Color(1, 1, 1, 0.5), "RussoOne-Regular"))
-	# right: rotating tip card
-	var tip := UI.panel(Color(0.02, 0.025, 0.035, 0.82), Color(1, 1, 1, 0.1), 10, 1)
-	tip.anchor_left = 1.0; tip.anchor_right = 1.0; tip.anchor_top = 1.0; tip.anchor_bottom = 1.0
-	tip.offset_left = -520; tip.offset_right = -70; tip.offset_top = -300; tip.offset_bottom = -200
-	loading.add_child(tip)
-	var tpv := UI.vbox(2)
-	tip.add_child(tpv)
-	tpv.add_child(UI.lbl("◆  İPUCU", 14, UI.ACCENT2, "Rajdhani-Bold"))
-	var tipl := UI.lbl(_load_tips[randi() % _load_tips.size()], 19, Color(1, 1, 1, 0.88), "Rajdhani-SemiBold")
-	tipl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tpv.add_child(tipl)
-	var tt := tipl.create_tween().set_loops(8)
-	tt.tween_interval(3.8)
-	tt.tween_property(tipl, "modulate:a", 0.0, 0.25)
-	tt.tween_callback(func(): tipl.text = _load_tips[randi() % _load_tips.size()])
-	tt.tween_property(tipl, "modulate:a", 1.0, 0.25)
-	# bottom: status (left) + percentage (right) above the bar drawn by LoadFx
-	var st := UI.lbl("Harita yükleniyor...", 17, Color(1, 1, 1, 0.65), "Rajdhani-Bold")
+		meta.add_child(UI.lbl("|", 16, Color(1, 1, 1, 0.2), "Rajdhani-Bold"))
+		meta.add_child(UI.lbl("KARTAL" + ("  (SEN)" if my == "a" else ""), 16, GS.TEAM_COLORS["a"].lightened(0.25), "Rajdhani-Bold"))
+		meta.add_child(UI.lbl("vs", 16, Color(1, 1, 1, 0.4), "Rajdhani-Bold"))
+		meta.add_child(UI.lbl("AKREP" + ("  (SEN)" if my == "b" else ""), 16, GS.TEAM_COLORS["b"].lightened(0.25), "Rajdhani-Bold"))
+	# status (left) and percentage (right), just above the line
+	var st := UI.lbl("Harita yükleniyor...", 14, Color(1, 1, 1, 0.5), "Rajdhani-Bold")
 	st.name = "st"
 	st.anchor_top = 1.0; st.anchor_bottom = 1.0
-	st.offset_left = 70; st.offset_top = -126; st.offset_right = 800; st.offset_bottom = -98
+	st.offset_left = 80; st.offset_top = -92; st.offset_right = 800; st.offset_bottom = -70
 	loading.add_child(st)
-	_load_pct = UI.lbl("0%", 44, Color.WHITE, "Teko", HORIZONTAL_ALIGNMENT_RIGHT)
+	_load_pct = UI.lbl("0%", 18, Color(1, 1, 1, 0.85), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_RIGHT)
 	_load_pct.anchor_left = 1.0; _load_pct.anchor_right = 1.0; _load_pct.anchor_top = 1.0; _load_pct.anchor_bottom = 1.0
-	_load_pct.offset_left = -300; _load_pct.offset_right = -140; _load_pct.offset_top = -150; _load_pct.offset_bottom = -96
+	_load_pct.offset_left = -280; _load_pct.offset_right = -80; _load_pct.offset_top = -94; _load_pct.offset_bottom = -70
 	loading.add_child(_load_pct)
-	var foot := UI.lbl("SOKAK: OPERASYON  •  v" + str(Updater.VERSION), 13, Color(1, 1, 1, 0.3), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
-	foot.anchor_left = 0.0; foot.anchor_right = 1.0; foot.anchor_top = 1.0; foot.anchor_bottom = 1.0
-	foot.offset_top = -60; foot.offset_bottom = -36
-	loading.add_child(foot)
+	# one quiet tip under the line
+	var tipl := UI.lbl(_load_tips[randi() % _load_tips.size()], 15, Color(1, 1, 1, 0.42), "Rajdhani-SemiBold", HORIZONTAL_ALIGNMENT_CENTER)
+	tipl.anchor_left = 0.0; tipl.anchor_right = 1.0; tipl.anchor_top = 1.0; tipl.anchor_bottom = 1.0
+	tipl.offset_top = -50; tipl.offset_bottom = -26
+	loading.add_child(tipl)
+	var tt := tipl.create_tween().set_loops(8)
+	tt.tween_interval(4.5)
+	tt.tween_property(tipl, "modulate:a", 0.0, 0.3)
+	tt.tween_callback(func(): tipl.text = _load_tips[randi() % _load_tips.size()])
+	tt.tween_property(tipl, "modulate:a", 1.0, 0.3)
 	loading.modulate.a = 0.0
 	var fin := loading.create_tween()
-	fin.tween_property(loading, "modulate:a", 1.0, 0.25)
+	fin.tween_property(loading, "modulate:a", 1.0, 0.3)
 
 func _loading_roster() -> void:
-	## loading screen: who is in the match (two team columns, or one list in free-for-all)
+	## loading screen roster: removed in v3.7.1 (clean screen) — kept as a no-op for callers
+	return
 	if loading == null or not is_instance_valid(loading) or combatants.is_empty():
 		return
 	var box := UI.panel(Color(0.02, 0.025, 0.035, 0.82), Color(1, 1, 1, 0.1), 12, 1)
@@ -535,8 +450,16 @@ func _build() -> void:
 		await get_tree().process_frame
 	SFX.play_music("music_match", -13, false)
 	SFX.play_amb(GS.MAPS.get(map_id, {}).get("amb", {"mahalle": "amb_city", "safranbolu": "amb_town", "gemi": "amb_ship", "liman": "amb_port", "insaat": "amb_wind", "canakkale": "amb_sea"}.get(map_id, "amb_town")))
+	# dip to black, then reveal the match (no messy cross-fade of the loading art over the HUD)
+	var blk := ColorRect.new()
+	blk.color = Color(0, 0, 0, 0)
+	blk.set_anchors_preset(Control.PRESET_FULL_RECT)
+	blk.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	loading.get_parent().add_child(blk)
 	var tw := create_tween()
-	tw.tween_property(loading, "modulate:a", 0.0, 0.5)
+	tw.tween_property(blk, "color:a", 1.0, 0.22)
+	tw.tween_callback(func(): loading.visible = false)
+	tw.tween_property(blk, "color:a", 0.0, 0.45).set_trans(Tween.TRANS_SINE)
 	tw.tween_callback(loading.get_parent().queue_free)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	countdown = 3.0
@@ -1223,7 +1146,7 @@ func _process(delta: float) -> void:
 		var side := b.global_transform.basis.x
 		cam3.global_position = b.global_position + side * 4.5 + Vector3.UP * 1.4
 		cam3.look_at(b.global_position + Vector3.UP * 1.0)
-	if loading and is_instance_valid(loading) and loading.modulate.a > 0.99:
+	if loading and is_instance_valid(loading) and loading.visible and loading.modulate.a > 0.99:
 		return
 	if ended:
 		return

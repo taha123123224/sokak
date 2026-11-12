@@ -158,67 +158,158 @@ def hips_up(dz, dy=0.0):
     # hips location is in bone-local space: convert a world offset
     pb['hips'].location = REST['hips'].inverted() @ Vector((0, dy, dz))
 
+# ---- pose-key authoring: each pose is {(bone, axis): angle} (+ 'dz'/'dy' hip offsets); poses are eased
+def posed(keys, t):
+    """keys: [(time, pose_dict, ease)], returns the interpolated pose at t"""
+    for i in range(len(keys) - 1):
+        t0, p0, _ = keys[i]; t1, p1, e = keys[i + 1]
+        if t0 <= t <= t1:
+            u = (t - t0) / max(t1 - t0, 1e-6)
+            if e == 'fast': u = 1 - (1 - u) ** 4          # snap (strikes)
+            elif e == 'in': u = u * u * u                 # wind-up
+            else: u = u * u * (3 - 2 * u)                 # smooth
+            out = {}
+            for k in set(p0) | set(p1):
+                out[k] = p0.get(k, 0.0) + (p1.get(k, 0.0) - p0.get(k, 0.0)) * u
+            return out
+    return dict(keys[-1][1])
+AX = {'X': X, 'Y': Y, 'Z': Z}
+def apply(pose):
+    dz = pose.pop('dz', 0.0); dy = pose.pop('dy', 0.0)
+    for (bn, ax), v in pose.items():
+        rot(bn, AX[ax], v)
+    hips_up(dz, dy)
+
 def idle(t):
+    # heavy breathing, shoulders rolling, head scanning, claws flexing
     w = TAU * t
-    br = S(w)
-    rot('spine', X, 0.03 * br); rot('chest', X, 0.04 * br)
-    rot('neck', X, -0.04 * br); rot('head', Z, 0.22 * S(w + 0.7)); rot('head', X, 0.06 * S(w * 2))
-    rot('jaw', X, -0.08 - 0.06 * max(0.0, S(w * 2)))
+    br = S(w); br2 = S(w * 2 + 0.4)
+    rot('spine', X, 0.035 * br); rot('chest', X, 0.05 * br); rot('chest', Z, 0.04 * S(w + 1.0))
+    rot('neck', X, -0.05 * br); rot('head', Z, 0.3 * S(w + 0.7)); rot('head', X, 0.08 * br2 + 0.04)
+    rot('jaw', X, -0.1 - 0.08 * max(0.0, S(w * 2)))
     for s, k in (('L', 1), ('R', -1)):
-        rot('upperarm' + s, X, 0.06 * S(w + (0 if k > 0 else 1.5))); rot('forearm' + s, X, 0.05 * br)
-        rot('hand' + s, Y, 0.1 * S(w * 2) * k)
-    hips_up(0.012 * br)
-key('idle', 72, idle)
+        ph = 0.0 if k > 0 else 1.7
+        rot('clav' + s, X, 0.05 * br); rot('clav' + s, Z, -0.04 * k * br)
+        rot('upperarm' + s, X, 0.08 * S(w + ph)); rot('upperarm' + s, Y, -0.05 * k * br)
+        rot('forearm' + s, X, 0.1 + 0.08 * S(w + ph + 0.6))
+        rot('hand' + s, X, 0.18 * S(w * 2 + ph)); rot('hand' + s, Y, 0.12 * k * S(w * 2 + ph))
+        rot('thigh' + s, X, 0.03 * br); rot('shin' + s, X, -0.04 * br)
+    hips_up(-0.025 * (0.5 + 0.5 * br))
+key('idle', 90, idle)
+
+def walk(t):
+    # prowling walk: low, heavy steps, shoulders rolling against the hips, head low and steady
+    w = TAU * t
+    for s, ph, k in (('L', 0.0, 1), ('R', math.pi, -1)):
+        a = w + ph
+        rot('thigh' + s, X, 0.45 * S(a) + 0.12)
+        rot('shin' + s, X, -0.55 * max(0.0, C(a + 0.3)) - 0.12)
+        rot('foot' + s, X, 0.3 * max(0.0, -S(a + 0.5)) + 0.1 * max(0.0, C(a)))
+        rot('toe' + s, X, 0.3 * max(0.0, S(a - 1.0)))
+        b = a + math.pi
+        rot('upperarm' + s, X, 0.32 + 0.38 * S(b)); rot('upperarm' + s, Y, 0.06 * k)
+        rot('forearm' + s, X, 0.3 + 0.25 * max(0.0, S(b + 0.8)))
+        rot('hand' + s, X, 0.2 * S(b + 0.5))
+    rot('hips', Z, 0.1 * S(w)); rot('hips', Y, 0.05 * S(w))
+    rot('spine', X, -0.14); rot('spine', Z, -0.05 * S(w)); rot('chest', Z, -0.14 * S(w)); rot('chest', X, -0.08)
+    rot('neck', X, 0.18); rot('head', Z, 0.1 * S(w)); rot('head', X, 0.06 + 0.03 * S(w * 2 + 1.0)); rot('jaw', X, -0.12)
+    hips_up(-0.06 + 0.04 * abs(C(w)))
+key('walk', 36, walk)
 
 def run(t):
-    # hunched sprint: big leg strides, arms pumping opposite, body rocking, head forward
+    # werewolf sprint: deep forward lean, long bounding strides with airtime, arms clawing forward,
+    # head stays level (counter-rotated), strong shoulder roll and hip drop at each contact
     w = TAU * t
-    for s, ph in (('L', 0.0), ('R', math.pi)):
+    for s, ph, k in (('L', 0.0, 1), ('R', math.pi, -1)):
         a = w + ph
-        rot('thigh' + s, X, 0.85 * S(a) + 0.15)
-        rot('shin' + s, X, -0.75 * max(0.0, C(a)) - 0.1)
-        rot('foot' + s, X, 0.55 * max(0.0, -S(a + 0.6)) - 0.15 * max(0.0, C(a)))
-        rot('toe' + s, X, 0.4 * max(0.0, S(a - 0.8)))
-        b = w + ph + math.pi
-        rot('upperarm' + s, X, 0.42 + 0.5 * S(b))
-        rot('forearm' + s, X, 0.35 + 0.3 * S(b + 0.6))
-        rot('hand' + s, X, 0.25 * S(b))
-    rot('hips', Z, 0.12 * S(w)); rot('hips', X, -0.15); rot('spine', X, -0.22); rot('chest', Z, -0.18 * S(w)); rot('chest', X, -0.12 + 0.05 * S(w * 2))
-    rot('neck', X, 0.3); rot('head', X, 0.2 - 0.05 * S(w * 2)); rot('jaw', X, -0.22)
-    hips_up(0.07 * abs(C(w)) - 0.05)
-key('run', 18, run)
+        rot('thigh' + s, X, 1.05 * S(a) + 0.32)
+        rot('shin' + s, X, -1.15 * max(0.0, C(a + 0.2)) - 0.06)
+        rot('foot' + s, X, 0.65 * max(0.0, -S(a + 0.7)) + 0.25 * max(0.0, C(a)))
+        rot('toe' + s, X, 0.5 * max(0.0, S(a - 0.9)))
+        b = a + math.pi
+        rot('upperarm' + s, X, 0.75 + 0.7 * S(b)); rot('upperarm' + s, Y, 0.12 * k * S(b))
+        rot('forearm' + s, X, 0.55 + 0.45 * max(0.0, S(b + 0.9)))
+        rot('hand' + s, X, 0.35 * S(b + 0.6) + 0.15)
+        rot('clav' + s, X, 0.08 * S(b))
+    rot('hips', X, -0.42); rot('hips', Z, 0.14 * S(w)); rot('hips', Y, 0.06 * S(w))
+    rot('spine', X, -0.3 + 0.06 * S(w * 2)); rot('chest', X, -0.12 + 0.05 * S(w * 2 + 0.5)); rot('chest', Z, -0.22 * S(w))
+    rot('neck', X, 0.55); rot('head', X, 0.32 - 0.07 * S(w * 2 + 0.8)); rot('jaw', X, -0.28)
+    hips_up(0.0 + 0.12 * max(0.0, S(w * 2 - 0.6)), 0.05)
+key('run', 20, run)
 
-def attack(t):
-    # two-handed overhead rake: wind up (0-0.35), slash down and across (0.35-0.6), recover
-    up = math.sin(min(t / 0.35, 1.0) * math.pi * 0.5) * (1.0 - max(0.0, (t - 0.65) / 0.35))
-    sl = math.sin(min(max((t - 0.32) / 0.3, 0.0), 1.0) * math.pi * 0.5) * (1.0 - max(0.0, (t - 0.7) / 0.3))
+def strike(side):
+    k = 1 if side == 'L' else -1   # L = the +X arm
+    o = 'R' if side == 'L' else 'L'
+    rest = {}
+    wind = {('chest', 'Z'): -0.42 * k, ('spine', 'Z'): -0.2 * k, ('hips', 'Z'): -0.1 * k, ('spine', 'X'): 0.06,
+            ('upperarm' + side, 'X'): -0.5, ('upperarm' + side, 'Y'): -1.25 * k, ('forearm' + side, 'X'): 1.1, ('hand' + side, 'X'): -0.45,
+            ('upperarm' + o, 'X'): 0.35, ('forearm' + o, 'X'): 0.5, ('head', 'Z'): 0.15 * k, ('jaw', 'X'): -0.35,
+            ('thigh' + side, 'X'): -0.12, ('thigh' + o, 'X'): 0.25, ('shin' + o, 'X'): -0.25, 'dz': -0.05}
+    hit = {('chest', 'Z'): 0.55 * k, ('spine', 'Z'): 0.25 * k, ('hips', 'Z'): 0.12 * k, ('spine', 'X'): -0.28, ('chest', 'X'): -0.12,
+           ('upperarm' + side, 'X'): 1.15, ('upperarm' + side, 'Y'): 0.1 * k, ('upperarm' + side, 'Z'): 1.05 * k, ('forearm' + side, 'X'): 0.25,
+           ('hand' + side, 'X'): 0.55, ('upperarm' + o, 'X'): -0.25, ('upperarm' + o, 'Y'): -0.35 * -k, ('forearm' + o, 'X'): 0.35,
+           ('head', 'Z'): -0.12 * k, ('neck', 'X'): 0.12, ('jaw', 'X'): -0.5,
+           ('thigh' + side, 'X'): 0.45, ('shin' + side, 'X'): -0.35, ('thigh' + o, 'X'): -0.22, 'dz': -0.1, 'dy': 0.18}
+    follow = {kk: v * 0.75 for kk, v in hit.items()}
+    follow[('upperarm' + side, 'X')] = 0.95; follow[('upperarm' + side, 'Z')] = 1.25 * k; follow[('forearm' + side, 'X')] = 0.4
+    return [(0.0, rest, 's'), (0.28, wind, 'in'), (0.4, hit, 'fast'), (0.56, follow, 's'), (1.0, rest, 's')]
+for nm, sd in (('attack', 'L'), ('attack2', 'R')):
+    kk = strike(sd)
+    key(nm, 18, lambda t, kk=kk: apply(posed(kk, t)), loop=False)
+
+def slam_keys():
+    rest = {}
+    up = {('spine', 'X'): 0.32, ('chest', 'X'): 0.22, ('neck', 'X'): 0.2, ('head', 'X'): 0.25, ('jaw', 'X'): -0.6, 'dz': 0.04}
     for s, k in (('L', 1), ('R', -1)):
-        rot('upperarm' + s, X, 2.0 * up - 1.6 * sl)
-        rot('upperarm' + s, Y, -0.5 * k * up + 0.6 * k * sl)
-        rot('forearm' + s, X, 0.6 * up - 0.2 * sl)
-        rot('hand' + s, X, -0.4 * up + 0.5 * sl)
-        rot('thigh' + s, X, 0.2 * sl if k > 0 else -0.1 * sl)
-    rot('spine', X, 0.18 * up - 0.4 * sl); rot('chest', X, 0.15 * up - 0.3 * sl)
-    rot('neck', X, 0.2 * up - 0.1 * sl); rot('head', X, 0.1 * up); rot('jaw', X, -0.45 * up - 0.2 * sl)
-    hips_up(-0.06 * sl, 0.1 * sl)
-key('attack', 18, attack, loop=False)
+        up[('upperarm' + s, 'X')] = 2.1; up[('upperarm' + s, 'Y')] = -0.55 * k; up[('forearm' + s, 'X')] = 0.75; up[('hand' + s, 'X')] = -0.5
+        up[('thigh' + s, 'X')] = 0.05
+    down = {('spine', 'X'): -0.55, ('chest', 'X'): -0.3, ('neck', 'X'): 0.35, ('head', 'X'): 0.15, ('jaw', 'X'): -0.55, 'dz': -0.2, 'dy': 0.22}
+    for s, k in (('L', 1), ('R', -1)):
+        down[('upperarm' + s, 'X')] = 0.95; down[('upperarm' + s, 'Y')] = 0.15 * k; down[('forearm' + s, 'X')] = 0.2; down[('hand' + s, 'X')] = 0.6
+        down[('thigh' + s, 'X')] = 0.55; down[('shin' + s, 'X')] = -0.6; down[('foot' + s, 'X')] = 0.15
+    hold = {kk: v * 0.9 for kk, v in down.items()}
+    return [(0.0, rest, 's'), (0.36, up, 'in'), (0.48, down, 'fast'), (0.66, hold, 's'), (1.0, rest, 's')]
+sk = slam_keys()
+key('attack3', 24, lambda t: apply(posed(sk, t)), loop=False)
 
 def jump(t):
-    k = S(t * math.pi)
-    for s in 'LR':
-        rot('thigh' + s, X, 1.0 * k); rot('shin' + s, X, -1.1 * k); rot('foot' + s, X, 0.6 * k)
-        rot('upperarm' + s, X, -0.6 * k); rot('forearm' + s, X, 0.5 * k)
-    rot('spine', X, -0.2 * k); rot('head', X, 0.15 * k)
-key('jump', 20, jump, loop=False)
+    # take-off stretch -> tuck at the apex -> reach for the landing
+    tk = [(0.0, {}, 's'),
+          (0.15, {('spine', 'X'): 0.15, ('thigh' + 'L', 'X'): -0.3, ('thighR', 'X'): -0.3, ('upperarmL', 'X'): -0.5, ('upperarmR', 'X'): -0.5, ('head', 'X'): 0.25}, 's'),
+          (0.5, {('spine', 'X'): -0.3, ('thighL', 'X'): 1.15, ('thighR', 'X'): 1.0, ('shinL', 'X'): -1.3, ('shinR', 'X'): -1.2, ('footL', 'X'): 0.5, ('footR', 'X'): 0.5,
+                 ('upperarmL', 'X'): 0.9, ('upperarmR', 'X'): 0.9, ('forearmL', 'X'): 0.9, ('forearmR', 'X'): 0.9, ('neck', 'X'): 0.3, ('jaw', 'X'): -0.3}, 's'),
+          (1.0, {('spine', 'X'): -0.1, ('thighL', 'X'): 0.5, ('thighR', 'X'): 0.35, ('shinL', 'X'): -0.4, ('shinR', 'X'): -0.35,
+                 ('upperarmL', 'X'): 1.0, ('upperarmR', 'X'): 1.0, ('upperarmL', 'Y'): -0.5, ('upperarmR', 'Y'): 0.5, ('jaw', 'X'): -0.25}, 's')]
+    apply(posed(tk, t))
+key('jump', 24, jump, loop=False)
+
+def tuck(t):
+    # flip: compact ball, held (the body itself spins in-game)
+    p = {('spine', 'X'): -0.55, ('chest', 'X'): -0.3, ('neck', 'X'): -0.2, ('head', 'X'): -0.2,
+         ('thighL', 'X'): 1.6, ('thighR', 'X'): 1.6, ('shinL', 'X'): -1.9, ('shinR', 'X'): -1.9, ('footL', 'X'): 0.6, ('footR', 'X'): 0.6,
+         ('upperarmL', 'X'): 1.4, ('upperarmR', 'X'): 1.4, ('upperarmL', 'Y'): 0.35, ('upperarmR', 'Y'): -0.35, ('forearmL', 'X'): 1.3, ('forearmR', 'X'): 1.3,
+         ('jaw', 'X'): -0.2, 'dz': 0.2}
+    apply(posed([(0.0, {}, 's'), (0.25, p, 's'), (0.75, p, 's'), (1.0, {}, 's')], t))
+key('tuck', 18, tuck, loop=False)
 
 def howl(t):
-    k = S(min(t / 0.25, 1.0) * math.pi * 0.5) * (1.0 - max(0.0, (t - 0.82) / 0.18))
-    rot('spine', X, 0.25 * k); rot('chest', X, 0.3 * k); rot('neck', X, 0.45 * k); rot('head', X, 0.6 * k)
-    rot('jaw', X, -0.5 * k)
-    for s, kk in (('L', 1), ('R', -1)):
-        rot('upperarm' + s, Y, 0.35 * kk * k); rot('upperarm' + s, X, 0.3 * k); rot('forearm' + s, X, 0.4 * k)
-    hips_up(0.03 * k)
-key('howl', 48, howl, loop=False)
+    # transformation roar: crouch and gather, then rise with the chest thrown open, arms flung wide and
+    # back, head up, jaws wide, the whole body trembling with the roar; settle back into the stance
+    w = TAU * t
+    gather = {('spine', 'X'): -0.45, ('chest', 'X'): -0.2, ('neck', 'X'): -0.1, ('head', 'X'): -0.2,
+              ('thighL', 'X'): 0.6, ('thighR', 'X'): 0.6, ('shinL', 'X'): -0.7, ('shinR', 'X'): -0.7, ('footL', 'X'): 0.2, ('footR', 'X'): 0.2,
+              ('upperarmL', 'X'): 0.5, ('upperarmR', 'X'): 0.5, ('forearmL', 'X'): 1.0, ('forearmR', 'X'): 1.0,
+              ('upperarmL', 'Y'): 0.2, ('upperarmR', 'Y'): -0.2, 'dz': -0.2}
+    roar = {('spine', 'X'): 0.35, ('chest', 'X'): 0.35, ('neck', 'X'): 0.5, ('head', 'X'): 0.75, ('jaw', 'X'): -0.75,
+            ('upperarmL', 'Y'): -0.95, ('upperarmR', 'Y'): 0.95, ('upperarmL', 'X'): -0.35, ('upperarmR', 'X'): -0.35,
+            ('forearmL', 'X'): 0.45, ('forearmR', 'X'): 0.45, ('handL', 'X'): -0.5, ('handR', 'X'): -0.5,
+            ('clavL', 'Z'): 0.15, ('clavR', 'Z'): -0.15, 'dz': 0.04}
+    pk = [(0.0, {}, 's'), (0.18, gather, 's'), (0.32, roar, 'fast'), (0.78, roar, 's'), (1.0, {}, 's')]
+    apply(posed(pk, t))
+    tr = smoothstep01 = max(0.0, min(1.0, (t - 0.3) / 0.05)) * max(0.0, min(1.0, (0.8 - t) / 0.1))
+    rot('chest', X, 0.03 * S(w * 22) * tr); rot('head', Z, 0.04 * S(w * 27 + 1.0) * tr)
+    rot('upperarmL', X, 0.03 * S(w * 19) * tr); rot('upperarmR', X, 0.03 * S(w * 21 + 2.0) * tr)
+key('howl', 60, howl, loop=False)
 
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB', export_animations=True, export_animation_mode='NLA_TRACKS',

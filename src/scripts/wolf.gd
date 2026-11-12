@@ -141,9 +141,9 @@ func _update_body() -> void:
 	# player: hide the own wolf when a wall pushes the camera into it
 	body.visible = host.alive and (not is_player or host._tp_dist > 1.1)
 
-func attack_fx() -> void:
+func attack_fx(heavy: bool = false) -> void:
 	if body and is_instance_valid(body):
-		body.attack()
+		body.attack(heavy)
 
 ## (legacy) bots: dark fur overlay, a hunched, bigger silhouette and glowing red eyes
 static var _fur: StandardMaterial3D

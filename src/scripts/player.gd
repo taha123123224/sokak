@@ -833,8 +833,10 @@ func _melee(heavy: bool) -> void:
 	if wolf:
 		# third person: the claws strike from the wolf's chest in the direction the camera looks
 		if wolf_ctl:
-			wolf_ctl.attack_fx()
-		get_tree().create_timer(0.16).timeout.connect(func():
+			wolf_ctl.attack_fx(heavy)
+		if match_node.hud and match_node.hud.has_method("claw_fx"):
+			match_node.hud.claw_fx(heavy, 0.28 if heavy else 0.16)
+		get_tree().create_timer(0.28 if heavy else 0.16).timeout.connect(func():
 			var fwd := -cam.global_transform.basis.z
 			match_node.melee(self, global_position + Vector3.UP * 1.15 + Vector3(fwd.x, 0, fwd.z).normalized() * 0.5, fwd, dmg * 1.0, cur))
 		return
