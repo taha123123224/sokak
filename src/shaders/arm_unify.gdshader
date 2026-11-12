@@ -10,7 +10,15 @@ uniform vec4 base_color : source_color = vec4(1.0);
 uniform float sleeve_v = -1.0;     // >= 0: texture rows below this V are the sleeve (packs with a dark sleeve)
 uniform float camo_scale = 5.0;
 uniform vec3 glove : source_color = vec3(0.07, 0.07, 0.075);
+uniform float near_cut = 0.0;      // > 0: geometry closer to the camera than this dissolves (hides shoulders)
 void fragment() {
+	if (near_cut > 0.0) {
+		float dz = -VERTEX.z;
+		// ordered dither so the cut is a soft fade, not a hard edge
+		vec2 pp = mod(FRAGCOORD.xy, 4.0);
+		float th = (mod(pp.x * 2.0 + pp.y * 3.0, 4.0) + mod(pp.y * 2.0 + pp.x, 2.0) * 0.5) / 4.5;
+		if (smoothstep(near_cut * 0.62, near_cut, dz) < th) discard;
+	}
 	vec3 c = texture(albedo_tex, UV).rgb * base_color.rgb;
 	float lum = dot(c, vec3(0.3, 0.59, 0.11));
 	float skin = smoothstep(0.06, 0.16, c.r - c.b) * smoothstep(0.18, 0.35, c.r);

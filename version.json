@@ -1,47 +1,47 @@
 {
- "version": "3.7.1",
- "build": 48,
+ "version": "3.7.2",
+ "build": 49,
  "parts": [
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v48.pck.part00",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v49.pck.part00",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v48.pck.part01",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v49.pck.part01",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v48.pck.part02",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v49.pck.part02",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v48.pck.part03",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v49.pck.part03",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v48.pck.part04",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v49.pck.part04",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v48.pck.part05",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v49.pck.part05",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v48.pck.part06",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v49.pck.part06",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v48.pck.part07",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v49.pck.part07",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v48.pck.part08",
-   "size": 48176220
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v49.pck.part08",
+   "size": 48176668
   }
  ],
- "pck_size": 803150940,
+ "pck_size": 803151388,
  "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
- "notes": "v3.7.1: KURT ADAM yenilendi: yeni pençe saldırıları (sağ/sol savuruş + ağır darbe), yürüme, güçlü koşu, takla, kükreme • Yeni Kurt enerji barı ve dönüşüm yazıları, pençe izi efekti • Yeni sinematik giriş animasyonu • Sade ve şık maç yükleme ekranı, karartmalı maç geçişi",
+ "notes": "v3.7.2: Bıçak tutuşu düzeltildi: ekrana giren omuz parçası kaldırıldı, eller daha aşağıda ve temiz görünüyor • v3.7.1: Kurt Adam animasyonları, yeni enerji barı, yeni giriş animasyonu, sade yükleme ekranı",
  "launcher": {
   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/baslatici.pck",
   "size": 1689664

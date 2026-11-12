@@ -1398,8 +1398,8 @@ func _rig_setup(id: String, path: String) -> void:
 const MELEE_ROLL := {"knife": 90.0, "karambit": 90.0}
 var melee_rig := false
 func _rig_setup_melee(id: String, path: String) -> void:
-	_rig_setup(id, path)
 	melee_rig = true
+	_rig_setup(id, path)
 	for mi in vm_weapon.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).visible = true
 	for mi in fp_root.find_children("gun_*", "MeshInstance3D", true, false):
@@ -1408,7 +1408,8 @@ func _rig_setup_melee(id: String, path: String) -> void:
 	var cpos: Vector3 = _v3(fp_meta.get("cam", [0, 0, 0]))
 	var pa := deg_to_rad(float(fp_meta.get("cam_pitch", 0.0)))
 	var cb := Basis(Vector3(-1, 0, 0), Vector3(0, cos(pa), sin(pa)), Vector3(0, sin(pa), -cos(pa)))
-	fp_root.transform = Transform3D(cb, cpos).affine_inverse()
+	# v3.7.1: hands sit a little lower in the view (the shoulders drop out of frame)
+	fp_root.transform = Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-5.0)), Vector3(0.0, -0.1, 0.0)) * Transform3D(cb, cpos).affine_inverse()
 	var sock := fp_root.find_child("knife", true, false) as Node3D
 	var sk: Dictionary = fp_meta.get("socket", {})
 	if sock == null or fp_ap == null or sk.is_empty():
@@ -1460,7 +1461,7 @@ func _unify_rig_arms() -> void:
 			if not (mt is StandardMaterial3D):
 				continue
 			var sm := mt as StandardMaterial3D
-			var akey = [sm, cur == "pence"]
+			var akey = [sm, cur == "pence", melee_rig]
 			if not _arm_mats.has(akey):
 				var sh := ShaderMaterial.new()
 				sh.shader = preload("res://shaders/arm_unify.gdshader")
@@ -1476,6 +1477,9 @@ func _unify_rig_arms() -> void:
 				else:
 					sh.set_shader_parameter("camo_tex", load("res://assets/tex/arm_acu.png"))
 					sh.set_shader_parameter("sleeve_v", float(fp_meta.get("sleeve_v", -1.0)))
+				if melee_rig:
+					# knife rig: the upper arms / shoulders right in front of the lens fade away, only forearms + hands show
+					sh.set_shader_parameter("near_cut", float(fp_meta.get("near_cut", 0.34)))
 				_arm_mats[akey] = sh
 			m3.set_surface_override_material(si, _arm_mats[akey])
 
