@@ -1530,7 +1530,14 @@ func _sp_on_death(victim, attacker, wid: String, head: bool) -> void:
 	get_tree().create_timer((3.5 * (1.0 - GS.gear("respawn"))) if victim == player else 3.0).timeout.connect(func(): if not ended: _spawn(ve, false))
 	_check_win()
 
-## v3.8: SOKAK OPERASYON posters and billboards on real walls near the spawns (deterministic per map)
+## v4.2: SOKAK OPERASYON advertising on real street furniture: back-lit poster stands ("raket")
+## and big two-legged billboards, standing on the ground with their back to a real wall. Nothing floats.
+const POSTERS := ["poster_a", "poster_b", "poster_c"]
+const BILLBOARDS := ["billboard_a", "billboard_b"]
+func _ptex(n: String) -> Texture2D:
+	var path := "res://assets/tex/posters/%s.jpg" % n
+	return load(path) if ResourceLoader.exists(path) else load("res://assets/tex/posters/poster_a.jpg")
+
 func _place_posters() -> void:
 	if map_id == "ayvadisi" or spawn_points.is_empty():
 		return
@@ -1538,63 +1545,166 @@ func _place_posters() -> void:
 	var space := get_world_3d().direct_space_state
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(map_id)
-	var tex_p: Texture2D = load("res://assets/tex/posters/poster_a.jpg")
-	var tex_b: Texture2D = load("res://assets/tex/posters/billboard_a.jpg")
 	var placed: Array[Vector3] = []
-	var want_p := 6
-	var want_b := 2
-	for tries in 260:
+	var want_p := 12
+	var want_b := 4
+	var bx0 := float(bounds[0]) + 2.0; var bx1 := float(bounds[2]) - 2.0
+	var bz0 := -float(bounds[3]) + 2.0; var bz1 := -float(bounds[1]) - 2.0
+	for tries in 600:
 		if want_p <= 0 and want_b <= 0:
 			break
 		var sp: Dictionary = spawn_points[rng.randi() % spawn_points.size()]
-		var big := want_b > 0 and tries % 3 == 0
-		var w := 5.2 if big else 1.25
-		var h := 2.4 if big else 1.85
-		var o: Vector3 = sp["pos"] + Vector3(rng.randf_range(-6, 6), (3.2 if big else 1.75), rng.randf_range(-6, 6))
+		var big := want_b > 0 and (tries % 3 == 0 or want_p <= 0)
+		var spos: Vector3 = sp["pos"]
+		var o: Vector3 = spos + Vector3(rng.randf_range(-14, 14), 1.4, rng.randf_range(-14, 14))
 		var a := rng.randf() * TAU
 		var dir := Vector3(sin(a), 0, cos(a))
-		var r := space.intersect_ray(PhysicsRayQueryParameters3D.create(o, o + dir * 22.0, 1))
+		var r := space.intersect_ray(PhysicsRayQueryParameters3D.create(o, o + dir * 26.0, 1))
 		if r.is_empty():
 			continue
+		var hp: Vector3 = r["position"]
+		# the invisible map boundary is not a wall you can put a sign against
+		if hp.x < bx0 or hp.x > bx1 or hp.z < bz0 or hp.z > bz1:
+			continue
 		var n: Vector3 = r["normal"]
-		if absf(n.y) > 0.15 or o.distance_to(r["position"]) < 2.5:
+		if absf(n.y) > 0.1 or o.distance_to(hp) < 3.0:
 			continue
 		n.y = 0.0; n = n.normalized()
-		var c: Vector3 = r["position"]
 		var right := Vector3.UP.cross(n).normalized()
-		# the whole poster must sit on one flat wall: probe its corners
-		var ok := true
-		for cx in [-0.5, 0.5]:
-			for cy in [-0.5, 0.5]:
-				var pc: Vector3 = c + right * w * float(cx) + Vector3.UP * h * float(cy)
-				var rr := space.intersect_ray(PhysicsRayQueryParameters3D.create(pc + n * 0.4, pc - n * 0.4, 1))
-				if rr.is_empty() or absf(rr["position"].distance_to(pc)) > 0.08 or (rr["normal"] as Vector3).dot(n) < 0.95:
-					ok = false
-		if not ok or c.y - h * 0.5 < (sp["pos"] as Vector3).y - 0.6:
+		var half_w := 2.9 if big else 0.75
+		var depth := 0.45 if big else 0.35
+		var base := hp + n * (depth + 0.12)
+		# solid ground under the whole footprint, level with this spawn area
+		var gy := -1000.0
+		var ground_ok := true
+		for k in [-1.0, 0.0, 1.0]:
+			var gp: Vector3 = base + right * half_w * float(k)
+			var gr := space.intersect_ray(PhysicsRayQueryParameters3D.create(gp + Vector3.UP * 2.0, gp + Vector3.DOWN * 3.0, 1))
+			if gr.is_empty():
+				ground_ok = false; break
+			var y: float = gr["position"].y
+			if gy > -999.0 and absf(y - gy) > 0.25:
+				ground_ok = false; break
+			gy = maxf(gy, y)
+		if not ground_ok or absf(gy - spos.y) > 1.5:
+			continue
+		base.y = gy
+		# the wall must be there behind the whole width (no sign sticking out past a corner)
+		var wall_ok := true
+		for k in [-1.0, 1.0]:
+			var wp: Vector3 = base + right * half_w * float(k) + Vector3.UP * 1.2
+			var wr := space.intersect_ray(PhysicsRayQueryParameters3D.create(wp, wp - n * (depth + 0.6), 1))
+			if wr.is_empty():
+				wall_ok = false
+		if not wall_ok:
+			continue
+		# free space for the stand (nothing else standing there)
+		var q := PhysicsShapeQueryParameters3D.new()
+		var bs := BoxShape3D.new()
+		var hgt := 5.6 if big else 2.2
+		bs.size = Vector3(half_w * 2.0, hgt - 0.2, depth * 1.6)
+		q.shape = bs
+		q.transform = Transform3D(Basis(right, Vector3.UP, n), base + Vector3.UP * (hgt * 0.5 + 0.1))
+		q.collision_mask = 1
+		if not space.intersect_shape(q, 1).is_empty():
 			continue
 		var close := false
-		for q in placed:
-			if q.distance_to(c) < 7.0:
+		for pq in placed:
+			if pq.distance_to(base) < (9.0 if big else 6.0):
 				close = true
 		if close:
 			continue
-		placed.append(c)
-		var mi := MeshInstance3D.new()
-		var qm := QuadMesh.new()
-		qm.size = Vector2(w, h)
-		mi.mesh = qm
-		var mt := StandardMaterial3D.new()
-		mt.albedo_texture = tex_b if big else tex_p
-		mt.roughness = 0.75
-		mt.uv1_scale = Vector3(1, 1, 1)
-		mi.material_override = mt
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		statics.add_child(mi)
-		mi.global_transform = Transform3D(Basis(right, Vector3.UP, n), c + n * 0.025)
+		placed.append(base)
+		var xf := Transform3D(Basis(right, Vector3.UP, n), base)
+		if OS.has_environment("SIGNDBG"):
+			print("SIGN ", big, " ", base, " ", n)
 		if big:
+			_billboard(xf, _ptex(BILLBOARDS[(4 - want_b) % BILLBOARDS.size()]))
 			want_b -= 1
 		else:
+			_poster_stand(xf, _ptex(POSTERS[(12 - want_p) % POSTERS.size()]), _ptex(POSTERS[(13 - want_p) % POSTERS.size()]))
 			want_p -= 1
+
+static var _sign_steel: StandardMaterial3D
+func _sign_mats() -> void:
+	if _sign_steel == null:
+		_sign_steel = StandardMaterial3D.new()
+		_sign_steel.albedo_color = Color(0.13, 0.14, 0.15)
+		_sign_steel.metallic = 0.75
+		_sign_steel.roughness = 0.38
+
+func _sign_box(parent: Node3D, sz: Vector3, pos: Vector3, m: Material) -> void:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new(); bm.size = sz
+	mi.mesh = bm
+	mi.material_override = m
+	mi.position = pos
+	parent.add_child(mi)
+
+func _sign_face(parent: Node3D, tex: Texture2D, sz: Vector2, pos: Vector3, back: bool, glow: float) -> void:
+	var mi := MeshInstance3D.new()
+	var qm := QuadMesh.new(); qm.size = sz
+	mi.mesh = qm
+	var mt := StandardMaterial3D.new()
+	mt.albedo_texture = tex
+	mt.roughness = 0.25
+	mt.clearcoat_enabled = true; mt.clearcoat = 0.6; mt.clearcoat_roughness = 0.1
+	if glow > 0.0:
+		# back-lit panel (like a real city light poster)
+		mt.emission_enabled = true
+		mt.emission_texture = tex
+		mt.emission_energy_multiplier = glow
+	mi.material_override = mt
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = pos
+	if back:
+		mi.rotation.y = PI
+	parent.add_child(mi)
+
+func _sign_collider(parent: Node3D, sz: Vector3, pos: Vector3) -> void:
+	var sb := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new(); bs.size = sz
+	cs.shape = bs
+	sb.add_child(cs)
+	sb.position = pos
+	parent.add_child(sb)
+
+func _poster_stand(xf: Transform3D, tex: Texture2D, tex2: Texture2D) -> void:
+	## free-standing back-lit poster box on a concrete foot (1.3 x 2.1 m)
+	_sign_mats()
+	var root := Node3D.new()
+	statics.add_child(root)
+	root.global_transform = xf
+	var foot := StandardMaterial3D.new()
+	foot.albedo_color = Color(0.5, 0.5, 0.49); foot.roughness = 0.9
+	_sign_box(root, Vector3(1.5, 0.22, 0.5), Vector3(0, 0.11, 0), foot)
+	_sign_box(root, Vector3(1.42, 2.0, 0.2), Vector3(0, 1.22, 0), _sign_steel)
+	_sign_box(root, Vector3(1.5, 0.08, 0.26), Vector3(0, 2.25, 0), _sign_steel)
+	_sign_face(root, tex, Vector2(1.22, 1.82), Vector3(0, 1.22, 0.102), false, 0.35)
+	_sign_face(root, tex2, Vector2(1.22, 1.82), Vector3(0, 1.22, -0.102), true, 0.35)
+	_sign_collider(root, Vector3(1.5, 2.3, 0.5), Vector3(0, 1.15, 0))
+
+func _billboard(xf: Transform3D, tex: Texture2D) -> void:
+	## two-legged roadside billboard (5.6 x 2.6 m panel at 2.7 m) with a catwalk and lamp heads
+	_sign_mats()
+	var root := Node3D.new()
+	statics.add_child(root)
+	root.global_transform = xf
+	for sx in [-1.8, 1.8]:
+		_sign_box(root, Vector3(0.24, 2.9, 0.24), Vector3(sx, 1.45, -0.05), _sign_steel)
+		_sign_box(root, Vector3(0.6, 0.12, 0.6), Vector3(sx, 0.06, -0.05), _sign_steel)
+		_sign_collider(root, Vector3(0.3, 2.9, 0.3), Vector3(sx, 1.45, -0.05))
+	_sign_box(root, Vector3(5.8, 2.8, 0.2), Vector3(0, 4.1, -0.05), _sign_steel)
+	_sign_face(root, tex, Vector2(5.5, 2.52), Vector3(0, 4.1, 0.052), false, 0.22)
+	_sign_box(root, Vector3(5.8, 0.06, 0.7), Vector3(0, 2.68, 0.25), _sign_steel)
+	var lamp := StandardMaterial3D.new()
+	lamp.albedo_color = Color(1, 0.95, 0.85); lamp.emission_enabled = true
+	lamp.emission = Color(1, 0.93, 0.8); lamp.emission_energy_multiplier = 3.0
+	for lx in [-1.9, 0.0, 1.9]:
+		_sign_box(root, Vector3(0.05, 0.05, 0.55), Vector3(lx, 5.6, 0.22), _sign_steel)
+		_sign_box(root, Vector3(0.36, 0.08, 0.16), Vector3(lx, 5.56, 0.5), lamp)
+	_sign_collider(root, Vector3(5.8, 2.8, 0.3), Vector3(0, 4.1, -0.05))
 
 var comms: Node3D
 func ensure_comms() -> Node3D:

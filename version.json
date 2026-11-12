@@ -1,51 +1,51 @@
 {
- "version": "4.2.0",
- "build": 55,
+ "version": "4.2.1",
+ "build": 56,
  "parts": [
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v55.pck.part00",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part00",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v55.pck.part01",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part01",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v55.pck.part02",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part02",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v55.pck.part03",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part03",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v55.pck.part04",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part04",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v55.pck.part05",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part05",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v55.pck.part06",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part06",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v55.pck.part07",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part07",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v55.pck.part08",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part08",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v55.pck.part09",
-   "size": 69735740
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part09",
+   "size": 71798672
   }
  ],
- "pck_size": 919082300,
+ "pck_size": 921145232,
  "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
- "notes": "v4.2: İnşaat haritası tamamen kapalı şantiye panolarıyla çevrildi + yeni siper düzeni (konteyner koridoru, prefabrik beton alanı, ortada kademeli bariyerler) • Maç içi para: öldürme +$300, bıçak +$1500 • B menüsünden zırh: Hafif Yelek $350, Kevlar $650, Yelek+Kask $1000 (botlar da alıyor) • Ölme süresi uzadı (hasar %18 azaldı, bedava zırh kalktı) • Kurt botlar sıçrayıp atılıyor, ağır pençe vuruyor, vurulunca takla atıp kaçıyor",
+ "notes": "v4.2.1: SOKAK Operasyon reklamları artık havada değil — yerde duran ışıklı afiş panoları (12 adet) ve iki ayaklı büyük reklam panoları (4 adet), 5 farklı afiş tasarımı • İnşaat: açık beton zemin, kırmızı kolon kalıpları (üstünde filizler), paletli briket yığınları, yeşil şantiye filesi artık yarı saydam",
  "launcher": {
   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/baslatici.pck",
   "size": 1689664

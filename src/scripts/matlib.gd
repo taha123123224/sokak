@@ -13,6 +13,9 @@ var DEFS := {
 	"asphalt": ["asphalt", 0.22, Color(1.3, 1.3, 1.32), 0.95, 0, {}],
 	"curb": ["concrete", 0.8, Color(1.1, 1.1, 1.08), -1, 0, {}],
 	"concrete": ["rawconc", 0.3, Color(1.0, 0.99, 0.97), -1, 0, {}],
+	"site_floor": ["concrete", 0.22, Color(1.08, 1.08, 1.06), 0.55, 0, {}],
+	"pallet_wood": ["planks", 0.8, Color(1.1, 1.05, 0.9), -1, 0, {}],
+	"formwork": ["woodbeam", 0.8, Color(1.0, 0.85, 0.65), -1, 0, {}],
 	"plaster_white": ["plaster", 0.35, Color(0.86, 0.84, 0.79), -1, 0, {}],
 	"plaster_cream": ["plaster", 0.35, Color(0.86, 0.80, 0.67), -1, 0, {}],
 	"plaster_ochre": ["plaster", 0.35, Color(0.78, 0.63, 0.45), -1, 0, {}],
@@ -261,6 +264,17 @@ func get_mat(name: String) -> Material:
 		s.roughness = 1.0
 		s.cull_mode = BaseMaterial3D.CULL_BACK
 		s.render_priority = 1
+		m = s
+	elif name == "scaffold_net":
+		# v4.2: see-through green shade net (was an opaque green sheet)
+		var s := StandardMaterial3D.new()
+		s.albedo_texture = tex("scaffold_net.png")
+		s.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_DEPTH_PRE_PASS
+		s.cull_mode = BaseMaterial3D.CULL_DISABLED
+		s.uv1_triplanar = true
+		s.uv1_world_triplanar = true
+		s.uv1_scale = Vector3(2.5, 2.5, 2.5)
+		s.roughness = 0.95
 		m = s
 	elif name.begins_with("poster"):
 		var s := StandardMaterial3D.new()

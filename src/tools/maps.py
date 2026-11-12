@@ -2011,6 +2011,25 @@ def hoarding(x0, y0, x1, y1, mm, h=5.2, gate=None):
         box('hd_corner', (0.5, 0.5, h + 0.4), (cx, cy, (h + 0.4) / 2), m=mm['concrete'])
 
 
+def formwork_column(x, y, mm, h=3.4, rot=0):
+    """red steel column formwork with a concrete cap and rebar sticking out (cover pillar)"""
+    fm = M('poster_formwork', (0.8, 0.8, 0.8), 0.55, 0.3)
+    b = box('fw_col', (1.3, 1.3, h), (x, y, h / 2), (0, 0, rot), m=fm); b['normuv'] = True
+    box('fw_cap', (1.42, 1.42, 0.22), (x, y, h + 0.11), (0, 0, rot), m=mm['concrete'])
+    for dx in (-0.45, -0.15, 0.15, 0.45):
+        for dy in (-0.45, 0.45):
+            cyl('fw_rebar', 0.018, 0.9, (x + dx, y + dy, h + 0.65), m=M('rebar_rust', (0.35, 0.18, 0.1), 0.8, 0.6), axis='Z', verts=5)
+    col((x, y, h / 2), (1.3, 1.3, h), rotz=rot)
+
+
+def block_stack(x, y, sx, sy, sz, rot=0):
+    """pallet-stacked hollow concrete blocks"""
+    bm = M('poster_blocks', (0.8, 0.8, 0.8), 0.9)
+    b = box('blocks', (sx, sy, sz), (x, y, 0.12 + sz / 2), (0, 0, rot), m=bm); b['normuv'] = True
+    box('blk_pallet', (sx, sy, 0.12), (x, y, 0.06), (0, 0, rot), m=M('pallet_wood', (0.55, 0.42, 0.28), 0.9))
+    col((x, y, (sz + 0.12) / 2), (sx, sy, sz + 0.12), rotz=rot)
+
+
 def sand_pile(x, y, r, h, m):
     cyl('sand', r, h, (x, y, h / 2), m=m, axis='Z', verts=18, r2=r * 0.15)
     col((x, y, h * 0.35), (r * 1.3, r * 1.3, h * 0.7))
@@ -2080,7 +2099,8 @@ def map_insaat():
     dirt = M('site_dirt', (0.45, 0.37, 0.28), 0.95)
     gravel = M('gravel', (0.5, 0.48, 0.45), 0.95)
     ground('site', X0 - 260, Y0 - 260, X1 + 260, Y1 + 260, 0, dirt)
-    box('pad', (30, 22, 0.06), (0, 4, 0.03), m=mm['concrete'])
+    box('pad', (X1 - X0 + 1, Y1 - Y0 + 1, 0.04), (0, 0, 0.02), m=M('site_floor', (0.62, 0.62, 0.6), 0.6))
+    box('pad2', (30, 22, 0.06), (0, 4, 0.03), m=mm['concrete'])
     box('road', (68, 7, 0.05), (0, -24, 0.025), m=gravel)
     # ---- unfinished 3-storey concrete frame (20 x 14) with an open roof slab
     BX, BY, BW, BD, FH = 0, 6, 20, 14, 3.6
@@ -2168,10 +2188,19 @@ def map_insaat():
             box('precast', (3.8, 1.6, 0.3), (sx, sy, 0.15 + k * 0.32), (0, 0, r + RND.uniform(-3, 3)), m=mm['concrete'])
         col((sx, sy, n * 0.16), (3.8 if r == 0 else 1.6, 1.6 if r == 0 else 3.8, n * 0.32))
     container(20, 6, 0, 0, mm['c_white'], mm)
-    # MID: staggered half-cover between the building and the road
-    for (jx, jy, r) in [(-8, -6, 0), (-2, -9, 0), (5, -5, 0), (10, -11, 0), (-12, -13, 90), (2, -15, 90)]:
-        jersey(jx, jy, r, mm)
-    for (px, py) in [(-4.5, -12.5), (7.5, -8), (12.5, -2)]:
+    # MID: red column formwork pillars + stacked block pallets (tall cover / waist cover / a jump-up platform)
+    for (fx, fy) in [(-7, -5), (3, -6.5), (11, -9), (-3, -14), (15, -15)]:
+        formwork_column(fx, fy, mm)
+    block_stack(-11, -9, 3.6, 1.3, 1.0)
+    block_stack(-11, -10.3, 3.6, 1.3, 1.0)
+    block_stack(6.5, -11.5, 1.3, 1.3, 1.7)
+    block_stack(0, -10, 2.6, 1.3, 1.0)
+    block_stack(14, -3, 1.3, 2.6, 1.3)
+    block_stack(-15, 0, 1.3, 1.3, 1.7)
+    jersey(9, -2, 0, mm)
+    jersey(-1, -19, 0, mm)
+    crate(-5.5, -9.5, 0, 1.25, mm, rot=15)
+    for (px, py) in [(7.5, -7), (12.5, -1)]:
         pallet_stack(px, py, RND.randint(3, 5), mm)
     # NORTH yard (behind the building): rebar racks + formwork stacks so the A side has cover to the frame
     for (fx, fy) in [(-6, 18), (4, 19.5), (12, 17)]:
