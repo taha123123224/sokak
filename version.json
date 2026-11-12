@@ -1,51 +1,51 @@
 {
- "version": "3.8.0",
- "build": 51,
+ "version": "3.9.0",
+ "build": 52,
  "parts": [
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v51.pck.part00",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v52.pck.part00",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v51.pck.part01",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v52.pck.part01",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v51.pck.part02",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v52.pck.part02",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v51.pck.part03",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v52.pck.part03",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v51.pck.part04",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v52.pck.part04",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v51.pck.part05",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v52.pck.part05",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v51.pck.part06",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v52.pck.part06",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v51.pck.part07",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v52.pck.part07",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v51.pck.part08",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v52.pck.part08",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v51.pck.part09",
-   "size": 66450132
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v52.pck.part09",
+   "size": 66458292
   }
  ],
- "pck_size": 915796692,
+ "pck_size": 915804852,
  "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
- "notes": "v3.8.0: YENİ MOD: BAYRAK SAVAŞI • G: silahı yere at, E: yerden al, ölenin çantasından mermi • T: sprey boya, B: telsiz mesajları (bomba artık X) • Haritalarda SOKAK OPERASYON afişleri • YENİ Ay Vadisi: karlı dağlar, nehir, köprüler, klan kampları • Yeni modeller: SCAR-H, Kar98, MP5, P90, Vector, M249, Magnum, Deagle + yeni silah sesleri",
+ "notes": "v3.9.0: MARKET > EKİPMAN: Kevlar / Çelik Yelek, Çelik Kask, Taktik & Nişancı Eldiveni (hızlı silah çıkarma, az tepme), Sessiz & Koşu Postalı, Mühimmat & Bomba Çantası, Hızlı Doğma / Adrenalin / Toparlanma kartları • Yeni satın alma animasyonu • v3.8: Bayrak Savaşı, yere silah atma, sprey, telsiz, yeni Ay Vadisi, yeni silah modelleri",
  "launcher": {
   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/baslatici.pck",
   "size": 1689664

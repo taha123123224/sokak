@@ -304,6 +304,10 @@
 		"crates2": {
 
 		},
+		"gear": [],
+		"gear_eq": {
+
+		},
 		"gold": 7500,
 		"level": 1,
 		"mats": {
@@ -413,6 +417,56 @@
 		"vector",
 		"scar"
 	],
+	"gear": {
+		"adrenalin": {
+			"price": 9500,
+			"slot": "kart"
+		},
+		"bomba_canta": {
+			"price": 8000,
+			"slot": "canta"
+		},
+		"celik_kask": {
+			"price": 9000,
+			"slot": "kask"
+		},
+		"celik_yelek": {
+			"price": 14000,
+			"slot": "yelek"
+		},
+		"hizli_dogma": {
+			"price": 7500,
+			"slot": "kart"
+		},
+		"kevlar": {
+			"price": 6000,
+			"slot": "yelek"
+		},
+		"kosu_postal": {
+			"price": 8500,
+			"slot": "postal"
+		},
+		"muhimmat": {
+			"price": 5000,
+			"slot": "canta"
+		},
+		"nisanci_eld": {
+			"price": 11000,
+			"slot": "eldiven"
+		},
+		"sessiz_postal": {
+			"price": 6500,
+			"slot": "postal"
+		},
+		"taktik_eld": {
+			"price": 7000,
+			"slot": "eldiven"
+		},
+		"toparlanma": {
+			"price": 10000,
+			"slot": "kart"
+		}
+	},
 	"max_lvl": 7,
 	"missions": [
 		{

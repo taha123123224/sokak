@@ -2712,7 +2712,7 @@ func _page_market() -> void:
 	var ttl := UI.lbl("MAĞAZA", 50, Color.WHITE, "Teko")
 	ttl.custom_minimum_size = Vector2(210, 0)
 	th.add_child(ttl)
-	for t in [["silah", "SİLAHLAR"], ["stil", "KAPLAMALAR"], ["kasa", "KASALAR"], ["karakter", "AJANLAR"], ["eklenti", "EKLENTİLER"], ["malzeme", "MALZEME"]]:
+	for t in [["silah", "SİLAHLAR"], ["ekipman", "EKİPMAN"], ["stil", "KAPLAMALAR"], ["kasa", "KASALAR"], ["karakter", "AJANLAR"], ["eklenti", "EKLENTİLER"], ["malzeme", "MALZEME"]]:
 		var on: bool = market_tab == t[0]
 		var tb := Button.new()
 		tb.text = t[1]
@@ -2822,6 +2822,9 @@ func _page_market() -> void:
 			set_showcase("frag")
 			for pi in GS.Econ.PACKS.size():
 				grid.add_child(_store_pack_tile(pi))
+		"ekipman":
+			sc.queue_free()
+			v.add_child(_gear_page())
 
 var mk_info: PanelContainer
 func _mk_preview(id: String, skin: String) -> void:
@@ -3267,20 +3270,244 @@ func _store_detail(id: String) -> void:
 	buy.disabled = int(GS.profile["gold"]) < int(w["price"])
 	bh.add_child(buy)
 
+## ---------------------------------------------------------------- v3.9 EKİPMAN (Zula-style gear)
+const GEAR_ICON := {"yelek": "⛨", "kask": "⛑", "eldiven": "✋", "postal": "⚡", "canta": "▣", "kart": "♦"}
+func _gear_page() -> Control:
+	var outer := UI.vbox(14)
+	outer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# loadout strip: the six slots with what is equipped
+	var strip := PanelContainer.new()
+	var ssb := UI.sb(Color(0.045, 0.05, 0.062, 1.0), Color(1, 1, 1, 0.06), 1, 6, 14)
+	strip.add_theme_stylebox_override("panel", ssb)
+	outer.add_child(strip)
+	var sh := UI.hbox(12)
+	strip.add_child(sh)
+	var lt := UI.vbox(0)
+	lt.custom_minimum_size = Vector2(210, 0)
+	lt.add_child(UI.lbl("TAKILI EKİPMAN", 15, UI.ACCENT, "Rajdhani-Bold"))
+	lt.add_child(UI.lbl("Her yuvaya bir parça. Etkiler maçta hemen uygulanır.", 14, Color(1, 1, 1, 0.5), "Rajdhani-SemiBold"))
+	lt.get_child(1).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sh.add_child(lt)
+	var eq: Dictionary = GS.gear_eq()
+	for sl in GS.GEAR_SLOTS:
+		var cell := PanelContainer.new()
+		var gid := str(eq.get(sl[0], ""))
+		var has: bool = gid != "" and GS.GEAR.has(gid) and GS.gear_owned(gid)
+		var rc: Color = GS.RARITY_COLORS[int(GS.GEAR[gid]["rar"])] if has else Color(1, 1, 1, 0.12)
+		var csb := UI.sb(Color(0.07, 0.078, 0.095, 1.0), rc, 1, 6, 6)
+		csb.border_width_bottom = 3
+		cell.add_theme_stylebox_override("panel", csb)
+		cell.custom_minimum_size = Vector2(150, 104)
+		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var cv := UI.vbox(0)
+		cell.add_child(cv)
+		cv.add_child(UI.lbl(str(sl[1]), 13, Color(1, 1, 1, 0.45), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+		if has:
+			var ic := TextureRect.new()
+			ic.texture = load("res://assets/ui/gear/%s.png" % gid)
+			ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			ic.custom_minimum_size = Vector2(0, 52)
+			cv.add_child(ic)
+			cv.add_child(UI.lbl(str(GS.GEAR[gid]["name"]), 14, Color.WHITE, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+		else:
+			cv.add_child(UI.lbl(GEAR_ICON.get(sl[0], "+"), 34, Color(1, 1, 1, 0.14), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+			cv.add_child(UI.lbl("BOŞ", 14, Color(1, 1, 1, 0.3), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+		sh.add_child(cell)
+	# all gear, grouped by slot
+	var sc := ScrollContainer.new()
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	outer.add_child(sc)
+	var list := UI.vbox(18)
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(list)
+	for sl in GS.GEAR_SLOTS:
+		var hdr := UI.hbox(10)
+		hdr.add_child(UI.lbl(GEAR_ICON.get(sl[0], "") + "  " + str(sl[1]), 22, Color.WHITE, "Teko"))
+		var ln := ColorRect.new(); ln.color = Color(1, 1, 1, 0.07); ln.custom_minimum_size = Vector2(0, 1)
+		ln.size_flags_horizontal = Control.SIZE_EXPAND_FILL; ln.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		hdr.add_child(ln)
+		list.add_child(hdr)
+		var row := GridContainer.new()
+		row.columns = 4
+		row.add_theme_constant_override("h_separation", 12)
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		list.add_child(row)
+		for gid in GS.GEAR.keys():
+			if str(GS.GEAR[gid]["slot"]) == str(sl[0]):
+				row.add_child(_gear_card(gid))
+	return outer
+
+func _gear_card(gid: String) -> Control:
+	var gd: Dictionary = GS.GEAR[gid]
+	var rc: Color = GS.RARITY_COLORS[int(gd["rar"])]
+	var owned := GS.gear_owned(gid)
+	var on: bool = str(GS.gear_eq().get(str(gd["slot"]), "")) == gid and owned
+	var card := PanelContainer.new()
+	var sb := _store_bg(rc)
+	sb.content_margin_left = 14; sb.content_margin_right = 14; sb.content_margin_top = 10; sb.content_margin_bottom = 12
+	if on:
+		sb.border_color = UI.GREEN
+		sb.border_width_left = 2; sb.border_width_right = 2; sb.border_width_top = 2
+	card.add_theme_stylebox_override("panel", sb)
+	card.custom_minimum_size = Vector2(0, 300)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var v := UI.vbox(6)
+	card.add_child(v)
+	var top := UI.hbox(6)
+	v.add_child(top)
+	top.add_child(UI.lbl(GS.RARITY_NAMES[int(gd["rar"])].to_upper(), 13, rc.lightened(0.2), "Rajdhani-Bold"))
+	top.add_child(UI.spacer())
+	if on:
+		top.add_child(UI.lbl("✔ TAKILI", 13, UI.GREEN, "Rajdhani-Bold"))
+	elif owned:
+		top.add_child(UI.lbl("SAHİPSİN", 13, Color(1, 1, 1, 0.55), "Rajdhani-Bold"))
+	# icon on a soft rarity halo
+	var art := Control.new()
+	art.custom_minimum_size = Vector2(0, 130)
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(art)
+	var halo := TextureRect.new()
+	var gt := GradientTexture2D.new(); var g := Gradient.new()
+	g.set_color(0, Color(rc, 0.32)); g.set_color(1, Color(rc, 0.0))
+	gt.gradient = g; gt.fill = GradientTexture2D.FILL_RADIAL; gt.fill_from = Vector2(0.5, 0.5); gt.fill_to = Vector2(0.95, 0.95)
+	halo.texture = gt; halo.set_anchors_preset(Control.PRESET_FULL_RECT); halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art.add_child(halo)
+	var ic := TextureRect.new()
+	ic.texture = load("res://assets/ui/gear/%s.png" % gid)
+	ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	ic.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art.add_child(ic)
+	ic.resized.connect(func(): ic.pivot_offset = ic.size * 0.5)
+	card.mouse_entered.connect(func(): ic.create_tween().tween_property(ic, "scale", Vector2(1.08, 1.08), 0.15))
+	card.mouse_exited.connect(func(): ic.create_tween().tween_property(ic, "scale", Vector2.ONE, 0.15))
+	v.add_child(UI.lbl(str(gd["name"]), 22, Color.WHITE, "Rajdhani-Bold"))
+	var d := UI.lbl(str(gd["desc"]), 15, Color(1, 1, 1, 0.62), "Rajdhani-SemiBold")
+	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	d.custom_minimum_size = Vector2(0, 40)
+	v.add_child(d)
+	v.add_child(UI.spacer())
+	if not owned:
+		var bb := UI.btn("◉ %s   SATIN AL" % UI.money(int(gd["price"])), func(): _buy_gear(gid), 18, true, 0, 42)
+		bb.disabled = int(GS.profile["gold"]) < int(gd["price"])
+		v.add_child(bb)
+	elif on:
+		v.add_child(UI.btn("ÇIKAR", func(): _equip_gear(str(gd["slot"]), ""), 17, false, 0, 42))
+	else:
+		v.add_child(UI.btn("TAK", func(): _equip_gear(str(gd["slot"]), gid), 18, true, 0, 42))
+	return card
+
+func _buy_gear(gid: String) -> void:
+	var r: Dictionary = await _act("buy_gear", {"id": gid})
+	if not r["ok"]:
+		return
+	var gd: Dictionary = GS.GEAR[gid]
+	purchase_fx(load("res://assets/ui/gear/%s.png" % gid), str(gd["name"]), "TAKILDI  •  " + str(gd["desc"]), GS.RARITY_COLORS[int(gd["rar"])], int(gd["price"]))
+	show_page("market")
+
+func _equip_gear(slot: String, gid: String) -> void:
+	var r: Dictionary = await _act("equip_gear", {"slot": slot, "id": gid})
+	if not r["ok"]:
+		return
+	SFX.play("equip", -6)
+	show_page("market")
+
+## full-screen purchase celebration: light rays, the item pops in, name + price, then it fades away
+const RAYS_SHADER := """
+shader_type canvas_item;
+uniform vec4 col : source_color = vec4(1.0, 0.7, 0.3, 1.0);
+uniform float k = 0.0;
+void fragment() {
+	vec2 p = UV - 0.5;
+	p.x *= 1.777;
+	float r = length(p);
+	float a = atan(p.y, p.x);
+	float rays = pow(0.5 + 0.5 * sin(a * 14.0 + TIME * 0.8), 6.0) * smoothstep(0.75, 0.05, r);
+	float core = exp(-r * r * 18.0);
+	float ring = exp(-pow((r - 0.12 - k * 0.35) * 30.0, 2.0)) * (1.0 - k);
+	vec3 c = col.rgb * (rays * 0.35 + core * 0.9 + ring * 1.2);
+	COLOR = vec4(c, clamp(rays * 0.35 + core * 0.8 + ring, 0.0, 1.0) * col.a);
+}
+"""
+func purchase_fx(tex: Texture2D, title: String, sub: String, col: Color, price: int = 0) -> void:
+	SFX.play("buy", -2)
+	var layer := Control.new()
+	layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	ui.add_child(layer)
+	var bg := ColorRect.new()
+	bg.color = Color(0.01, 0.012, 0.018, 0.0)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(bg)
+	var rays := ColorRect.new()
+	rays.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rays.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var rm := ShaderMaterial.new(); var rs := Shader.new(); rs.code = RAYS_SHADER; rm.shader = rs
+	rm.set_shader_parameter("col", Color(col.r, col.g, col.b, 0.0))
+	rays.material = rm
+	layer.add_child(rays)
+	var ic := TextureRect.new()
+	ic.texture = tex
+	ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	ic.set_anchors_preset(Control.PRESET_CENTER)
+	ic.offset_left = -190; ic.offset_right = 190; ic.offset_top = -230; ic.offset_bottom = 70
+	ic.pivot_offset = Vector2(190, 150)
+	ic.scale = Vector2(0.2, 0.2)
+	ic.modulate.a = 0.0
+	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(ic)
+	var tv := UI.vbox(4)
+	tv.set_anchors_preset(Control.PRESET_CENTER)
+	tv.offset_left = -500; tv.offset_right = 500; tv.offset_top = 90; tv.offset_bottom = 260
+	tv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(tv)
+	var head := UI.lbl("S A T I N   A L I N D I", 18, col.lightened(0.25), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+	tv.add_child(head)
+	var nm := UI.lbl(title.to_upper(), 58, Color.WHITE, "Teko", HORIZONTAL_ALIGNMENT_CENTER)
+	tv.add_child(nm)
+	var sl := UI.lbl(sub, 18, Color(1, 1, 1, 0.65), "Rajdhani-SemiBold", HORIZONTAL_ALIGNMENT_CENTER)
+	sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tv.add_child(sl)
+	if price > 0:
+		tv.add_child(UI.lbl("◉ -" + UI.money(price), 22, UI.GOLD, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+	tv.modulate.a = 0.0
+	var tw := layer.create_tween()
+	tw.set_parallel()
+	tw.tween_property(bg, "color:a", 0.86, 0.25)
+	tw.tween_method(func(x): rm.set_shader_parameter("col", Color(col.r, col.g, col.b, x)), 0.0, 1.0, 0.35)
+	tw.tween_method(func(x): rm.set_shader_parameter("k", x), 0.0, 1.0, 0.9)
+	tw.tween_property(ic, "modulate:a", 1.0, 0.2).set_delay(0.08)
+	tw.tween_property(ic, "scale", Vector2.ONE, 0.55).set_delay(0.08).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(tv, "modulate:a", 1.0, 0.35).set_delay(0.35)
+	tw.tween_property(tv, "position:y", tv.position.y, 0.45).from(tv.position.y + 24).set_delay(0.35).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	var close := func():
+		if not is_instance_valid(layer):
+			return
+		var t2 := layer.create_tween()
+		t2.tween_property(layer, "modulate:a", 0.0, 0.3)
+		t2.tween_callback(layer.queue_free)
+	layer.gui_input.connect(func(e): if e is InputEventMouseButton and e.pressed: close.call())
+	get_tree().create_timer(2.6).timeout.connect(close)
+
 func _buy_weapon(id: String) -> void:
 	var r: Dictionary = await _act("buy_weapon", {"id": id})
 	if not r["ok"]:
 		return
-	SFX.play("buy")
-	_toast(GS.WEAPONS[id]["name"] + " çantana eklendi!", UI.GREEN)
+	var kt: Texture2D = load("res://assets/ui/kf/%s.png" % id) if ResourceLoader.exists("res://assets/ui/kf/%s.png" % id) else null
+	purchase_fx(kt, str(GS.WEAPONS[id]["name"]), "Çantana eklendi  •  " + str(GS.WEAPONS[id].get("cls", "")), STORE_GRADE_COL[_store_grade(id)], int(GS.WEAPONS[id]["price"]))
 	show_page("market")
 
 func _buy_skin(id: String, sk: String) -> void:
 	var r: Dictionary = await _act("buy_skin", {"wid": id, "skin": sk})
 	if not r["ok"]:
 		return
-	SFX.play("buy")
-	_toast(GS.SKINS[sk]["name"] + " stili alındı ve uygulandı!", UI.GREEN)
+	var kt2: Texture2D = load("res://assets/ui/kf/%s.png" % id) if ResourceLoader.exists("res://assets/ui/kf/%s.png" % id) else null
+	purchase_fx(kt2, str(GS.SKINS[sk]["name"]), "%s için kaplama alındı ve uygulandı" % str(GS.WEAPONS[id]["name"]), GS.RARITY_COLORS[int(GS.SKINS[sk]["rarity"])], int(GS.SKINS[sk]["price"]))
 	show_page("market")
 
 func _buy_pack(i: int) -> void:
@@ -5017,6 +5244,10 @@ func _page_mods() -> void:
 # ---------------------------------------------------------------- screenshot test hooks
 func test_hook(i: int) -> void:
 	match i:
+		68:
+			market_tab = "ekipman"; show_page("market")
+		69:
+			purchase_fx(load("res://assets/ui/gear/celik_yelek.png"), "Çelik Yelek", "TAKILDI  •  Gövdeye gelen hasar %15 azalır", GS.RARITY_COLORS[3], 14000)
 		60:
 			_store_detail("scar")
 		61:
