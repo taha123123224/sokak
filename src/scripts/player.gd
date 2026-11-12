@@ -1324,6 +1324,8 @@ func _load_vm_weapon(id: String) -> void:
 			_rig_setup_melee(id, fp_path)
 		elif fp_meta.get("rig", 0):
 			_rig_setup(id, fp_path)
+		else:
+			_unify_rig_arms()     # v3.7.3: the same gloves / sleeves / shoulder fade as the knife on every gun
 		if fp_ap:
 			if _fp_has("idle"):
 				fp_ap.get_animation(_fp_name("idle")).loop_mode = Animation.LOOP_LINEAR
@@ -1477,9 +1479,15 @@ func _unify_rig_arms() -> void:
 				else:
 					sh.set_shader_parameter("camo_tex", load("res://assets/tex/arm_acu.png"))
 					sh.set_shader_parameter("sleeve_v", float(fp_meta.get("sleeve_v", -1.0)))
-				if melee_rig:
-					# knife rig: the upper arms / shoulders right in front of the lens fade away, only forearms + hands show
-					sh.set_shader_parameter("near_cut", float(fp_meta.get("near_cut", 0.34)))
+				# v3.7.3: every rig gets the same look as the knife: dark leather gloves, and the upper arms /
+				# shoulders right in front of the lens fade away so only forearms + hands show
+				sh.set_shader_parameter("near_cut", float(fp_meta.get("near_cut", 0.34 if melee_rig else 0.2)))
+				var om: Material = m3.mesh.surface_get_material(si)
+				var mname := (sm.resource_name + " " + (om.resource_name if om else "")).to_lower()
+				if mname.contains("glove"):
+					sh.set_shader_parameter("glove_all", true)
+				elif mname.contains("sm002"):
+					sh.set_shader_parameter("glove_box", Vector4(0.855, 0.31, 0.69, 1.0))
 				_arm_mats[akey] = sh
 			m3.set_surface_override_material(si, _arm_mats[akey])
 

@@ -10,7 +10,9 @@ uniform vec4 base_color : source_color = vec4(1.0);
 uniform float sleeve_v = -1.0;     // >= 0: texture rows below this V are the sleeve (packs with a dark sleeve)
 uniform float camo_scale = 5.0;
 uniform vec3 glove : source_color = vec3(0.07, 0.07, 0.075);
-uniform float near_cut = 0.0;      // > 0: geometry closer to the camera than this dissolves (hides shoulders)
+uniform float near_cut = 0.0;
+uniform bool glove_all = false;    // the whole surface is a glove (packs with a separate glove mesh)
+uniform vec4 glove_box = vec4(0.0); // x: v above which.. y: u left max, z: u right min, w: 1 = enabled (sm002 body atlas)      // > 0: geometry closer to the camera than this dissolves (hides shoulders)
 void fragment() {
 	if (near_cut > 0.0) {
 		float dz = -VERTEX.z;
@@ -32,6 +34,10 @@ void fragment() {
 	}
 	vec3 camo = texture(camo_tex, UV * camo_scale).rgb * 0.9;
 	float shade = clamp(lum / max(dot(texture(albedo_tex, UV, 4.0).rgb, vec3(0.3, 0.59, 0.11)), 0.02), 0.5, 1.4);
+	float gl = 0.0;
+	if (glove_all) gl = 1.0;
+	if (glove_box.w > 0.5 && UV.y > glove_box.x && (UV.x < glove_box.y || UV.x > glove_box.z)) gl = 1.0;
+	if (gl > 0.5) { sleeve = 0.0; skin = 1.0; }
 	vec3 col = mix(c, glove * (0.6 + lum * 2.0), skin * (1.0 - sleeve));
 	col = mix(col, camo * shade, sleeve);
 	ALBEDO = col;
