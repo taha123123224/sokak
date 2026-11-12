@@ -776,13 +776,13 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	# natural, filmic light (Zula-like): warm key sun, sky-blue ambient in the shadows, deep contact shadows,
 	# colours kept realistic (no washed-out white, no candy saturation)
 	var P := {
-		"day":      {"elev": -52.0, "az": 35.0, "sun": Color(1.0, 0.93, 0.82), "se": 2.3, "top": Color("4a76ad"), "hor": Color("c2cfdc"), "amb": Color(0.72, 0.73, 0.76), "ae": 0.85, "fog": Color("bfcad6"), "exp": 0.97, "sat": 0.93, "fill": Color(0.8, 0.84, 0.92)},
-		"golden":   {"elev": -36.0, "az": 220.0, "sun": Color(1.0, 0.83, 0.62), "se": 2.3, "top": Color("4570a8"), "hor": Color("dcbf9f"), "amb": Color(0.72, 0.7, 0.7), "ae": 0.82, "fog": Color("d9c0a4"), "exp": 0.96, "sat": 1.0, "fill": Color(0.7, 0.75, 0.92)},
-		"sunset":   {"elev": -22.0, "az": 280.0, "sun": Color(1.0, 0.74, 0.52), "se": 2.15, "top": Color("41689f"), "hor": Color("e0ae8e"), "amb": Color(0.7, 0.66, 0.68), "ae": 0.8, "fog": Color("d9ab8e"), "exp": 0.95, "sat": 0.98, "fill": Color(0.62, 0.66, 0.9)},
+		"day":      {"elev": -52.0, "az": 35.0, "sun": Color(1.0, 0.93, 0.82), "se": 2.3, "top": Color("1f6bd2"), "hor": Color("a3cdf0"), "amb": Color(0.72, 0.73, 0.76), "ae": 0.85, "fog": Color("bfcad6"), "exp": 0.97, "sat": 0.93, "fill": Color(0.8, 0.84, 0.92)},
+		"golden":   {"elev": -36.0, "az": 220.0, "sun": Color(1.0, 0.83, 0.62), "se": 2.3, "top": Color("2463c0"), "hor": Color("f0cfa6"), "amb": Color(0.72, 0.7, 0.7), "ae": 0.82, "fog": Color("d9c0a4"), "exp": 0.96, "sat": 1.0, "fill": Color(0.7, 0.75, 0.92)},
+		"sunset":   {"elev": -22.0, "az": 280.0, "sun": Color(1.0, 0.74, 0.52), "se": 2.15, "top": Color("2a539f"), "hor": Color("ffab7a"), "amb": Color(0.7, 0.66, 0.68), "ae": 0.8, "fog": Color("d9ab8e"), "exp": 0.95, "sat": 0.98, "fill": Color(0.62, 0.66, 0.9)},
 		"twilight": {"elev": -16.0, "az": 250.0, "sun": Color(1.0, 0.72, 0.5), "se": 2.4, "top": Color("2a3a9a"), "hor": Color("ffa86a"), "amb": Color(0.78, 0.76, 0.84), "ae": 1.15, "fog": Color("b9a3b8"), "exp": 1.05, "sat": 1.1, "fill": Color(0.6, 0.6, 1.0)},
 		"night":    {"elev": -38.0, "az": 140.0, "sun": Color(0.62, 0.72, 1.0), "se": 0.75, "top": Color("08101f"), "hor": Color("2b3350"), "amb": Color(0.3, 0.34, 0.48), "ae": 0.62, "fog": Color("1d2438"), "exp": 1.05, "sat": 0.85, "fill": Color(0.4, 0.48, 0.85)},
 		"alaca":    {"elev": -14.0, "az": 235.0, "sun": Color(1.0, 0.68, 0.46), "se": 2.1, "top": Color("0f1a3a"), "hor": Color("e8925a"), "amb": Color(0.56, 0.63, 0.8), "ae": 0.95, "fog": Color("6d7d99"), "exp": 1.0, "sat": 0.98, "fill": Color(0.5, 0.6, 0.95)},
-		"overcast": {"elev": -55.0, "az": 120.0, "sun": Color(1.0, 0.96, 0.9), "se": 1.9, "top": Color("5a7fa8"), "hor": Color("c0ccd8"), "amb": Color(0.7, 0.72, 0.76), "ae": 0.75, "fog": Color("c2ccd6"), "exp": 1.0, "sat": 0.92, "fill": Color(0.8, 0.84, 0.9)},
+		"overcast": {"elev": -55.0, "az": 120.0, "sun": Color(1.0, 0.96, 0.9), "se": 1.9, "top": Color("4f7fb8"), "hor": Color("c6d5e4"), "amb": Color(0.7, 0.72, 0.76), "ae": 0.75, "fog": Color("c2ccd6"), "exp": 1.0, "sat": 0.92, "fill": Color(0.8, 0.84, 0.9)},
 	}
 	var c: Dictionary = P.get(preset, P["day"])
 	sun.rotation_degrees = Vector3(c["elev"], c["az"], 0)
@@ -826,7 +826,20 @@ func _setup_env(env_cfg: Dictionary) -> void:
 		sm.sun_angle_max = 2.5
 		sm.sun_curve = 0.05
 		sm.sky_energy_multiplier = 0.55
-	if str(env_cfg.get("preset", "")) != "alaca":
+	var pack := str(s.get("color_pack", "canli"))
+	if preset in ["day", "golden", "sunset", "overcast", "twilight"] and pack != "gercekci":
+		# v3.7 modern sky with lit clouds (+ studio panels in the reflection pass for crisp metal)
+		var mm := ShaderMaterial.new()
+		mm.shader = preload("res://shaders/sky_modern.gdshader")
+		mm.set_shader_parameter("zen", c["top"])
+		mm.set_shader_parameter("hor", c["hor"])
+		mm.set_shader_parameter("gnd", Color(0.32, 0.31, 0.29))
+		mm.set_shader_parameter("sun_col", c["sun"])
+		mm.set_shader_parameter("cover", {"day": 0.5, "golden": 0.46, "sunset": 0.5, "overcast": 0.82, "twilight": 0.5}[preset])
+		mm.set_shader_parameter("cloud_dark", Color(c["top"]).lerp(Color(0.62, 0.66, 0.74), 0.6))
+		mm.set_shader_parameter("studio", 0.55)
+		sky.sky_material = mm
+	elif str(env_cfg.get("preset", "")) != "alaca":
 		sky.sky_material = sm
 	# soft fill light from the opposite side (lifts shadows, no extra shadow pass)
 	var fill := DirectionalLight3D.new()
@@ -846,8 +859,8 @@ func _setup_env(env_cfg: Dictionary) -> void:
 		e.ambient_light_sky_contribution = 0.25
 		e.ambient_light_energy = 0.42
 	e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
-	e.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env_exp = float(c["exp"])
+	e.tonemap_mode = Environment.TONE_MAPPER_ACES if pack == "gercekci" else Environment.TONE_MAPPER_AGX
+	env_exp = float(c["exp"]) * (1.0 if pack == "gercekci" else 1.04)
 	e.tonemap_exposure = env_exp * float(s.get("brightness", 1.0))
 	e.tonemap_white = 6.0
 	e.fog_enabled = not GS.has_meta("nofog")
@@ -889,6 +902,15 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	e.adjustment_contrast = 1.13
 	e.adjustment_saturation = float(c["sat"]) * 1.06
 	e.adjustment_color_correction = _grade_lut()
+	if pack == "canli":
+		# "Canlı" (Valorant-like): clean, vivid colour with punchy but not neon contrast
+		e.adjustment_contrast = 1.08
+		e.adjustment_saturation = float(c["sat"]) * 1.24
+		e.adjustment_color_correction = grade_lut3d("canli")
+	elif pack == "sinematik":
+		e.adjustment_contrast = 1.14
+		e.adjustment_saturation = float(c["sat"]) * 1.1
+		e.adjustment_color_correction = grade_lut3d("sinematik")
 	if preset == "alaca":
 		# cinematic blue hour: cool shadows, warm low sun, light haze in the valley
 		e.volumetric_fog_albedo = Color(0.8, 0.86, 1.0)
@@ -905,6 +927,46 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	add_child(sun)
 
 ## Film-style grade: gentle S-curve, cool shadows, warm highlights (modern shooter look)
+## v3.7 colour packs: a 33³ 3D LUT applied after tonemapping
+static var _lut_cache := {}
+static func grade_lut3d(pack: String) -> ImageTexture3D:
+	if _lut_cache.has(pack):
+		return _lut_cache[pack]
+	var N := 33
+	var imgs: Array[Image] = []
+	for bz in N:
+		var im := Image.create(N, N, false, Image.FORMAT_RGB8)
+		for gy in N:
+			for rx in N:
+				var c := Vector3(float(rx), float(gy), float(bz)) / float(N - 1)
+				im.set_pixel(rx, gy, _grade(c, pack))
+		imgs.append(im)
+	var t := ImageTexture3D.new()
+	t.create(Image.FORMAT_RGB8, N, N, N, false, imgs)
+	_lut_cache[pack] = t
+	return t
+
+static func _grade(c: Vector3, pack: String) -> Color:
+	var lum := c.dot(Vector3(0.2126, 0.7152, 0.0722))
+	var mx := maxf(c.x, maxf(c.y, c.z)); var mn := minf(c.x, minf(c.y, c.z))
+	var sat := mx - mn
+	var vib := 0.38 if pack == "canli" else 0.15
+	c = Vector3(lum, lum, lum) + (c - Vector3(lum, lum, lum)) * (1.0 + vib * (1.0 - sat))
+	if pack == "canli":
+		# cool clean shadows, warm sunny highlights, gentle S-curve, no crushed blacks
+		c += Vector3(-0.012, 0.006, 0.03) * pow(1.0 - lum, 2.0)
+		c += Vector3(0.028, 0.014, -0.012) * lum * lum
+		var sc := Vector3(smoothstep(0.0, 1.0, c.x), smoothstep(0.0, 1.0, c.y), smoothstep(0.0, 1.0, c.z))
+		c = c.lerp(sc, 0.22)
+		c = c * 0.985 + Vector3(0.012, 0.014, 0.018)
+	else:
+		# cinematic teal / orange
+		c += Vector3(-0.03, 0.01, 0.045) * pow(1.0 - lum, 2.2)
+		c += Vector3(0.05, 0.02, -0.03) * lum * lum
+		var sc2 := Vector3(smoothstep(0.0, 1.0, c.x), smoothstep(0.0, 1.0, c.y), smoothstep(0.0, 1.0, c.z))
+		c = c.lerp(sc2, 0.35)
+	return Color(clampf(c.x, 0, 1), clampf(c.y, 0, 1), clampf(c.z, 0, 1))
+
 static func _grade_lut() -> GradientTexture1D:
 	var g := Gradient.new()
 	g.offsets = PackedFloat32Array([0.0, 0.12, 0.3, 0.55, 0.8, 1.0])

@@ -161,6 +161,7 @@ func _build() -> void:
 			_slide("resolution_scale", "Çözünürlük Ölçeği", 0.5, 2.0, 0.05, "%.2fx", "1.0 üstü = süper örnekleme")
 			_options("upscaler", "Ölçekleyici", [["fsr2", "AMD FSR 2.2"], ["fsr", "FSR 1.0"]], "Ölçek < 1 iken kullanılır")
 			_slide("sharpen", "Keskinlik", 0.0, 1.0, 0.05)
+			_options("color_pack", "Renk Paketi", [["canli", "Canlı (Valorant tarzı)"], ["sinematik", "Sinematik"], ["gercekci", "Gerçekçi (eski)"]], "Gökyüzü, ışık ve renk düzenlemesi • maçta uygulanır")
 			_slide("brightness", "Parlaklık (pozlama)", 0.6, 1.4, 0.02)
 			_slide("fov", "Görüş Açısı (FOV)", 60, 110, 1, "%d°")
 			_slide("draw_distance", "Çizim Mesafesi", 0.5, 1.5, 0.05, "%.2fx")
