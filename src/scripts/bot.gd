@@ -532,7 +532,10 @@ func _physics_process(delta: float) -> void:
 	_follow_chest(delta)
 	if gun:
 		gun.position = gun_base + Vector3(0, 0.012, 0.06) * fire_kick
-	var hv := Vector2(velocity.x, velocity.z).move_toward(Vector2(move_dir.x, move_dir.z) * speed, 30.0 * delta)
+	if wolf and wolf_ctl and not puppet:
+		speed *= wolf_ctl.SPEED
+		_wolf_ai(delta)
+	var hv := Vector2(velocity.x, velocity.z).move_toward(Vector2(move_dir.x, move_dir.z) * speed, (30.0 if _pounce_t <= 0.0 else 2.0) * delta)
 	velocity.x = hv.x; velocity.z = hv.y
 	if not is_on_floor():
 		velocity.y -= 16.0 * delta
@@ -921,7 +924,14 @@ func _sp_take_damage(amount: float, attacker, pos: Vector3, headshot: bool, w: S
 		hit_react = 1.0
 		hit_head = headshot
 		return
-	health -= amount * (wolf_ctl.DMG_TAKEN if wolf and wolf_ctl else 1.0)
+	var dmg_in: float = amount * (wolf_ctl.DMG_TAKEN if wolf and wolf_ctl else 1.0)
+	if armor > 0.0 and w != "" and not GS.WEAPONS.get(w, {}).get("throwable", false) and (not headshot or helmet):
+		var absorbed: float = minf(armor, dmg_in * 0.5 * (1.0 - float(GS.ball(w).get("ap", 0.2))))
+		armor -= absorbed
+		dmg_in -= absorbed
+	health -= dmg_in
+	if wolf and wolf_ctl and health > 0 and randf() < 0.45:
+		_wolf_dodge()
 	if attacker == match_node.player:
 		dmg_from_player += amount
 		_hit_flash(headshot)
@@ -1078,6 +1088,51 @@ func _death_anim(delta: float) -> void:
 		velocity.y -= 16.0 * delta
 		move_and_slide()
 
+# ---------------------------------------------------------------- v4.2 wolf bot abilities
+var _pounce_cd := 2.0
+var _pounce_t := 0.0
+var _dodge_cd := 0.0
+var _flip_t := -1.0
+func _wolf_ai(delta: float) -> void:
+	## wolves hunt: long pounce leaps onto the target, heavy claw on landing, somersault dodges when shot
+	_pounce_cd -= delta
+	_dodge_cd -= delta
+	if _pounce_t > 0.0:
+		_pounce_t -= delta
+		if _pounce_t <= 0.0 and target and is_instance_valid(target) and target.alive:
+			var d0: float = global_position.distance_to(target.global_position)
+			if d0 < 3.2:
+				wolf_ctl.attack_fx(true)
+				match_node.melee(self, global_position + Vector3.UP * 1.2, (target.chest_pos() - (global_position + Vector3.UP * 1.2)).normalized(), float(wdata["dmg"]) * 1.6, wid)
+				fire_cd = 0.8
+	if _flip_t >= 0.0:
+		_flip_t += delta / 0.55
+		if wolf_ctl.body and is_instance_valid(wolf_ctl.body):
+			wolf_ctl.body.set_flip(_flip_t if _flip_t < 1.0 else 0.0)
+		if _flip_t >= 1.0:
+			_flip_t = -1.0
+	if target == null or not is_instance_valid(target) or not target.alive or not target_visible or not is_on_floor():
+		return
+	var to: Vector3 = target.global_position - global_position
+	var d: float = Vector2(to.x, to.z).length()
+	if _pounce_cd <= 0.0 and d > 4.5 and d < 12.0:
+		_pounce_cd = randf_range(2.6, 4.2)
+		var fwd := Vector3(to.x, 0, to.z).normalized()
+		aim_yaw = atan2(-to.x, -to.z)
+		velocity = fwd * clampf(d * 1.15, 8.0, 14.0) + Vector3.UP * 5.2
+		_pounce_t = 0.55
+		wolf_ctl.attack_fx(true)
+		SFX.play3d("gore1", global_position, -8, 0.6, 30.0, 4.0)
+
+func _wolf_dodge() -> void:
+	if _dodge_cd > 0.0 or not is_on_floor():
+		return
+	_dodge_cd = randf_range(3.0, 5.0)
+	var right := Vector3(cos(aim_yaw), 0, -sin(aim_yaw)) * (1.0 if randf() < 0.5 else -1.0)
+	velocity = right * 9.0 + Vector3.UP * 6.0
+	_pounce_t = 0.35
+	_flip_t = 0.0
+
 # ---------------------------------------------------------------- v4.1 grenades
 var nades_left := 1
 var nade_cd := 8.0
@@ -1160,7 +1215,21 @@ func _end_throw() -> void:
 	if gun: gun.visible = true
 	if _nade_mesh: _nade_mesh.visible = false
 
+var armor := 0.0
+var helmet := false
+var money := 800
+func _bot_buy() -> void:
+	# bots spend their kill money on armour like players do
+	armor = 0.0; helmet = false
+	if money >= 1000 and randf() < 0.8:
+		money -= 1000; armor = 100.0; helmet = true
+	elif money >= 650:
+		money -= 650; armor = 100.0
+	elif money >= 350 and randf() < 0.5:
+		money -= 350; armor = 50.0
+
 func respawn(pos: Vector3, yaw_: float, weapon: String) -> void:
+	_bot_buy()
 	nades_left = 1
 	nade_cd = randf_range(6.0, 14.0)
 	if throw_k >= 0.0: _end_throw()

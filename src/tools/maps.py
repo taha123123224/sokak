@@ -1973,6 +1973,44 @@ def fence_panel(x, y, rot, mm, length=3.4):
     box('f_banner', (length * 0.95, 0.03, 0.9), (0, -0.02, 1.0), m=M('fence_banner', (0.1, 0.32, 0.55), 0.7), parent=root)
 
 
+def hoarding(x0, y0, x1, y1, mm, h=5.2, gate=None):
+    """v4.2: solid construction-site hoarding around the whole map (no more see-through fence):
+    corrugated sheet panels on a concrete kerb, steel posts, a yellow/black safety stripe and
+    printed site banners. gate=(side, centre, width) leaves a closed double gate."""
+    panel_m = [M('container_blue', (0.1, 0.27, 0.58), 0.6), M('container_grey', (0.52, 0.54, 0.55), 0.6)]
+    stripe = M('site_sign', (0.95, 0.75, 0.1), 0.5)
+    dark = M('hoard_dark', (0.06, 0.06, 0.07), 0.7)
+    banner = M('fence_banner', (0.1, 0.32, 0.55), 0.7)
+    def run(ax, ay, bx, by, inward):
+        L = math.hypot(bx - ax, by - ay)
+        rot = math.degrees(math.atan2(by - ay, bx - ax))
+        n = max(1, int(round(L / 3.0)))
+        seg = L / n
+        for i in range(n):
+            t = (i + 0.5) / n
+            cx, cy = ax + (bx - ax) * t, ay + (by - ay) * t
+            m = panel_m[0] if (i // 4) % 2 == 0 else panel_m[1]
+            box('hd_panel', (seg - 0.04, 0.12, h - 0.5), (cx, cy, 0.5 + (h - 0.5) / 2), (0, 0, rot), m=m, uv=0.6)
+            box('hd_kerb', (seg, 0.35, 0.5), (cx, cy, 0.25), (0, 0, rot), m=mm['concrete'])
+            box('hd_post', (0.14, 0.3, h + 0.2), (ax + (bx - ax) * i / n, ay + (by - ay) * i / n, (h + 0.2) / 2), (0, 0, rot), m=mm['steel'])
+            # safety stripe band along the top
+            for k in range(3):
+                box('hd_stripe', (seg / 6 - 0.02, 0.14, 0.32), (cx + math.cos(math.radians(rot)) * (k - 1) * seg / 3, cy + math.sin(math.radians(rot)) * (k - 1) * seg / 3, h - 0.25), (0, 0, rot + 0), m=stripe)
+            box('hd_top', (seg, 0.16, 0.08), (cx, cy, h + 0.02), (0, 0, rot), m=dark)
+            if i % 4 == 1 and i + 2 < n:
+                ox, oy = -math.sin(math.radians(rot)) * inward * 0.09, math.cos(math.radians(rot)) * inward * 0.09
+                bm = M('poster_site%d' % (1 + (i // 4) % 2), (0.8, 0.8, 0.8), 0.7)
+                bz = box('hd_banner', (5.2, 0.03, 1.9), (cx + ox + math.cos(math.radians(rot)) * seg * 0.5, cy + oy + math.sin(math.radians(rot)) * seg * 0.5, 2.5), (0, 0, rot), m=bm)
+                bz['normuv'] = True
+        col(((ax + bx) / 2, (ay + by) / 2, h / 2), (L + 0.3, 0.4, h), rotz=rot)
+    run(x0, y1, x1, y1, -1)
+    run(x0, y0, x1, y0, 1)
+    run(x0, y0, x0, y1, 1)
+    run(x1, y0, x1, y1, -1)
+    for (cx, cy) in [(x0, y0), (x1, y0), (x0, y1), (x1, y1)]:
+        box('hd_corner', (0.5, 0.5, h + 0.4), (cx, cy, (h + 0.4) / 2), m=mm['concrete'])
+
+
 def sand_pile(x, y, r, h, m):
     cyl('sand', r, h, (x, y, h / 2), m=m, axis='Z', verts=18, r2=r * 0.15)
     col((x, y, h * 0.35), (r * 1.3, r * 1.3, h * 0.7))
@@ -2115,14 +2153,34 @@ def map_insaat():
     barrel(-8, 22, mm, 'yellow'); barrel(-7.3, 22.6, mm, 'red'); barrel(16, -16, mm, 'blue')
     car(-14, -24, 90, ('red', (0.55, 0.03, 0.03)), mm)
     car(-8, -25, 90, ('white', (0.85, 0.85, 0.82)), mm)
-    # perimeter fence with site banners
-    for i in range(int((X1 - X0) / 3.4)):
-        fence_panel(X0 + 1.7 + i * 3.4, Y1 + 0.6, 0, mm)
-        if not (-6 < X0 + 1.7 + i * 3.4 < 6):
-            fence_panel(X0 + 1.7 + i * 3.4, Y0 - 0.6, 0, mm)
-    for i in range(int((Y1 - Y0) / 3.4)):
-        fence_panel(X0 - 0.6, Y0 + 1.7 + i * 3.4, 90, mm)
-        fence_panel(X1 + 0.6, Y0 + 1.7 + i * 3.4, 90, mm)
+    # ---- v4.2 lane structure: west container lane, east precast-slab yard, staggered mid cover
+    wood = M('formwork', (0.62, 0.48, 0.3), 0.85)
+    # WEST lane: two stacked container rows form a long wall with a gap (peek window) + ladder side
+    container(-22, -4, 0, 90, mm['c_blue'], mm)
+    container(-22, 3.5, 0, 90, mm['c_grey'], mm)
+    container(-22, -4, 2.59, 90, mm['c_white'], mm)
+    container(-15.5, -14, 0, 0, mm['c_grey'], mm)
+    for (fx, fy, r) in [(-28, -8, 90), (-17, 4, 0)]:
+        wall('formwork', fx, fy, 0, 3.2, 0.25, 2.2, wood, rot=r)
+    # EAST yard: stacked precast slabs (waist / head high), a site trailer
+    for (sx, sy, n, r) in [(17, -14, 3, 0), (24, -4, 5, 90), (14, 2, 2, 0), (27, -16, 4, 0)]:
+        for k in range(n):
+            box('precast', (3.8, 1.6, 0.3), (sx, sy, 0.15 + k * 0.32), (0, 0, r + RND.uniform(-3, 3)), m=mm['concrete'])
+        col((sx, sy, n * 0.16), (3.8 if r == 0 else 1.6, 1.6 if r == 0 else 3.8, n * 0.32))
+    container(20, 6, 0, 0, mm['c_white'], mm)
+    # MID: staggered half-cover between the building and the road
+    for (jx, jy, r) in [(-8, -6, 0), (-2, -9, 0), (5, -5, 0), (10, -11, 0), (-12, -13, 90), (2, -15, 90)]:
+        jersey(jx, jy, r, mm)
+    for (px, py) in [(-4.5, -12.5), (7.5, -8), (12.5, -2)]:
+        pallet_stack(px, py, RND.randint(3, 5), mm)
+    # NORTH yard (behind the building): rebar racks + formwork stacks so the A side has cover to the frame
+    for (fx, fy) in [(-6, 18), (4, 19.5), (12, 17)]:
+        for k in range(4):
+            box('formwork_stack', (2.6, 1.3, 0.12), (fx, fy, 0.06 + k * 0.13), (0, 0, RND.uniform(-6, 6)), m=wood)
+        col((fx, fy, 0.3), (2.6, 1.3, 0.6))
+    wall('formwork', 0, 22.5, 0, 4.2, 0.25, 2.2, wood)
+    # v4.2: closed site hoarding all the way round (the outside is no longer visible)
+    hoarding(X0 - 0.6, Y0 - 0.6, X1 + 0.6, Y1 + 0.6, mm)
     # background city blocks
     for i, (ax, ay, h) in enumerate([(-60, 50, 26), (-30, 62, 34), (10, 58, 22), (45, 55, 30), (70, 10, 24), (66, -40, 36), (-70, -20, 28), (-55, -60, 20), (20, -66, 26)]):
         box('bg_block', (18, 16, h), (ax, ay, h / 2), m=[mm['p_grey'], mm['p_cream'], mm['concrete']][i % 3])

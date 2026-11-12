@@ -18,7 +18,9 @@ var team := ""
 var is_player := true
 var alive := true
 var health := 100.0
-var armor := 100.0
+var armor := 0.0
+var helmet := false          # v4.2: bought in the B menu (protects the head)
+var money := 800             # v4.2: in-match money: +300 per kill, spend on armour
 var wolf := false            # v3.5.1 Kurt Adam mode: in wolf form
 var wolf_ctl                 # wolf.gd controller (kurt mode only)
 var _wolf_jumps := 0
@@ -1054,8 +1056,8 @@ func take_damage(amount: float, attacker, pos: Vector3, headshot: bool, wid: Str
 		slow_t = 0.9
 	elif bl.get("abil", "") == "suppress":
 		shake = max(shake, 0.55)
-	if armor > 0 and wid != "" and not GS.WEAPONS.get(wid, {}).get("throwable", false):
-		var absorbed: float = min(armor, dmg * 0.45 * (1.0 - float(bl.get("ap", 0.2))))
+	if armor > 0 and wid != "" and not GS.WEAPONS.get(wid, {}).get("throwable", false) and (not headshot or helmet):
+		var absorbed: float = min(armor, dmg * 0.5 * (1.0 - float(bl.get("ap", 0.2))))
 		armor -= absorbed
 		dmg -= absorbed
 	health -= dmg
@@ -1139,7 +1141,8 @@ func respawn(pos: Vector3, yaw_: float) -> void:
 	recoil_pitch = 0
 	recoil_vel = Vector2.ZERO
 	health = 100
-	armor = 100
+	armor = 0
+	helmet = false
 	alive = true
 	dmg_log.clear()
 	crouching = false

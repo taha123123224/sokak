@@ -1279,6 +1279,7 @@ func los(a: Vector3, b: Vector3, exclude: Array = []) -> bool:
 			return false
 	return true
 
+const DMG_SCALE := 0.82     # v4.2: longer time-to-kill (players were dying too fast)
 func hitscan(shooter, origin: Vector3, dir: Vector3, wid: String, dmg: float, rng: float, head_mult: float, wd: Dictionary = {}, depth: int = 0) -> Dictionary:
 	var to := origin + dir * rng
 	var q := PhysicsRayQueryParameters3D.create(origin, to, 1 | 2)
@@ -1307,7 +1308,7 @@ func hitscan(shooter, origin: Vector3, dir: Vector3, wid: String, dmg: float, rn
 		var bl: Dictionary = GS.ball(wid)
 		# per-weapon damage falloff: full damage up to f0, linear down to fmin at f1
 		var fall: float = 1.0 - clamp((d - float(bl["f0"])) / max(float(bl["f1"]) - float(bl["f0"]), 1.0), 0.0, 1.0) * (1.0 - float(bl["fmin"]))
-		var amount := dmg * fall * (head_mult if head else (float(bl.get("limb", 0.8)) if rel < 0.8 else 1.0))
+		var amount := dmg * fall * DMG_SCALE * (head_mult if head else (float(bl.get("limb", 0.8)) if rel < 0.8 else 1.0))
 		fx.blood(pos, -dir)
 		if randf() < 0.3:
 			var q2 := PhysicsRayQueryParameters3D.create(pos, pos + dir * 3.0, 1)
@@ -1461,6 +1462,10 @@ func _sp_on_death(victim, attacker, wid: String, head: bool) -> void:
 		ae = entry(attacker)
 		ae["kills"] += 1
 		ae["score"] += 100 + (50 if head else 0)
+		if "money" in attacker:
+			attacker.money = mini(16000, int(attacker.money) + (300 if not GS.WEAPONS.get(wid, {}).get("melee", false) else 1500))
+			if attacker == player and hud:
+				hud.money_pop(300 if not GS.WEAPONS.get(wid, {}).get("melee", false) else 1500)
 		if head: ae["head"] += 1
 		if teams and sab == null and ctf == null:
 			team_score[ae["team"]] += 1
@@ -1930,6 +1935,10 @@ func test_hook(i: int) -> void:
 		player.alive = false
 		player.vm_rect.visible = false
 		start_spectate()
+		return
+	if i == 99:
+		player.money = 1200
+		hud.toggle_buy(true)
 		return
 	if i == 98:
 		# ground items test: an ammo pouch and a dropped rifle 2.5 m ahead

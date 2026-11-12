@@ -673,6 +673,16 @@ func _process(delta: float) -> void:
 	hp_lbl.text = str(int(ceil(player.health)))
 	hp_bar.value = player.health
 	ar_bar.value = player.armor
+	if money_lbl == null:
+		money_lbl = UI.lbl("", 24, Color("8dff9a"), "RussoOne-Regular")
+		money_lbl.add_theme_constant_override("outline_size", 6)
+		money_lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+		money_lbl.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+		money_lbl.position = Vector2(232, root.size.y - 62)
+		money_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(money_lbl)
+	money_lbl.text = "$ %s" % UI.money(int(player.money))
+	money_lbl.position = Vector2(232, root.size.y - 62)
 	hp_lbl.add_theme_color_override("font_color", UI.RED if player.health < 30 else Color.WHITE)
 	var low: float = clamp((45.0 - player.health) / 45.0, 0.0, 1.0) if player.alive else 0.6
 	vignette.modulate.a = lerp(vignette.modulate.a, low, min(delta * 4.0, 1.0))
@@ -2373,6 +2383,73 @@ const BUY_COLS := [
 	[["BIÇAKLAR", ["knife", "karambit", "hancer", "kasap", "balta"]]],
 ]
 var _buy_detail: VBoxContainer
+const ARMOR_SHOP := [
+	{"id": "light", "name": "HAFİF YELEK", "price": 350, "armor": 50, "helmet": false, "desc": "50 zırh"},
+	{"id": "vest", "name": "KEVLAR YELEK", "price": 650, "armor": 100, "helmet": false, "desc": "100 zırh"},
+	{"id": "full", "name": "YELEK + KASK", "price": 1000, "armor": 100, "helmet": true, "desc": "100 zırh + kask"},
+]
+
+func _armor_card(it: Dictionary) -> Control:
+	var have: bool = player.armor >= float(it["armor"]) - 0.5 and (player.helmet or not it["helmet"])
+	var can: bool = player.alive and not have and int(player.money) >= int(it["price"])
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(196, 64)
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var bc := Color(0.06, 0.07, 0.09, 0.92) if can else Color(0.04, 0.04, 0.05, 0.85)
+	b.add_theme_stylebox_override("normal", UI.sb(bc, UI.GREEN if have else Color(1, 1, 1, 0.06), 2 if have else 1, 4, 0))
+	b.add_theme_stylebox_override("hover", UI.sb(Color(0.11, 0.12, 0.15, 0.98), UI.ACCENT2, 1, 4, 0))
+	b.add_theme_stylebox_override("pressed", UI.sb(Color(0.2, 0.12, 0.04, 1), Color.WHITE, 2, 4, 0))
+	var sh := ArmorIcon.new()
+	sh.helmet = it["helmet"]; sh.full = int(it["armor"]) >= 100
+	sh.position = Vector2(8, 10); sh.size = Vector2(44, 44)
+	b.add_child(sh)
+	var nm := UI.lbl(str(it["name"]), 15, Color.WHITE if can or have else UI.DIM, "Rajdhani-Bold")
+	nm.position = Vector2(58, 8)
+	b.add_child(nm)
+	var ds := UI.lbl(str(it["desc"]), 13, UI.DIM, "Rajdhani-SemiBold")
+	ds.position = Vector2(58, 30)
+	b.add_child(ds)
+	var pr := UI.lbl("✓ VAR" if have else "$ %d" % int(it["price"]), 15, UI.GREEN if have else (Color("8dff9a") if can else UI.RED), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_RIGHT)
+	pr.position = Vector2(110, 30); pr.size = Vector2(78, 20)
+	b.add_child(pr)
+	for c in b.find_children("*", "Control", true, false):
+		(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.pressed.connect(func():
+		if not can:
+			SFX.play("fail", -6)
+			return
+		player.money -= int(it["price"])
+		player.armor = maxf(player.armor, float(it["armor"]))
+		if it["helmet"]: player.helmet = true
+		SFX.play("buy", -4)
+		toggle_buy(true))
+	return b
+
+class ArmorIcon extends Control:
+	var helmet := false
+	var full := true
+	func _draw() -> void:
+		var c := Vector2(size.x * 0.5, size.y * 0.58)
+		var col := Color(0.75, 0.82, 0.9) if full else Color(0.6, 0.65, 0.7)
+		draw_colored_polygon(PackedVector2Array([c + Vector2(-13, -12), c + Vector2(13, -12), c + Vector2(13, 3), c + Vector2(0, 15), c + Vector2(-13, 3)]), col)
+		draw_colored_polygon(PackedVector2Array([c + Vector2(-8, -7), c + Vector2(8, -7), c + Vector2(8, 2), c + Vector2(0, 9), c + Vector2(-8, 2)]), Color(0.1, 0.12, 0.15, 0.9))
+		if helmet:
+			var hc := c + Vector2(0, -18)
+			draw_arc(hc, 9.0, PI, TAU, 16, Color(1, 0.8, 0.35), 5.0)
+			draw_line(hc + Vector2(-11, 0), hc + Vector2(11, 0), Color(1, 0.8, 0.35), 2.5)
+
+var money_lbl: Label
+func money_pop(n: int) -> void:
+	if money_lbl == null or not is_instance_valid(money_lbl):
+		return
+	var pop := UI.lbl("+$%d" % n, 22, Color("8dff9a"), "RussoOne-Regular")
+	pop.position = money_lbl.position + Vector2(0, -30)
+	root.add_child(pop)
+	var tw := pop.create_tween()
+	tw.tween_property(pop, "position:y", pop.position.y - 28, 0.9)
+	tw.parallel().tween_property(pop, "modulate:a", 0.0, 0.9).set_delay(0.4)
+	tw.tween_callback(pop.queue_free)
 
 func toggle_buy(open: bool) -> void:
 	if buy_panel:
@@ -2429,6 +2506,22 @@ func toggle_buy(open: bool) -> void:
 		top.add_child(chip)
 	var kb := UI.lbl("[B] KAPAT", 15, UI.DIM, "Rajdhani-Bold")
 	top.add_child(kb)
+	# v4.2: money + armour shop row
+	var ar := UI.hbox(10)
+	v.add_child(ar)
+	var mon := PanelContainer.new()
+	mon.add_theme_stylebox_override("panel", UI.sb(Color(0.1, 0.3, 0.12, 0.35), Color(0.4, 1.0, 0.5, 0.35), 1, 6, 10))
+	var mvb := UI.vbox(-4)
+	mon.add_child(mvb)
+	mvb.add_child(UI.lbl("PARAN", 12, Color(0.6, 1.0, 0.7, 0.8), "Rajdhani-Bold"))
+	mvb.add_child(UI.lbl("$ %s" % UI.money(int(player.money)), 30, Color("8dff9a"), "RussoOne-Regular"))
+	mon.custom_minimum_size = Vector2(170, 0)
+	ar.add_child(mon)
+	for it in ARMOR_SHOP:
+		ar.add_child(_armor_card(it))
+	var hint := UI.lbl("Öldürme başına +$300  •  bıçakla +$1500\nZırh ölünce gider; kask kafa vuruşlarını da emer.", 13, UI.DIM, "Rajdhani-SemiBold")
+	hint.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	ar.add_child(hint)
 	if mode == "gungame" or mode == "knife":
 		v.add_child(UI.lbl("Bu modda silah değiştirilemez.", 24, UI.RED, "Rajdhani-Bold"))
 		_ignore_unless_button(p)
