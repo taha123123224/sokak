@@ -17,10 +17,13 @@ const GOLD := Color("ffc23d")
 
 static var _fonts := {}
 
+## v4.1: one modern type family for the whole game (Barlow, OFL). Old names are mapped so every call site follows.
+const FONT_MAP := {"Rajdhani-Bold": "BarlowSemiCondensed-Bold", "Rajdhani-SemiBold": "BarlowSemiCondensed-SemiBold",
+	"Rajdhani-Medium": "BarlowSemiCondensed-Medium", "RussoOne-Regular": "BarlowCondensed-ExtraBold", "Teko": "BarlowCondensed-Bold"}
 static func font(n: String) -> FontFile:
 	if _fonts.has(n):
 		return _fonts[n]
-	var f: FontFile = load("res://assets/fonts/%s.ttf" % n)
+	var f: FontFile = load("res://assets/fonts/%s.ttf" % str(FONT_MAP.get(n, n)))
 	_fonts[n] = f
 	return f
 

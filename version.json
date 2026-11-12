@@ -1,51 +1,51 @@
 {
- "version": "4.0.0",
- "build": 53,
+ "version": "4.1.0",
+ "build": 54,
  "parts": [
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v53.pck.part00",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v54.pck.part00",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v53.pck.part01",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v54.pck.part01",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v53.pck.part02",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v54.pck.part02",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v53.pck.part03",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v54.pck.part03",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v53.pck.part04",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v54.pck.part04",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v53.pck.part05",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v54.pck.part05",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v53.pck.part06",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v54.pck.part06",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v53.pck.part07",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v54.pck.part07",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v53.pck.part08",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v54.pck.part08",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v53.pck.part09",
-   "size": 67479212
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v54.pck.part09",
+   "size": 68572140
   }
  ],
- "pck_size": 916825772,
+ "pck_size": 917918700,
  "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
- "notes": "v4.0.0: Yeni kasa açılışı (ışık patlaması, kutu sallanması yok) • Atölye: silah yükseltme artık gerçek bir silah ustası atölyesinde, kaynak kıvılcımları ve çekiç darbeleriyle • Yeni Oyuncu Kartı (profil) • Yeni Sıralama görünümü • v3.9: Ekipman marketi • v3.8: Bayrak Savaşı, yeni Ay Vadisi, yeni silah modelleri",
+ "notes": "v4.1: B = silah menüsü, F1 telsiz, F2/F3/F4 hızlı çağrı • CS2 tarzı TAB skor tablosu • Yeni modern yazı tipi (Barlow) • Üst menüde kayan vurgu • Sezon pasosu baştan tasarlandı (seviye halkası, final ödülü, animasyonlar) • CS2 tarzı kasa açma şeridi • Yeni silah yükseltme bölmesi • 27 silahın her birine ayrı gerçek ses • Botlar el bombası atıyor • Yere düşen çanta/silah küçük ve modern, 10 sn'de kaybolur • Zayıf PC'de otomatik performans koruması",
  "launcher": {
   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/baslatici.pck",
   "size": 1689664

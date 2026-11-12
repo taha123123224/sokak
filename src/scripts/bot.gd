@@ -428,6 +428,8 @@ func _physics_process(delta: float) -> void:
 	if think_t <= 0:
 		think_t = randf_range(0.12, 0.22)
 		_perceive()
+	if not frozen:
+		_nade_think(delta)
 	var move_dir := Vector3.ZERO
 	var speed := 5.0 * float(wdata.get("speed", 1.0))
 	var t := Time.get_ticks_msec() / 1000.0
@@ -468,7 +470,7 @@ func _physics_process(delta: float) -> void:
 			speed *= 0.6
 		react_t -= delta
 		var err: float = abs(angle_difference(aim_yaw, want_yaw)) + abs(want_pitch - aim_pitch)
-		if react_t <= 0 and err < 0.12 + 1.5 / max(dist, 1.0) and not frozen:
+		if react_t <= 0 and err < 0.12 + 1.5 / max(dist, 1.0) and not frozen and throw_k < 0.0:
 			_fire(tp, dist)
 	else:
 		crouching = false
@@ -808,6 +810,16 @@ var wolf := false            # v3.5.1 Kurt Adam
 var wolf_ctl
 var net_skin := ""     # online: skin / attachments / health of the remote player's weapon (death card)
 var net_parts: Array = []
+## v4.1: the attachments a player put on their weapon are visible on their character to everyone
+func _apply_parts() -> void:
+	if gun == null or not is_instance_valid(gun):
+		return
+	gun.set_meta("pa_w", wid)
+	var valid: Array = []
+	for p in net_parts:
+		if GS.PARTS.has(str(p)):
+			valid.append(str(p))
+	GS.parts_visual(gun, wid, valid)
 var net_hp := -1.0
 var net_wlvl := 0      # online: the remote player's upgrade level of the held weapon (kill feed badge)
 var net_use := false     # online: the remote player is holding E (sabotage plant / defuse)
@@ -828,7 +840,10 @@ func net_state(d: Dictionary) -> void:
 	net_wlvl = clampi(int(d.get("wl", 0)), 0, 7)
 	net_skin = str(d.get("sk", ""))
 	var pa = d.get("pa", [])
-	net_parts = (pa as Array).slice(0, 6) if pa is Array else []
+	var np2: Array = (pa as Array).slice(0, 6) if pa is Array else []
+	if np2 != net_parts or (gun and gun.get_meta("pa_w", "") != wid):
+		net_parts = np2
+		_apply_parts.call_deferred()
 	net_hp = float(d.get("hp", -1))
 	var wf := bool(d.get("wf", false))
 	if wf != wolf:
@@ -931,6 +946,7 @@ func _sp_take_damage(amount: float, attacker, pos: Vector3, headshot: bool, w: S
 	if health <= 0:
 		health = 0
 		alive = false
+		if throw_k >= 0.0: _end_throw()
 		death_t = 0.0
 		death_head = headshot
 		death_spin = randf_range(-0.8, 0.8) if not headshot else randf_range(-0.25, 0.25)
@@ -1062,7 +1078,92 @@ func _death_anim(delta: float) -> void:
 		velocity.y -= 16.0 * delta
 		move_and_slide()
 
+# ---------------------------------------------------------------- v4.1 grenades
+var nades_left := 1
+var nade_cd := 8.0
+var throw_k := -1.0
+var _nade_out := false
+var _nade_tgt := Vector3.ZERO
+var _nade_mesh: Node3D
+
+func _nade_think(delta: float) -> void:
+	if throw_k >= 0.0:
+		throw_k += delta / 1.0
+		if OS.has_environment("THK"): throw_k = float(OS.get_environment("THK"))
+		if pose:
+			pose.throw_k = throw_k
+			pose.fwd_world = Vector3(-sin(aim_yaw), 0, -cos(aim_yaw))
+		if _nade_mesh and is_instance_valid(_nade_mesh) and skel:
+			var hb := skel.find_bone("Bip01 R Hand")
+			if hb >= 0:
+				_nade_mesh.global_transform = skel.global_transform * skel.get_bone_global_pose(hb) * Transform3D(Basis(), Vector3(0.09, 0.0, 0.03))
+		if throw_k >= 0.5 and not _nade_out:
+			_nade_out = true
+			_release_nade()
+		if throw_k >= 1.0:
+			_end_throw()
+		return
+	nade_cd -= delta
+	if nade_cd > 0.0 or nades_left <= 0 or wolf or match_node.net != null or crouching:
+		return
+	nade_cd = 1.0
+	if wdata.get("melee", false) or match_node.mode in ["knife", "sniper", "gungame", "kurt"]:
+		return
+	if target == null or not is_instance_valid(target) or not target.alive:
+		return
+	var tp := Vector3.ZERO
+	var d: float = global_position.distance_to(target.global_position)
+	var now := Time.get_ticks_msec() / 1000.0
+	if target_visible and d > 10.0 and d < 28.0 and randf() < 0.18:
+		tp = target.global_position
+	elif not target_visible and now - last_seen_t < 4.0 and global_position.distance_to(last_seen) > 8.0 and global_position.distance_to(last_seen) < 26.0 and randf() < 0.45:
+		tp = last_seen      # flush them out of cover
+	if tp == Vector3.ZERO:
+		return
+	_nade_tgt = tp + Vector3(randf_range(-1.5, 1.5), 0, randf_range(-1.5, 1.5))
+	nades_left -= 1
+	nade_cd = randf_range(12.0, 20.0)
+	_start_throw()
+
+func _start_throw() -> void:
+	throw_k = 0.0
+	_nade_out = false
+	var to := _nade_tgt - global_position
+	aim_yaw = atan2(-to.x, -to.z)
+	if follow: follow.active = false
+	if gun: gun.visible = false
+	if _nade_mesh == null and ResourceLoader.exists("res://assets/models/w_frag.glb"):
+		_nade_mesh = (load("res://assets/models/w_frag.glb") as PackedScene).instantiate()
+		_nade_mesh.top_level = true
+		MatLib.apply(_nade_mesh)
+		add_child(_nade_mesh)
+	if _nade_mesh: _nade_mesh.visible = true
+	if randf() < 0.5:
+		SFX.play3d("pin_pull" if SFX.get_stream("pin_pull") else "bolt_back", global_position + Vector3.UP * 1.4, -6, 1.2, 25.0, 4.0)
+
+func _release_nade() -> void:
+	if not alive:
+		return
+	var o := global_position + Vector3.UP * 1.75 + Vector3(-sin(aim_yaw), 0, -cos(aim_yaw)) * 0.5
+	var dp := _nade_tgt + Vector3.UP * 0.2 - o
+	var T: float = clampf(Vector2(dp.x, dp.z).length() / 13.0, 0.7, 1.7)
+	var v := dp / T
+	v.y += 0.5 * 9.8 * T
+	match_node.throw_grenade(self, o, v, false)
+	SFX.play3d("throw", o, -4, 1.0, 35.0, 5.0)
+	if _nade_mesh: _nade_mesh.visible = false
+
+func _end_throw() -> void:
+	throw_k = -1.0
+	if pose: pose.throw_k = -1.0
+	if follow: follow.active = true
+	if gun: gun.visible = true
+	if _nade_mesh: _nade_mesh.visible = false
+
 func respawn(pos: Vector3, yaw_: float, weapon: String) -> void:
+	nades_left = 1
+	nade_cd = randf_range(6.0, 14.0)
+	if throw_k >= 0.0: _end_throw()
 	global_position = pos
 	velocity = Vector3.ZERO
 	reset_physics_interpolation()

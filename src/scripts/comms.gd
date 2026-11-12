@@ -1,5 +1,5 @@
 extends Node3D
-## v3.8 communication: spray paint (T) on walls and the radio menu (B, then 1-8) with team call-outs.
+## v3.8 communication: spray paint (T) on walls and the radio menu (F1, then 1-8; F2-F4 quick call-outs) with team call-outs.
 ## Both are sent over the network so other players see / hear them.
 
 const SPRAYS := ["gg", "kurt", "kurukafa", "sokak", "gulme", "ayyildiz", "like", "hedef", "tac", "ez", "kalp", "kedi", "burasi", "kartal", "akrep", "pow"]

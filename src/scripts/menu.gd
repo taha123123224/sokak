@@ -728,7 +728,11 @@ func _build_topbar() -> void:
 		ms.content_margin_left = 12; ms.content_margin_right = 12
 		mode_chip.add_theme_stylebox_override(st, ms)
 	lh.add_child(mode_chip)
-	# centre: tabs (lobby in the middle, bigger)
+	# centre: tabs (lobby in the middle, bigger) + sliding spotlight / underline behind them
+	tab_glow = TabGlow.new()
+	tab_glow.set_anchors_preset(Control.PRESET_FULL_RECT)
+	tab_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(tab_glow)
 	topbar = UI.hbox(0)
 	topbar.alignment = BoxContainer.ALIGNMENT_CENTER
 	topbar.set_anchors_preset(Control.PRESET_CENTER_TOP)
@@ -769,6 +773,51 @@ func _build_topbar() -> void:
 	_refresh_currency()
 	get_viewport().size_changed.connect(_topbar_fit)
 	_topbar_fit.call_deferred()
+
+var tab_glow: TabGlow
+class TabGlow extends Control:
+	## v4.1: the active top tab gets a soft spotlight, a glowing accent underline and a small notch;
+	## it glides to the new tab on page change. A thin accent hairline spans the whole bar.
+	var target_btn: Control
+	var cur := Rect2()
+	var t := 0.0
+	func _process(d: float) -> void:
+		t += d
+		if target_btn and is_instance_valid(target_btn) and target_btn.is_visible_in_tree():
+			var r := target_btn.get_global_rect()
+			r.position -= get_global_rect().position
+			if cur.size.x <= 0:
+				cur = r
+			var k := 1.0 - exp(-d * 14.0)
+			cur.position = cur.position.lerp(r.position, k)
+			cur.size = cur.size.lerp(r.size, k)
+		queue_redraw()
+	func _draw() -> void:
+		var a: Color = UI.ACCENT
+		# hairline under the bar (fades out at both sides)
+		var y := 66.0
+		var segs := 24
+		for i in segs:
+			var x0 := size.x * float(i) / segs
+			var x1 := size.x * float(i + 1) / segs
+			var f := sin(PI * (float(i) + 0.5) / segs)
+			draw_rect(Rect2(x0, y, x1 - x0, 1), Color(1, 1, 1, 0.1 * f))
+		if cur.size.x <= 0:
+			return
+		var c := cur
+		var bot := c.position.y + c.size.y - 2
+		# spotlight: vertical gradient quad behind the tab
+		var top := c.position.y + 4
+		var cols := PackedColorArray([Color(a.r, a.g, a.b, 0.0), Color(a.r, a.g, a.b, 0.0), Color(a.r, a.g, a.b, 0.22), Color(a.r, a.g, a.b, 0.22)])
+		draw_polygon(PackedVector2Array([Vector2(c.position.x, top), Vector2(c.end.x, top), Vector2(c.end.x, bot), Vector2(c.position.x, bot)]), cols)
+		# glowing underline
+		var pulse := 0.75 + 0.25 * sin(t * 3.0)
+		for g in 4:
+			var gw := float(g) * 2.0
+			draw_rect(Rect2(c.position.x + 8 - gw, bot - 1 - gw * 0.5, c.size.x - 16 + gw * 2, 3 + gw), Color(a.r, a.g, a.b, (0.9 if g == 0 else 0.12 * pulse)))
+		# notch
+		var mx := c.position.x + c.size.x * 0.5
+		draw_colored_polygon(PackedVector2Array([Vector2(mx - 6, bot + 2), Vector2(mx + 6, bot + 2), Vector2(mx, bot + 7)]), a)
 
 ## CS2-style friends rail on the right edge: friend count on top, online friends as avatars below
 func _build_friends_rail() -> void:
@@ -1144,7 +1193,9 @@ func show_page(p: String) -> void:
 		var nsb := StyleBoxFlat.new()
 		nsb.bg_color = Color(0, 0, 0, 0)
 		nsb.border_color = UI.ACCENT
-		nsb.border_width_bottom = 3 if on else 0
+		nsb.border_width_bottom = 0
+		if on and tab_glow and is_instance_valid(tab_glow):
+			tab_glow.target_btn = b
 		nsb.content_margin_left = old_sb.content_margin_left if old_sb else 18
 		nsb.content_margin_right = nsb.content_margin_left
 		b.add_theme_stylebox_override("normal", nsb)
@@ -2127,6 +2178,95 @@ func _parts_dialog(id: String) -> void:
 	v.add_child(UI.lbl("Eklentileri Eklenti Paketi kasasından kazanabilir ya da buradan satın alabilirsin. Bir eklentiye sahip olunca tüm uyumlu silahlarına takabilirsin.", 15, UI.DIM, "Rajdhani-SemiBold"))
 
 class UpgStage extends Control:
+	var bay := false                     # v4.1: clean sci-fi weapon bay (replaces the photo workshop)
+	func _ell(c: Vector2, rx: float, ry: float, a0: float, a1: float, col2: Color, w: float, n: int = 64) -> void:
+		var pts := PackedVector2Array()
+		for i in n + 1:
+			var a := lerpf(a0, a1, float(i) / n)
+			pts.append(c + Vector2(cos(a) * rx, sin(a) * ry))
+		draw_polyline(pts, col2, w, true)
+	func _draw_bay() -> void:
+		var W := size.x; var H := size.y
+		var cc := col
+		var p := 0.6 + charge * 1.0 + flash + weld * 0.3
+		# back wall: deep gradient
+		for k in 24:
+			var y0 := H * k / 24.0
+			var f := float(k) / 23.0
+			draw_rect(Rect2(0, y0, W, H / 24.0 + 1), Color(0.025 + cc.r * 0.05 * f, 0.03 + cc.g * 0.05 * f, 0.045 + cc.b * 0.06 * f))
+		# hex pattern on the wall, fading toward the edges
+		var hs := 26.0
+		var hy := 0
+		var yy := 8.0
+		while yy < H * 0.62:
+			var xx := (hs * 0.87) if hy % 2 == 1 else 0.0
+			while xx < W:
+				var dx: float = absf(xx - W * 0.5) / (W * 0.5)
+				var a: float = (1.0 - dx) * 0.06 * (1.0 - yy / (H * 0.62))
+				if a > 0.004:
+					var hp := PackedVector2Array()
+					for i in 7:
+						hp.append(Vector2(xx, yy) + Vector2.from_angle(PI / 6 + i * TAU / 6) * hs * 0.55)
+					draw_polyline(hp, Color(cc.r, cc.g, cc.b, a * (1.0 + charge)), 1.0)
+				xx += hs * 1.74
+			yy += hs * 1.5
+			hy += 1
+		# perspective floor grid (scrolls toward the viewer)
+		var hz := H * 0.66
+		var vp := Vector2(W * 0.5, H * 0.38)
+		for i in 15:
+			var fx := (i - 7) / 7.0
+			var bx := W * 0.5 + fx * W * 1.1
+			var ty: float = hz
+			var tx := lerpf(vp.x, bx, (ty - vp.y) / (H - vp.y))
+			draw_line(Vector2(tx, ty), Vector2(bx, H), Color(cc.r, cc.g, cc.b, 0.07), 1.0, true)
+		for i in 8:
+			var f := fmod(float(i) / 8.0 + t * 0.06, 1.0)
+			var y := hz + (H - hz) * f * f
+			draw_line(Vector2(0, y), Vector2(W, y), Color(cc.r, cc.g, cc.b, 0.08 * f), 1.0)
+		draw_rect(Rect2(0, hz - 1, W, 2), Color(cc.r, cc.g, cc.b, 0.25))
+		# top spotlight cone
+		var top := Vector2(W * 0.5, -10)
+		for k in 8:
+			var wdt := W * (0.12 + k * 0.035)
+			draw_colored_polygon(PackedVector2Array([top + Vector2(-20 - k * 6, 0), top + Vector2(20 + k * 6, 0), Vector2(W * 0.5 + wdt, H * 0.8), Vector2(W * 0.5 - wdt, H * 0.8)]), Color(1, 1, 1, 0.012 * p))
+		# platform: glowing elliptical pad with 7 level segments rotating around it
+		var pc := Vector2(W * 0.5, H * 0.8)
+		var rx := minf(W * 0.36, 420.0)
+		var ry := rx * 0.16
+		for k in 10:
+			draw_set_transform(pc, 0.0, Vector2(1.0, ry / rx))
+			draw_circle(Vector2.ZERO, rx * (1.15 - k * 0.09), Color(cc.r, cc.g, cc.b, 0.02 * (k + 1) * p * 0.6))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		_ell(pc, rx, ry, 0, TAU, Color(cc.r, cc.g, cc.b, 0.55), 2.0, 96)
+		_ell(pc, rx * 0.72, ry * 0.72, 0, TAU, Color(1, 1, 1, 0.12), 1.0, 96)
+		var rot := t * (0.35 + charge * 4.0)
+		for i in 7:
+			var a := rot + i * TAU / 7.0
+			var on := i < lvl
+			var sc2: Color = cc if on else Color(1, 1, 1, 0.12)
+			_ell(pc, rx * 1.1, ry * 1.1, a, a + TAU / 7.0 - 0.16, sc2, 4.0 if on else 2.5, 18)
+		if charge > 0.0:
+			_ell(pc, rx * 1.22, ry * 1.22, -PI / 2, -PI / 2 + TAU * charge, cc.lightened(0.35), 3.0, 96)
+			# rising light beam over the pad while charging
+			for k in 6:
+				var bw := rx * (0.5 - k * 0.07)
+				draw_rect(Rect2(pc.x - bw, 0, bw * 2, pc.y), Color(cc.r, cc.g, cc.b, 0.02 * charge))
+		# floating motes rising from the pad
+		for d3 in dust:
+			var px: float = pc.x + (d3.x - 0.5) * rx * 1.8
+			var py: float = pc.y - fmod(d3.y + t * 0.08 * d3.z * (1.0 + charge * 3.0), 1.0) * H * 0.7
+			draw_circle(Vector2(px, py), 1.4 * d3.z, Color(cc.r * 1.3, cc.g * 1.3, cc.b * 1.3, 0.35 * d3.z))
+		if burst >= 0.0:
+			var k := burst / 1.4
+			_ell(pc + Vector2(0, -H * 0.28), rx * (0.3 + k * 2.2), rx * (0.3 + k * 2.2) * 0.45, 0, TAU, Color(cc.r, cc.g, cc.b, (1.0 - k) * 0.9), 8.0 * (1.0 - k) + 2.0, 96)
+		# vignette
+		for k in 8:
+			var a := 0.05 * (8 - k)
+			draw_rect(Rect2(0, 0, W * 0.02 * (8 - k), H), Color(0, 0, 0, a * 0.5))
+			draw_rect(Rect2(W - W * 0.02 * (8 - k), 0, W * 0.02 * (8 - k), H), Color(0, 0, 0, a * 0.5))
+		if flash > 0.0:
+			draw_rect(Rect2(Vector2.ZERO, size), Color(cc.r, cc.g, cc.b, flash * 0.35))
 	func _draw_atelier() -> void:
 		var ts := atelier.get_size()
 		var k0: float = maxf(size.x / ts.x, size.y / ts.y)
@@ -2174,7 +2314,7 @@ class UpgStage extends Control:
 	var dust: Array = []
 	func _process(d: float) -> void:
 		t += d
-		if atelier and dust.is_empty():
+		if (atelier or bay) and dust.is_empty():
 			for i in 40:
 				dust.append(Vector3(randf(), randf(), randf_range(0.3, 1.0)))
 		if burst >= 0.0:
@@ -2183,6 +2323,9 @@ class UpgStage extends Control:
 		flash = maxf(flash - d * 2.2, 0.0)
 		queue_redraw()
 	func _draw() -> void:
+		if bay:
+			_draw_bay()
+			return
 		if atelier:
 			_draw_atelier()
 			return
@@ -2329,7 +2472,7 @@ func _upgrade_dialog(id: String) -> void:
 	# ---- stage: tier ring + weapon
 	var nc: Color = GS.lvl_color(lvl + 1)
 	var stage := UpgStage.new()
-	stage.atelier = preload("res://assets/ui/upgrade/atelier.jpg")
+	stage.bay = true
 	stage.custom_minimum_size = Vector2(0, 430)
 	stage.col = GS.lvl_color(maxi(lvl, 1))
 	stage.lvl = lvl
@@ -2356,8 +2499,9 @@ func _upgrade_dialog(id: String) -> void:
 	stage.add_child(big)
 	var place := func():
 		tr.size = Vector2(1000, 330)
-		tr.position = Vector2((stage.size.x - tr.size.x) / 2, stage.size.y * 0.76 - tr.size.y / 2)
+		tr.position = Vector2((stage.size.x - tr.size.x) / 2, stage.size.y * 0.5 - tr.size.y / 2)
 		tr.pivot_offset = tr.size / 2
+		tr.scale = Vector2.ONE * 1.55
 		big.size = Vector2(stage.size.x, 90)
 		big.position = Vector2(0, stage.size.y / 2 - 45)
 		big.pivot_offset = big.size / 2
@@ -2377,7 +2521,7 @@ func _upgrade_dialog(id: String) -> void:
 	sparks.damping_min = 40; sparks.damping_max = 90
 	sparks.scale_amount_min = 2.0; sparks.scale_amount_max = 5.0
 	stage.add_child(sparks)
-	stage.resized.connect(func(): sparks.position = Vector2(stage.size.x / 2, stage.size.y * 0.67))
+	stage.resized.connect(func(): sparks.position = Vector2(stage.size.x / 2, stage.size.y * 0.5))
 	# welding torch: a jet of hot sparks that wanders along the weapon while it is being worked on
 	var weld := CPUParticles2D.new()
 	weld.emitting = false
@@ -2482,7 +2626,7 @@ func _upgrade_dialog(id: String) -> void:
 		var wtw := create_tween()
 		for k in 6:
 			var wx := stage.size.x * 0.5 + randf_range(-0.32, 0.32) * tr.size.x
-			wtw.tween_property(weld, "position", Vector2(wx, stage.size.y * 0.67 + randf_range(-20, 10)), 0.38)
+			wtw.tween_property(weld, "position", Vector2(wx, stage.size.y * 0.5 + randf_range(-20, 10)), 0.38)
 		wtw.tween_callback(func(): weld.emitting = false)
 		var wl := create_tween()
 		wl.tween_method(func(x): stage.weld = x, 1.0, 1.0, 2.0)
@@ -2533,8 +2677,8 @@ func _upgrade_dialog(id: String) -> void:
 				gm.set_shader_parameter("glow", 2.4)
 				gm.set_shader_parameter("outline", 1.8)
 				var t3 := tr.create_tween()
-				t3.tween_property(tr, "scale", Vector2(1.08, 1.08), 0.12)
-				t3.tween_property(tr, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+				t3.tween_property(tr, "scale", Vector2.ONE * 1.68, 0.12)
+				t3.tween_property(tr, "scale", Vector2.ONE * 1.55, 0.5).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 				t3.parallel().tween_method(func(x): gm.set_shader_parameter("sweep", x), -0.4, 1.6, 0.6)
 				t3.parallel().tween_method(func(x): gm.set_shader_parameter("glow", x), 2.4, 0.25, 1.8).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 				t3.parallel().tween_method(func(x): gm.set_shader_parameter("outline", x), 1.8, 0.35, 2.0).set_ease(Tween.EASE_OUT)
@@ -2616,146 +2760,454 @@ func _pass_reward_col(it: Dictionary) -> Color:
 		"mat": return PACK_COL.get(str(it["id"]), UI.ACCENT)
 	return UI.GOLD
 
+func _pass_claim_all(cur_t: int) -> void:
+	for i in cur_t:
+		if not GS.profile.get("pass", {}).get("claimed", []).has(i + 1):
+			var r: Dictionary = await GS.act("pass_claim", {"tier": i + 1})
+			if not r["ok"]:
+				_toast(str(r["err"]), UI.RED)
+				break
+	SFX.play("success")
+	_refresh_currency()
+	show_page("pass")
+
 func _page_pass() -> void:
+	## v4.1 season pass: full-bleed key art backdrop with drifting sparks, a hero block (season title,
+	## animated level ring, glowing XP bar), a final-reward showcase with light rays, the reward track
+	## (cards slide in one after another, claimable ones shimmer) on top of a progress rail, and
+	## an info strip at the bottom.
 	soldier.visible = false
-	var dim := ColorRect.new()
-	dim.color = Color(0.016, 0.019, 0.025, 0.95)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.add_child(dim)
-	var root := MarginContainer.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	for sd in ["left", "right"]:
-		root.add_theme_constant_override("margin_" + sd, 44)
-	root.add_theme_constant_override("margin_top", 86)
-	root.add_theme_constant_override("margin_bottom", 26)
-	content.add_child(root)
-	var v := UI.vbox(14)
-	root.add_child(v)
 	var ps: Dictionary = GS.profile.get("pass", {"xp": 0, "claimed": []})
 	var pxp := int(ps.get("xp", 0))
 	var claimed: Array = ps.get("claimed", [])
 	var per: int = GS.Econ.PASS_XP
 	var tiers: Array = GS.Econ.PASS
 	var cur_t: int = mini(pxp / per, tiers.size())
-	# banner
-	var ban := Control.new()
-	ban.custom_minimum_size = Vector2(0, 230)
-	ban.clip_contents = true
-	v.add_child(ban)
+	var into: int = pxp - cur_t * per if cur_t < tiers.size() else per
+	var purple := Color("b84bff")
+	# ---- backdrop
+	var back := Control.new()
+	back.set_anchors_preset(Control.PRESET_FULL_RECT)
+	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	back.clip_contents = true
+	content.add_child(back)
+	var base := ColorRect.new(); base.color = Color(0.016, 0.018, 0.03, 1.0)
+	base.set_anchors_preset(Control.PRESET_FULL_RECT); base.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	back.add_child(base)
 	if ResourceLoader.exists("res://assets/ui/pass_banner.jpg"):
 		var bt := TextureRect.new()
 		bt.texture = load("res://assets/ui/pass_banner.jpg")
 		bt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; bt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		bt.set_anchors_preset(Control.PRESET_FULL_RECT)
-		ban.add_child(bt)
-	var grad := TextureRect.new()
-	var gt := GradientTexture2D.new(); var g := Gradient.new()
-	g.set_color(0, Color(0.016, 0.019, 0.025, 0.95)); g.set_color(1, Color(0.016, 0.019, 0.025, 0.0))
-	gt.gradient = g; gt.fill_from = Vector2(0, 0.5); gt.fill_to = Vector2(0.7, 0.5)
-	grad.texture = gt; grad.set_anchors_preset(Control.PRESET_FULL_RECT); grad.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	ban.add_child(grad)
-	var bv := UI.vbox(2)
-	bv.position = Vector2(30, 26)
-	ban.add_child(bv)
-	bv.add_child(UI.lbl("SEZON PASOSU", 16, UI.ACCENT2, "Rajdhani-Bold"))
-	bv.add_child(UI.lbl(GS.Econ.PASS_SEASON, 44, Color.WHITE, "Teko"))
-	bv.add_child(UI.lbl("Her maçta kazandığın XP ve her tamamladığın görev (+500) seni yeni seviyelere taşır. Ödüller ücretsiz!", 16, UI.TEXT, "Rajdhani-SemiBold"))
-	var prog := UI.hbox(14)
-	bv.add_child(prog)
-	var tb := PanelContainer.new()
-	tb.add_theme_stylebox_override("panel", UI.sb(Color(0.7, 0.3, 1.0, 0.2), Color("b84bff"), 2, 8, 6))
-	tb.add_child(UI.lbl("SEVİYE %d / %d" % [cur_t, tiers.size()], 26, Color.WHITE, "Teko"))
-	prog.add_child(tb)
-	var pv := UI.vbox(2)
-	prog.add_child(pv)
-	var into := pxp - cur_t * per if cur_t < tiers.size() else per
-	var bar := UI.bar(into, per, Color("b84bff"), 12)
-	bar.custom_minimum_size = Vector2(420, 12)
-	pv.add_child(bar)
-	pv.add_child(UI.lbl(("SONRAKİ SEVİYEYE %s XP" % UI.money(per - into)) if cur_t < tiers.size() else "TÜM SEVİYELER AÇILDI!", 14, UI.DIM, "Rajdhani-Bold"))
+		bt.set_anchors_preset(Control.PRESET_TOP_WIDE); bt.offset_bottom = 520
+		bt.modulate = Color(1, 1, 1, 0.0)
+		bt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		back.add_child(bt)
+		bt.create_tween().tween_property(bt, "modulate:a", 0.85, 0.6)
+		var kb := bt.create_tween().set_loops()
+		bt.pivot_offset = Vector2(800, 260)
+		kb.tween_property(bt, "scale", Vector2(1.06, 1.06), 9.0).set_trans(Tween.TRANS_SINE)
+		kb.tween_property(bt, "scale", Vector2.ONE, 9.0).set_trans(Tween.TRANS_SINE)
+	for gspec in [[Vector2(0, 0.5), Vector2(0.75, 0.5), 0.97], [Vector2(0.5, 1.0), Vector2(0.5, 0.25), 1.0]]:
+		var gr := TextureRect.new()
+		var gtx := GradientTexture2D.new(); var gg := Gradient.new()
+		gg.set_color(0, Color(0.016, 0.018, 0.03, gspec[2])); gg.set_color(1, Color(0.016, 0.018, 0.03, 0.0))
+		gtx.gradient = gg; gtx.fill_from = gspec[0]; gtx.fill_to = gspec[1]
+		gr.texture = gtx; gr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; gr.stretch_mode = TextureRect.STRETCH_SCALE
+		gr.set_anchors_preset(Control.PRESET_FULL_RECT); gr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		back.add_child(gr)
+	var sparks := PassSparks.new()
+	sparks.col = purple
+	sparks.set_anchors_preset(Control.PRESET_FULL_RECT)
+	sparks.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	back.add_child(sparks)
+	# ---- layout
+	var root := MarginContainer.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	for sd in ["left", "right"]:
+		root.add_theme_constant_override("margin_" + sd, 56)
+	root.add_theme_constant_override("margin_right", 110)
+	root.add_theme_constant_override("margin_top", 92)
+	root.add_theme_constant_override("margin_bottom", 22)
+	content.add_child(root)
+	var v := UI.vbox(16)
+	root.add_child(v)
+	var hero := UI.hbox(30)
+	hero.custom_minimum_size = Vector2(0, 250)
+	v.add_child(hero)
+	# level ring
+	var ring := PassRing.new()
+	ring.level = cur_t; ring.max_level = tiers.size(); ring.frac = float(into) / float(per); ring.col = purple
+	ring.custom_minimum_size = Vector2(200, 200)
+	ring.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hero.add_child(ring)
+	var hv := UI.vbox(4)
+	hv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hero.add_child(hv)
+	var tagr := UI.hbox(10)
+	hv.add_child(tagr)
+	tagr.add_child(_store_grade_chip("SEZON PASOSU", purple))
+	tagr.add_child(_store_grade_chip("ÜCRETSİZ  •  %d SEVİYE" % tiers.size(), UI.GOLD))
+	var title := UI.lbl(GS.Econ.PASS_SEASON.to_upper(), 66, Color.WHITE, "RussoOne-Regular")
+	title.add_theme_constant_override("outline_size", 0)
+	hv.add_child(title)
+	hv.add_child(UI.lbl("Her maçta kazandığın XP ve her tamamladığın görev (+500 XP) seni yeni seviyelere taşır.", 18, Color(1, 1, 1, 0.75), "Rajdhani-SemiBold"))
+	hv.add_child(UI.spacer(false, 0, 10))
+	var xpr := UI.hbox(16)
+	hv.add_child(xpr)
+	var xb := PassBar.new()
+	xb.frac = float(into) / float(per); xb.col = purple
+	xb.custom_minimum_size = Vector2(520, 16)
+	xb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	xpr.add_child(xb)
+	xpr.add_child(UI.lbl(("%s / %s XP" % [UI.money(into), UI.money(per)]) if cur_t < tiers.size() else "TAMAMLANDI", 20, Color.WHITE, "RussoOne-Regular"))
 	var ready := 0
 	for i in cur_t:
 		if not claimed.has(i + 1):
 			ready += 1
+	var actr := UI.hbox(12)
+	hv.add_child(UI.spacer(false, 0, 6))
+	hv.add_child(actr)
 	if ready > 0:
-		var allb := UI.btn("TÜMÜNÜ AL (%d)" % ready, func():
-			for i in cur_t:
-				if not GS.profile.get("pass", {}).get("claimed", []).has(i + 1):
-					var r: Dictionary = await GS.act("pass_claim", {"tier": i + 1})
-					if not r["ok"]:
-						_toast(str(r["err"]), UI.RED)
-						break
-			SFX.play("success")
-			_refresh_currency()
-			show_page("pass"), 18, true, 200, 46)
-		prog.add_child(allb)
-	# tiers
+		var allb := UI.btn("TÜMÜNÜ AL  (%d)" % ready, func(): _pass_claim_all(cur_t), 20, true, 240, 50)
+		actr.add_child(allb)
+		var pt := allb.create_tween().set_loops()
+		pt.tween_property(allb, "modulate", Color(1.25, 1.15, 1.0), 0.6).set_trans(Tween.TRANS_SINE)
+		pt.tween_property(allb, "modulate", Color.WHITE, 0.6).set_trans(Tween.TRANS_SINE)
+	actr.add_child(UI.lbl("%d / %d ödül alındı" % [claimed.size(), tiers.size()], 16, Color(1, 1, 1, 0.55), "Rajdhani-Bold"))
+	# final reward showcase
+	var fin: Dictionary = tiers[tiers.size() - 1]
+	var fc := _pass_reward_col(fin)
+	var show := Control.new()
+	show.custom_minimum_size = Vector2(380, 250)
+	show.clip_contents = true
+	hero.add_child(show)
+	var fbg := Panel.new()
+	var fsb := UI.sb(Color(fc.r * 0.12, fc.g * 0.12, fc.b * 0.14, 0.75), Color(fc.r, fc.g, fc.b, 0.6), 1, 6, 0)
+	fbg.add_theme_stylebox_override("panel", fsb)
+	fbg.set_anchors_preset(Control.PRESET_FULL_RECT); fbg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	show.add_child(fbg)
+	var rays := ColorRect.new()
+	rays.set_anchors_preset(Control.PRESET_FULL_RECT); rays.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var rm := ShaderMaterial.new(); var rs := Shader.new(); rs.code = RAYS_SHADER; rm.shader = rs
+	rm.set_shader_parameter("col", Color(fc.r, fc.g, fc.b, 0.55)); rm.set_shader_parameter("k", 1.0)
+	rays.material = rm
+	show.add_child(rays)
+	var fart := _pass_reward_art(fin, Vector2(300, 170))
+	fart.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if str(fin.get("type", "")) in ["skin", "weapon"]:
+		fart.ready.connect(func(): fart.pivot_offset = fart.size * 0.5; fart.scale = Vector2(1.4, 1.4), CONNECT_DEFERRED)
+	var fcc := CenterContainer.new()
+	fcc.set_anchors_preset(Control.PRESET_FULL_RECT); fcc.offset_top = 14; fcc.offset_bottom = -34
+	fcc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	show.add_child(fcc)
+	fcc.add_child(fart)
+	var bob := fart.create_tween().set_loops()
+	bob.tween_property(fcc, "position:y", 6.0, 1.6).set_trans(Tween.TRANS_SINE)
+	bob.tween_property(fcc, "position:y", 14.0, 1.6).set_trans(Tween.TRANS_SINE)
+	var ftop := UI.lbl("FİNAL ÖDÜLÜ  •  SEVİYE %d" % tiers.size(), 14, fc.lightened(0.4), "Rajdhani-Bold")
+	ftop.position = Vector2(16, 10)
+	show.add_child(ftop)
+	var fname := UI.lbl(_pass_reward_name(fin), 20, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
+	fname.set_anchors_preset(Control.PRESET_BOTTOM_WIDE); fname.offset_top = -36; fname.offset_bottom = -8
+	show.add_child(fname)
+	# ---- reward track + rail
 	var sc := ScrollContainer.new()
-	sc.custom_minimum_size = Vector2(0, 340)
-	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.custom_minimum_size = Vector2(0, 380)
 	sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(sc)
-	var row := UI.hbox(10)
+	var row := UI.hbox(0)
 	sc.add_child(row)
 	for i in tiers.size():
-		row.add_child(_pass_tier_card(i + 1, tiers[i], i + 1 <= cur_t, claimed.has(i + 1)))
-	# scroll to the first unclaimed / current tier
+		var col := UI.vbox(10)
+		col.custom_minimum_size = Vector2(184, 0)
+		row.add_child(col)
+		var cm := MarginContainer.new()
+		cm.add_theme_constant_override("margin_left", 6); cm.add_theme_constant_override("margin_right", 6)
+		col.add_child(cm)
+		var card := _pass_tier_card(i + 1, tiers[i], i + 1 <= cur_t, claimed.has(i + 1))
+		cm.add_child(card)
+		var seg := PassRail.new()
+		seg.tier = i + 1; seg.cur = cur_t; seg.frac = float(into) / float(per); seg.col = purple
+		seg.first = i == 0; seg.last = i == tiers.size() - 1
+		seg.custom_minimum_size = Vector2(184, 34)
+		col.add_child(seg)
+		# staggered entrance
+		cm.modulate.a = 0.0
+		var tw := cm.create_tween()
+		tw.tween_interval(0.03 * mini(i, 12))
+		tw.tween_property(cm, "modulate:a", 1.0, 0.25)
 	var focus: int = maxi(0, mini(cur_t - 2, tiers.size() - 1))
-	sc.ready.connect(func(): sc.scroll_horizontal = focus * 178, CONNECT_DEFERRED)
-	get_tree().create_timer(0.05).timeout.connect(func(): if is_instance_valid(sc): sc.scroll_horizontal = focus * 178)
+	get_tree().create_timer(0.05).timeout.connect(func(): if is_instance_valid(sc): sc.scroll_horizontal = focus * 184)
+	# ---- info strip
+	var info := UI.hbox(12)
+	info.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(info)
+	var nxt_big := -1
+	for i in range(cur_t, tiers.size()):
+		if (i + 1) % 5 == 0:
+			nxt_big = i + 1
+			break
+	var specs := [
+		["XP NASIL KAZANILIR", "Maç bitir: oyun XP'si kadar  •  Günlük görev: +500  •  Galibiyet ve MVP ekstra XP verir", UI.ACCENT],
+		["SONRAKİ BÜYÜK ÖDÜL", ("Seviye %d  —  %s" % [nxt_big, _pass_reward_name(tiers[nxt_big - 1])]) if nxt_big > 0 else "Tüm büyük ödüller açıldı", purple],
+		["İLERLEME", "%d. seviyedesin  •  toplam %s XP  •  %d ödül bekliyor" % [cur_t, UI.money(pxp), ready], UI.GREEN]]
+	for sp in specs:
+		var ip := PanelContainer.new()
+		var isb := UI.sb(Color(0.04, 0.045, 0.06, 0.82), Color(1, 1, 1, 0.06), 1, 4, 14)
+		isb.set_border_width_all(0); isb.border_width_left = 3; isb.border_color = sp[2]
+		ip.add_theme_stylebox_override("panel", isb)
+		ip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ip.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		info.add_child(ip)
+		var iv := UI.vbox(4)
+		ip.add_child(iv)
+		iv.add_child(UI.lbl(sp[0], 14, (sp[2] as Color).lightened(0.3), "Rajdhani-Bold"))
+		var il := UI.lbl(sp[1], 17, Color(1, 1, 1, 0.82), "Rajdhani-SemiBold")
+		il.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		iv.add_child(il)
+
+class PassSparks extends Control:
+	var col := Color.WHITE
+	var pts: Array = []
+	func _ready() -> void:
+		for i in 46:
+			pts.append([randf(), randf(), randf_range(0.01, 0.04), randf_range(1.0, 2.6), randf() * TAU])
+	func _process(d: float) -> void:
+		for p in pts:
+			p[1] -= p[2] * d
+			if p[1] < -0.02:
+				p[1] = 1.02; p[0] = randf()
+		queue_redraw()
+	func _draw() -> void:
+		var t := Time.get_ticks_msec() * 0.001
+		for p in pts:
+			var a: float = 0.25 + 0.25 * sin(t * 2.0 + p[4])
+			var pos := Vector2(p[0] * size.x + sin(t * 0.6 + p[4]) * 14.0, p[1] * size.y)
+			draw_circle(pos, p[3] * 2.4, Color(col.r, col.g, col.b, a * 0.18))
+			draw_circle(pos, p[3] * 0.8, Color(1, 0.9, 1, a))
+
+class PassRing extends Control:
+	var level := 0
+	var max_level := 30
+	var frac := 0.0
+	var col := Color.PURPLE
+	var shown := 0.0
+	var t := 0.0
+	func _process(d: float) -> void:
+		t += d
+		shown = lerpf(shown, frac, 1.0 - exp(-d * 3.0))
+		queue_redraw()
+	func _draw() -> void:
+		var c := size * 0.5
+		var r: float = minf(size.x, size.y) * 0.5 - 12.0
+		draw_circle(c, r + 10, Color(0, 0, 0, 0.45))
+		draw_arc(c, r, 0, TAU, 96, Color(1, 1, 1, 0.08), 12.0, true)
+		var a0 := -PI * 0.5
+		var a1 := a0 + TAU * clampf(shown, 0.0, 1.0)
+		for g in 3:
+			draw_arc(c, r, a0, a1, 96, Color(col.r, col.g, col.b, 0.14), 12.0 + g * 7.0, true)
+		draw_arc(c, r, a0, a1, 96, col.lightened(0.15), 12.0, true)
+		var tip := c + Vector2.from_angle(a1) * r
+		draw_circle(tip, 9.0 + 2.0 * sin(t * 4.0), Color(1, 1, 1, 0.9))
+		# ticks
+		for i in 30:
+			var ta := a0 + TAU * i / 30.0
+			draw_line(c + Vector2.from_angle(ta) * (r - 20), c + Vector2.from_angle(ta) * (r - 14), Color(1, 1, 1, 0.18), 2.0)
+		var f: Font = UI.font("RussoOne-Regular")
+		var s := str(level)
+		var fs := 78
+		var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		draw_string(f, Vector2(c.x - w * 0.5, c.y + 26), s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+		var f2: Font = UI.font("Rajdhani-Bold")
+		var s2 := "SEVİYE"
+		var w2 := f2.get_string_size(s2, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+		draw_string(f2, Vector2(c.x - w2 * 0.5, c.y - 34), s2, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 1, 1, 0.6))
+		var s3 := "/ %d" % max_level
+		var w3 := f2.get_string_size(s3, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+		draw_string(f2, Vector2(c.x - w3 * 0.5, c.y + 52), s3, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 1, 1, 0.5))
+
+class PassBar extends Control:
+	var frac := 0.0
+	var col := Color.PURPLE
+	var shown := 0.0
+	var t := 0.0
+	func _process(d: float) -> void:
+		t += d
+		shown = lerpf(shown, frac, 1.0 - exp(-d * 3.0))
+		queue_redraw()
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		draw_rect(r, Color(1, 1, 1, 0.08))
+		var w := size.x * clampf(shown, 0.0, 1.0)
+		if w <= 1:
+			return
+		draw_rect(Rect2(0, -4, w, size.y + 8), Color(col.r, col.g, col.b, 0.18))
+		draw_rect(Rect2(0, 0, w, size.y), col)
+		draw_rect(Rect2(0, 0, w, size.y * 0.4), Color(1, 1, 1, 0.18))
+		# shimmer
+		var sx := fmod(t * 260.0, size.x + 160.0) - 80.0
+		if sx < w:
+			for k in 8:
+				var x := sx + k * 6.0
+				if x > 0 and x < w:
+					draw_rect(Rect2(x, 0, 6, size.y), Color(1, 1, 1, 0.22 * sin(PI * k / 8.0)))
+		draw_rect(Rect2(w - 3, -3, 3, size.y + 6), Color.WHITE)
+
+class PassRail extends Control:
+	var tier := 1
+	var cur := 0
+	var frac := 0.0
+	var col := Color.PURPLE
+	var first := false
+	var last := false
+	var t := 0.0
+	func _process(d: float) -> void:
+		t += d
+		if tier == cur + 1:
+			queue_redraw()
+	func _draw() -> void:
+		var cy := size.y * 0.5
+		var cx := size.x * 0.5
+		var open := tier <= cur
+		var lc := Color(1, 1, 1, 0.12)
+		# line to the left (from previous node) and right (to next)
+		if not first:
+			draw_rect(Rect2(0, cy - 2, cx, 4), col if open else lc)
+		if not last:
+			draw_rect(Rect2(cx, cy - 2, cx, 4), lc)
+			if tier < cur:
+				draw_rect(Rect2(cx, cy - 2, cx, 4), col)
+			elif tier == cur:
+				draw_rect(Rect2(cx, cy - 2, cx * frac, 4), col)
+		var big := tier % 5 == 0
+		var rr := 13.0 if big else 10.0
+		if tier == cur + 1:
+			draw_circle(Vector2(cx, cy), rr + 6 + 3 * sin(t * 4.0), Color(col.r, col.g, col.b, 0.25))
+		draw_circle(Vector2(cx, cy), rr + 2, Color(0.02, 0.02, 0.03))
+		draw_circle(Vector2(cx, cy), rr, col if open else Color(0.18, 0.18, 0.22))
+		var f: Font = UI.font("RussoOne-Regular")
+		var s := str(tier)
+		var fs := 15 if big else 13
+		var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		draw_string(f, Vector2(cx - w * 0.5, cy + fs * 0.36), s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE if open else Color(1, 1, 1, 0.55))
 
 func _pass_tier_card(tier: int, it: Dictionary, open: bool, got: bool) -> Control:
 	var c := _pass_reward_col(it)
 	var big: bool = tier % 5 == 0
+	var holder := Control.new()
+	holder.custom_minimum_size = Vector2(172, 330)
 	var p := PanelContainer.new()
-	var sb := _store_bg(c if open else c.darkened(0.55))
+	var sb := UI.sb(Color(c.r * 0.1 + 0.02, c.g * 0.1 + 0.022, c.b * 0.1 + 0.03, 0.9), Color(c.r, c.g, c.b, 0.55 if open else 0.18), 1, 6, 0)
+	sb.border_width_bottom = 3
 	if big:
-		sb.border_width_top = 3
+		sb.border_width_top = 2
+		sb.shadow_color = Color(c.r, c.g, c.b, 0.25 if open else 0.0); sb.shadow_size = 12
 	p.add_theme_stylebox_override("panel", sb)
-	p.custom_minimum_size = Vector2(168, 320)
+	p.set_anchors_preset(Control.PRESET_FULL_RECT)
+	holder.add_child(p)
+	# rarity glow at the top of the card
+	var glow := TextureRect.new()
+	var gt := GradientTexture2D.new(); var g := Gradient.new()
+	g.set_color(0, Color(c.r, c.g, c.b, 0.35 if open else 0.1)); g.set_color(1, Color(c.r, c.g, c.b, 0.0))
+	gt.gradient = g; gt.fill = GradientTexture2D.FILL_RADIAL; gt.fill_from = Vector2(0.5, 0.42); gt.fill_to = Vector2(0.5, 0.0)
+	glow.texture = gt; glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; glow.stretch_mode = TextureRect.STRETCH_SCALE
+	glow.set_anchors_preset(Control.PRESET_FULL_RECT); glow.offset_bottom = -110
+	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_child(glow)
 	var v := UI.vbox(4)
-	p.add_child(v)
-	var hm := MarginContainer.new()
-	hm.add_theme_constant_override("margin_left", 10); hm.add_theme_constant_override("margin_right", 6)
-	v.add_child(hm)
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.offset_left = 8; v.offset_right = -8; v.offset_top = 8; v.offset_bottom = -10
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_child(v)
 	var hh := UI.hbox(6)
-	hm.add_child(hh)
-	var tl := UI.lbl("%d" % tier, 30, (c.lightened(0.3) if open else UI.DIM), "Teko")
-	hh.add_child(tl)
+	v.add_child(hh)
+	hh.add_child(UI.lbl(str(_pass_reward_type_name(it)), 13, c.lightened(0.35) if open else UI.DIM, "Rajdhani-Bold"))
 	hh.add_child(UI.spacer())
 	if big:
-		hh.add_child(_store_grade_chip("BÜYÜK ÖDÜL", c))
+		hh.add_child(_store_grade_chip("BÜYÜK", c))
 	var art_wrap := CenterContainer.new()
-	art_wrap.custom_minimum_size = Vector2(0, 150)
+	art_wrap.custom_minimum_size = Vector2(0, 170)
+	art_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(art_wrap)
-	var art := _pass_reward_art(it, Vector2(140, 130))
+	var art := _pass_reward_art(it, Vector2(156, 150))
 	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if not open:
-		art.modulate = Color(0.45, 0.45, 0.5, 0.8)
+		art.modulate = Color(0.5, 0.5, 0.56, 0.85)
 	art_wrap.add_child(art)
-	if open and not got:
-		var tw := art.create_tween().set_loops()
-		tw.tween_property(art, "modulate", Color(1.3, 1.25, 1.15), 0.7).set_trans(Tween.TRANS_SINE)
-		tw.tween_property(art, "modulate", Color.WHITE, 0.7).set_trans(Tween.TRANS_SINE)
-	var nl := UI.lbl(_pass_reward_name(it), 15, Color.WHITE if open else UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+	if str(it.get("type", "")) in ["skin", "weapon"]:
+		# weapon thumbnails carry a lot of padding: zoom them in so the gun fills the card
+		art.ready.connect(func(): art.pivot_offset = art.size * 0.5; art.scale = Vector2(1.55, 1.55), CONNECT_DEFERRED)
+	var nl := UI.lbl(_pass_reward_name(it), 16, Color.WHITE if open else Color(1, 1, 1, 0.6), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
 	nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	nl.custom_minimum_size = Vector2(150, 40)
+	nl.custom_minimum_size = Vector2(150, 44)
 	v.add_child(nl)
 	v.add_child(UI.spacer())
 	if got:
-		v.add_child(UI.lbl("✓ ALINDI", 18, UI.GREEN, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UI.lbl("✓  ALINDI", 18, UI.GREEN, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+		var dimc := ColorRect.new(); dimc.color = Color(0, 0, 0, 0.28)
+		dimc.set_anchors_preset(Control.PRESET_FULL_RECT); dimc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.add_child(dimc)
 	elif open:
+		v.mouse_filter = Control.MOUSE_FILTER_PASS
 		v.add_child(UI.btn("ÖDÜLÜ AL", func():
 			var r: Dictionary = await _act("pass_claim", {"tier": tier})
 			if r["ok"]:
-				SFX.play("success")
 				var rs: Dictionary = r.get("res", {})
+				var tex: Texture2D = null
+				if art is TextureRect: tex = (art as TextureRect).texture
+				if tex and not rs.has("dup"):
+					purchase_fx(tex, _pass_reward_name(it), "SEZON ÖDÜLÜ • SEVİYE %d" % tier, c)
+				else:
+					SFX.play("success")
 				_toast(("Ödül alındı: " + _pass_reward_name(it)) if not rs.has("dup") else "Zaten sendeydi: +%s altın" % UI.money(int(rs["dup"])), UI.GREEN)
 				show_page("pass"), 16, true, 0, 40))
+		var sh := CardShine.new()
+		sh.col = c
+		sh.set_anchors_preset(Control.PRESET_FULL_RECT)
+		sh.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.add_child(sh)
 	else:
-		v.add_child(UI.lbl("KİLİTLİ  •  %s XP" % UI.money(tier * GS.Econ.PASS_XP), 14, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
-	return p
+		var lk := UI.hbox(6)
+		lk.alignment = BoxContainer.ALIGNMENT_CENTER
+		lk.add_child(UI.lbl("KİLİTLİ  •", 14, Color(1, 1, 1, 0.35), "Rajdhani-Bold"))
+		lk.add_child(UI.lbl("%s XP" % UI.money(tier * GS.Econ.PASS_XP), 15, Color(1, 1, 1, 0.5), "Rajdhani-Bold"))
+		v.add_child(lk)
+	# hover lift
+	holder.mouse_filter = Control.MOUSE_FILTER_PASS
+	holder.mouse_entered.connect(func():
+		holder.pivot_offset = holder.size * 0.5
+		holder.create_tween().tween_property(holder, "scale", Vector2(1.04, 1.04), 0.12))
+	holder.mouse_exited.connect(func(): holder.create_tween().tween_property(holder, "scale", Vector2.ONE, 0.12))
+	return holder
+
+func _pass_reward_type_name(it: Dictionary) -> String:
+	match str(it.get("type", "")):
+		"gold": return "ALTIN"
+		"mat": return "MALZEME"
+		"crate": return "KASA"
+		"skin": return "KAPLAMA"
+		"weapon": return "SİLAH"
+		"char": return "AJAN"
+	return "ÖDÜL"
+
+class CardShine extends Control:
+	## a diagonal light sweep that crosses claimable cards every few seconds
+	var col := Color.WHITE
+	var t := 0.0
+	func _process(d: float) -> void:
+		t += d
+		queue_redraw()
+	func _draw() -> void:
+		var ph := fmod(t, 2.6) / 1.0
+		if ph > 1.0:
+			draw_rect(Rect2(Vector2.ZERO, size), Color(col.r, col.g, col.b, 0.0), false, 2.0)
+			return
+		var x := lerpf(-size.y * 0.6, size.x + 20.0, ph)
+		var pts := PackedVector2Array([Vector2(x, 0), Vector2(x + 26, 0), Vector2(x + 26 - size.y * 0.5, size.y), Vector2(x - size.y * 0.5, size.y)])
+		var poly := Geometry2D.intersect_polygons(pts, PackedVector2Array([Vector2.ZERO, Vector2(size.x, 0), size, Vector2(0, size.y)]))
+		for pp in poly:
+			draw_colored_polygon(pp, Color(1, 1, 1, 0.08))
 
 # ================================================================ MARKET
 func _page_market() -> void:
@@ -3762,10 +4214,21 @@ func _page_crate() -> void:
 	var strip := HBoxContainer.new()
 	strip.add_theme_constant_override("separation", 10)
 	clip.add_child(strip)
+	var reel_bg := ColorRect.new()
+	reel_bg.color = Color(0.03, 0.035, 0.045, 0.95)
+	reel_bg.size = Vector2(1240, 210)
+	reel_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clip.add_child(reel_bg); clip.move_child(reel_bg, 0)
+	var mglow := ColorRect.new()
+	mglow.color = Color(1.0, 0.82, 0.25, 0.16)
+	mglow.size = Vector2(16, 210); mglow.position = Vector2(612, 0)
+	mglow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clip.add_child(mglow)
 	var marker := ColorRect.new()
-	marker.color = GS.CRATES[crate_type]["color"]
-	marker.size = Vector2(4, 210)
-	marker.position = Vector2(618, 0)
+	marker.color = Color(1.0, 0.84, 0.3)
+	marker.size = Vector2(3, 210)
+	marker.position = Vector2(618.5, 0)
+	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	clip.add_child(marker)
 	# edge fades + pointer triangles: the reel reads like a premium case opening
 	for side in [0, 1]:
@@ -3782,12 +4245,12 @@ func _page_crate() -> void:
 		clip.add_child(fade)
 	var tri := Polygon2D.new()
 	tri.polygon = PackedVector2Array([Vector2(-14, 0), Vector2(14, 0), Vector2(0, 18)])
-	tri.color = GS.CRATES[crate_type]["color"]
+	tri.color = Color(1.0, 0.84, 0.3)
 	tri.position = Vector2(620, 0)
 	clip.add_child(tri)
 	var tri2 := Polygon2D.new()
 	tri2.polygon = PackedVector2Array([Vector2(-14, 0), Vector2(14, 0), Vector2(0, -18)])
-	tri2.color = GS.CRATES[crate_type]["color"]
+	tri2.color = Color(1.0, 0.84, 0.3)
 	tri2.position = Vector2(620, 210)
 	clip.add_child(tri2)
 	crate_items.clear()
@@ -3823,6 +4286,9 @@ func _page_crate() -> void:
 		var nc := _crate_card(win)
 		strip.add_child(nc); strip.move_child(nc, win_i)
 		strip.position.x = 0
+		for ch in strip.get_children():
+			(ch as Control).modulate = Color.WHITE
+			(ch as Control).scale = Vector2.ONE
 		var target_x := -(win_i * 190.0 + 90.0) + 620.0 + randf_range(-60, 60)
 		# unlock: the panel shakes, a coloured flash bursts out, then the reel starts
 		SFX.play("upgrade_charge", -6, 1.4)
@@ -3840,14 +4306,26 @@ func _page_crate() -> void:
 		sh.tween_callback(flash.queue_free)
 		var tw := create_tween()
 		tw.tween_interval(0.42)
-		tw.tween_property(strip, "position:x", target_x, 5.5).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+		tw.tween_property(strip, "position:x", target_x, 6.2).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
 		var last_idx := [-1]
 		var ticker := func(_v):
 			var idx := int((-strip.position.x + 620.0) / 190.0)
 			if idx != last_idx[0]:
 				last_idx[0] = idx
 				SFX.play("tick", -8)
-		tw.parallel().tween_method(ticker, 0.0, 1.0, 5.5)
+		tw.parallel().tween_method(ticker, 0.0, 1.0, 6.2)
+		tw.tween_interval(0.25)
+		tw.tween_callback(func():
+			# CS2: everything but the winner fades back, the winner pops
+			for k in strip.get_child_count():
+				var ch := strip.get_child(k) as Control
+				if ch and ch != nc:
+					ch.create_tween().tween_property(ch, "modulate", Color(0.35, 0.35, 0.4, 1.0), 0.3)
+			nc.pivot_offset = nc.size * 0.5
+			var pop := nc.create_tween()
+			pop.tween_property(nc, "scale", Vector2(1.1, 1.1), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			pop.tween_property(nc, "scale", Vector2(1.04, 1.04), 0.25))
+		tw.tween_interval(0.5)
 		tw.tween_callback(func():
 			var label: String = win["label"] + ("  (zaten vardı: +%s altın)" % UI.money(int(win["dup"])) if win.has("dup") else "")
 			SFX.play("success")
@@ -4243,45 +4721,81 @@ func _roll_item(t: String = "sokak") -> Dictionary:
 	return {"type": "skin", "wid": wid, "id": sk, "label": "%s | %s" % [GS.WEAPONS[wid]["name"], sd["name"]], "color": GS.RARITY_COLORS[int(sd["rarity"])], "rarity": int(sd["rarity"])}
 
 func _crate_card(it: Dictionary) -> Control:
-	var p := UI.panel(Color(0.07, 0.085, 0.11), it["color"], 6)
+	## v4.1 CS2 reel tile: dark slate gradient, rarity glow behind the item, thick rarity bar at the bottom,
+	## two-line caption (category on top, name below)
+	var rc: Color = it["color"]
+	var p := Control.new()
 	p.custom_minimum_size = Vector2(180, 200)
-	var v := UI.vbox(2)
-	p.add_child(v)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bg := TextureRect.new()
+	var gt := GradientTexture2D.new(); var g := Gradient.new()
+	g.set_color(0, Color(0.13, 0.14, 0.16)); g.set_color(1, Color(rc.r * 0.22 + 0.06, rc.g * 0.22 + 0.06, rc.b * 0.22 + 0.07))
+	gt.gradient = g; gt.fill_from = Vector2(0.5, 0); gt.fill_to = Vector2(0.5, 1); gt.width = 8; gt.height = 64
+	bg.texture = gt; bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; bg.stretch_mode = TextureRect.STRETCH_SCALE
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT); bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(bg)
+	var glow := TextureRect.new()
+	var gt2 := GradientTexture2D.new(); var g2 := Gradient.new()
+	g2.set_color(0, Color(rc.r, rc.g, rc.b, 0.45)); g2.set_color(1, Color(rc.r, rc.g, rc.b, 0.0))
+	gt2.gradient = g2; gt2.fill = GradientTexture2D.FILL_RADIAL; gt2.fill_from = Vector2(0.5, 0.5); gt2.fill_to = Vector2(0.5, 0.0)
+	glow.texture = gt2; glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; glow.stretch_mode = TextureRect.STRETCH_SCALE
+	glow.position = Vector2(0, 0); glow.size = Vector2(180, 150); glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(glow)
+	var art: Control
+	match str(it["type"]):
+		"skin": art = thumb_rect(it["wid"], it["id"], Vector2(170, 120))
+		"weapon": art = thumb_rect(it["id"], "std", Vector2(170, 120))
+		"part":
+			var pi := PartIcon.new(); pi.pid = it["id"]; art = pi
+		"char":
+			var ag := _agent_art(str(it["id"]), Vector2(110, 120), true)
+			art = ag if ag else UI.lbl("?", 60, rc, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
+		"mat", "gold":
+			var ic := CurIcon.new()
+			ic.kind = "gold" if it["type"] == "gold" else "gem"
+			ic.mat = str(it["id"]) if it["type"] == "mat" else ""
+			ic.col = rc
+			art = ic
+		_:
+			art = UI.lbl("◉", 60, rc, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if art is TextureRect:
+		(art as TextureRect).expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		(art as TextureRect).stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var is_gun: bool = str(it["type"]) in ["skin", "weapon"]
+	art.position = Vector2(-30, 0) if is_gun else Vector2(25, 14)
+	art.size = Vector2(240, 140) if is_gun else Vector2(130, 112)
+	p.add_child(art)
 	var bar := ColorRect.new()
-	bar.color = it["color"]
-	bar.custom_minimum_size = Vector2(0, 4)
-	v.add_child(bar)
-	if it["type"] == "skin":
-		v.add_child(thumb_rect(it["wid"], it["id"], Vector2(0, 110)))
-	elif it["type"] == "weapon":
-		v.add_child(thumb_rect(it["id"], "std", Vector2(0, 110)))
-	elif it["type"] == "part":
-		var pi := PartIcon.new()
-		pi.pid = it["id"]
-		pi.custom_minimum_size = Vector2(0, 110)
-		pi.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		v.add_child(pi)
-	elif it["type"] == "char" and _agent_art(str(it["id"]), Vector2(0, 110), true):
-		v.add_child(_agent_art(str(it["id"]), Vector2(0, 110), true))
-	elif it["type"] == "char":
-		var l2 := UI.lbl("👤", 64, it["color"], "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
-		l2.custom_minimum_size = Vector2(0, 110)
-		v.add_child(l2)
-	elif it["type"] == "mat" or it["type"] == "gold":
-		var ic := CurIcon.new()
-		ic.kind = "gold" if it["type"] == "gold" else "gem"
-		ic.mat = str(it["id"]) if it["type"] == "mat" else ""
-		ic.col = it["color"]
-		ic.custom_minimum_size = Vector2(0, 110)
-		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		v.add_child(ic)
+	bar.color = rc
+	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE); bar.offset_top = -6
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(bar)
+	var lab: String = str(it["label"])
+	var top_t := ""
+	var main_t := lab
+	if " | " in lab:
+		top_t = lab.get_slice(" | ", 0); main_t = lab.get_slice(" | ", 1)
+	elif ": " in lab:
+		top_t = lab.get_slice(": ", 0); main_t = lab.substr(lab.find(": ") + 2)
 	else:
-		var l := UI.lbl("■" if it["type"] == "mat" else "◉", 60, it["color"], "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
-		l.custom_minimum_size = Vector2(0, 110)
-		v.add_child(l)
-	var t := UI.lbl(it["label"], 16, Color.WHITE, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
-	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(t)
+		top_t = {"gold": "ALTIN", "mat": "MALZEME"}.get(str(it["type"]), "")
+	var cv := UI.vbox(-4)
+	cv.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	cv.offset_top = -56; cv.offset_bottom = -8; cv.offset_left = 10; cv.offset_right = -8
+	cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(cv)
+	var tl := UI.lbl(top_t.to_upper(), 13, Color(1, 1, 1, 0.55), "Rajdhani-Bold")
+	tl.clip_text = true
+	cv.add_child(tl)
+	var ml := UI.lbl(main_t, 18, Color.WHITE, "Rajdhani-Bold")
+	ml.clip_text = true
+	cv.add_child(ml)
+	var edge := Panel.new()
+	var esb := StyleBoxFlat.new(); esb.bg_color = Color(0, 0, 0, 0); esb.border_color = Color(1, 1, 1, 0.07); esb.set_border_width_all(1)
+	edge.add_theme_stylebox_override("panel", esb)
+	edge.set_anchors_preset(Control.PRESET_FULL_RECT); edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(edge)
 	return p
 
 func _item_display(it: Dictionary) -> Dictionary:
@@ -5442,6 +5956,12 @@ func test_hook(i: int) -> void:
 	match i:
 		68:
 			market_tab = "ekipman"; show_page("market")
+		70:
+			GS.profile["gold"] = 999999
+			for b in content.find_children("*", "Button", true, false):
+				if str((b as Button).text).begins_with("KASAYI") or str((b as Button).text).begins_with("SATIN AL"):
+					(b as Button).pressed.emit()
+					break
 		69:
 			purchase_fx(load("res://assets/ui/gear/celik_yelek.png"), "Çelik Yelek", "TAKILDI  •  Gövdeye gelen hasar %15 azalır", GS.RARITY_COLORS[3], 14000)
 		60:

@@ -26,18 +26,18 @@ var WEAPONS := {
 	"revolver": {"name": "Magnum .357", "cat": "tabanca", "cls": "Tabanca", "dmg": 62, "rpm": 150, "mag": 6, "reserve": 36, "reload": 2.3, "spread": 0.02, "ads_spread": 0.003, "move": 0.04, "recoil": 0.06, "hrec": 0.012, "auto": false, "range": 120.0, "speed": 1.05, "price": 2600, "snd": "shot_revolver", "zoom": 1.25, "head": 2.7},
 	"glock":  {"name": "Glock 17", "cat": "tabanca", "cls": "Tabanca", "dmg": 24, "rpm": 420, "mag": 17, "reserve": 68, "reload": 1.6, "spread": 0.02, "ads_spread": 0.006, "move": 0.015, "recoil": 0.02, "hrec": 0.006, "auto": false, "range": 80.0, "speed": 1.08, "price": 0, "snd": "shot_pistol", "zoom": 1.15, "head": 2.5},
 	"deagle": {"name": "Deagle .50", "cat": "tabanca", "cls": "Tabanca", "dmg": 54, "rpm": 210, "mag": 7, "reserve": 35, "reload": 1.9, "spread": 0.022, "ads_spread": 0.004, "move": 0.04, "recoil": 0.055, "hrec": 0.012, "auto": false, "range": 120.0, "speed": 1.05, "price": 1800, "snd": "shot_deagle", "zoom": 1.2, "head": 2.6},
-	"r870":   {"name": "870 Pompalı", "cat": "ana", "cls": "Pompalı", "dmg": 19, "rpm": 62, "mag": 6, "reserve": 30, "reload": 0.6, "spread": 0.068, "ads_spread": 0.05, "move": 0.02, "recoil": 0.075, "hrec": 0.02, "auto": false, "range": 45.0, "pellets": 8, "speed": 0.97, "price": 2800, "snd": "shot_shotgun", "zoom": 1.15, "head": 1.6, "shell_reload": true},
-	"fn502":  {"name": "FN 502 Taktik", "cat": "tabanca", "cls": "Tabanca", "dmg": 21, "rpm": 480, "mag": 15, "reserve": 60, "reload": 1.5, "spread": 0.017, "ads_spread": 0.004, "move": 0.012, "recoil": 0.014, "hrec": 0.005, "auto": false, "range": 75.0, "speed": 1.08, "price": 1400, "snd": "shot_pistol", "zoom": 1.2, "head": 2.5, "silenced": true},
-	"m1911":  {"name": "M1911 Susturuculu", "cat": "tabanca", "cls": "Tabanca", "dmg": 31, "rpm": 380, "mag": 8, "reserve": 48, "reload": 1.7, "spread": 0.016, "ads_spread": 0.003, "move": 0.012, "recoil": 0.024, "hrec": 0.007, "auto": false, "range": 70.0, "speed": 1.07, "price": 1900, "snd": "shot_pistol", "zoom": 1.2, "head": 2.6, "silenced": true},
-	"vityaz": {"name": "PP-19 Vityaz", "cat": "ana", "cls": "Hafif Makinalı", "dmg": 22, "rpm": 820, "mag": 30, "reserve": 150, "reload": 2.1, "spread": 0.025, "ads_spread": 0.006, "move": 0.02, "recoil": 0.011, "hrec": 0.007, "auto": true, "range": 85.0, "speed": 1.05, "price": 2700, "snd": "shot_smg", "zoom": 1.2, "head": 2.2},
-	"rpk16":  {"name": "RPK-16", "cat": "ana", "cls": "Ağır Makinalı", "dmg": 31, "rpm": 700, "mag": 95, "reserve": 190, "reload": 4.6, "spread": 0.031, "ads_spread": 0.006, "move": 0.07, "recoil": 0.018, "hrec": 0.01, "auto": true, "range": 175.0, "speed": 0.86, "price": 5600, "snd": "shot_ak", "zoom": 1.45, "head": 2.4},
-	"awm":    {"name": "AWM", "cat": "ana", "cls": "Nişancı", "dmg": 135, "rpm": 38, "mag": 5, "reserve": 20, "reload": 3.6, "spread": 0.09, "ads_spread": 0.0002, "move": 0.13, "recoil": 0.09, "hrec": 0.01, "auto": false, "range": 450.0, "scope": true, "zoom": 5.5, "speed": 0.84, "price": 6500, "snd": "shot_sniper", "head": 3.2, "bolt": true},
-	"uzi":    {"name": "Micro UZI", "cat": "ana", "cls": "Hafif Makinalı", "dmg": 18, "rpm": 1200, "mag": 32, "reserve": 160, "reload": 1.8, "spread": 0.032, "ads_spread": 0.011, "move": 0.012, "recoil": 0.009, "hrec": 0.011, "auto": true, "range": 55.0, "speed": 1.1, "price": 2100, "snd": "shot_smg", "zoom": 1.15, "head": 2.0},
-	"kuzgun": {"name": "BR-7 Kuzgun", "cat": "ana", "cls": "Savaş Tüfeği", "dmg": 36, "rpm": 900, "mag": 36, "reserve": 144, "reload": 2.5, "spread": 0.02, "ads_spread": 0.002, "move": 0.045, "recoil": 0.016, "hrec": 0.006, "auto": false, "burst": 3, "burst_delay": 0.32, "range": 220.0, "speed": 0.95, "price": 5200, "snd": "shot_m4", "zoom": 2.0, "head": 2.5},
-	"m4k":    {"name": "M4 Karabina", "cat": "ana", "cls": "Makinalı", "dmg": 30, "rpm": 780, "mag": 30, "reserve": 120, "reload": 2.1, "spread": 0.023, "ads_spread": 0.0028, "move": 0.04, "recoil": 0.015, "hrec": 0.007, "auto": true, "range": 165.0, "speed": 0.98, "price": 3400, "snd": "shot_m4", "zoom": 1.35, "head": 2.5},
-	"usp":    {"name": "USP .45 Taktik", "cat": "tabanca", "cls": "Tabanca", "dmg": 29, "rpm": 400, "mag": 12, "reserve": 60, "reload": 1.6, "spread": 0.017, "ads_spread": 0.0035, "move": 0.013, "recoil": 0.022, "hrec": 0.006, "auto": false, "range": 85.0, "speed": 1.08, "price": 1600, "snd": "shot_pistol", "zoom": 1.2, "head": 2.6},
-	"kartal": {"name": "Kartal .44 Toplu", "cat": "tabanca", "cls": "Tabanca", "dmg": 68, "rpm": 130, "mag": 6, "reserve": 30, "reload": 2.4, "spread": 0.019, "ads_spread": 0.0028, "move": 0.04, "recoil": 0.065, "hrec": 0.013, "auto": false, "range": 125.0, "speed": 1.05, "price": 3000, "snd": "shot_revolver", "zoom": 1.25, "head": 2.7},
-	"akm":    {"name": "AKM", "cat": "ana", "cls": "Makinalı", "dmg": 34, "rpm": 600, "mag": 30, "reserve": 120, "reload": 2.5, "spread": 0.029, "ads_spread": 0.0042, "move": 0.05, "recoil": 0.022, "hrec": 0.009, "auto": true, "range": 160.0, "speed": 0.95, "price": 3000, "snd": "shot_ak", "zoom": 1.25, "head": 2.6},
+	"r870":   {"name": "870 Pompalı", "cat": "ana", "cls": "Pompalı", "dmg": 19, "rpm": 62, "mag": 6, "reserve": 30, "reload": 0.6, "spread": 0.068, "ads_spread": 0.05, "move": 0.02, "recoil": 0.075, "hrec": 0.02, "auto": false, "range": 45.0, "pellets": 8, "speed": 0.97, "price": 2800, "snd": "shot_r870", "zoom": 1.15, "head": 1.6, "shell_reload": true},
+	"fn502":  {"name": "FN 502 Taktik", "cat": "tabanca", "cls": "Tabanca", "dmg": 21, "rpm": 480, "mag": 15, "reserve": 60, "reload": 1.5, "spread": 0.017, "ads_spread": 0.004, "move": 0.012, "recoil": 0.014, "hrec": 0.005, "auto": false, "range": 75.0, "speed": 1.08, "price": 1400, "snd": "shot_fn502", "zoom": 1.2, "head": 2.5, "silenced": true},
+	"m1911":  {"name": "M1911 Susturuculu", "cat": "tabanca", "cls": "Tabanca", "dmg": 31, "rpm": 380, "mag": 8, "reserve": 48, "reload": 1.7, "spread": 0.016, "ads_spread": 0.003, "move": 0.012, "recoil": 0.024, "hrec": 0.007, "auto": false, "range": 70.0, "speed": 1.07, "price": 1900, "snd": "shot_m1911", "zoom": 1.2, "head": 2.6, "silenced": true},
+	"vityaz": {"name": "PP-19 Vityaz", "cat": "ana", "cls": "Hafif Makinalı", "dmg": 22, "rpm": 820, "mag": 30, "reserve": 150, "reload": 2.1, "spread": 0.025, "ads_spread": 0.006, "move": 0.02, "recoil": 0.011, "hrec": 0.007, "auto": true, "range": 85.0, "speed": 1.05, "price": 2700, "snd": "shot_vityaz", "zoom": 1.2, "head": 2.2},
+	"rpk16":  {"name": "RPK-16", "cat": "ana", "cls": "Ağır Makinalı", "dmg": 31, "rpm": 700, "mag": 95, "reserve": 190, "reload": 4.6, "spread": 0.031, "ads_spread": 0.006, "move": 0.07, "recoil": 0.018, "hrec": 0.01, "auto": true, "range": 175.0, "speed": 0.86, "price": 5600, "snd": "shot_rpk", "zoom": 1.45, "head": 2.4},
+	"awm":    {"name": "AWM", "cat": "ana", "cls": "Nişancı", "dmg": 135, "rpm": 38, "mag": 5, "reserve": 20, "reload": 3.6, "spread": 0.09, "ads_spread": 0.0002, "move": 0.13, "recoil": 0.09, "hrec": 0.01, "auto": false, "range": 450.0, "scope": true, "zoom": 5.5, "speed": 0.84, "price": 6500, "snd": "shot_awm", "head": 3.2, "bolt": true},
+	"uzi":    {"name": "Micro UZI", "cat": "ana", "cls": "Hafif Makinalı", "dmg": 18, "rpm": 1200, "mag": 32, "reserve": 160, "reload": 1.8, "spread": 0.032, "ads_spread": 0.011, "move": 0.012, "recoil": 0.009, "hrec": 0.011, "auto": true, "range": 55.0, "speed": 1.1, "price": 2100, "snd": "shot_uzi", "zoom": 1.15, "head": 2.0},
+	"kuzgun": {"name": "BR-7 Kuzgun", "cat": "ana", "cls": "Savaş Tüfeği", "dmg": 36, "rpm": 900, "mag": 36, "reserve": 144, "reload": 2.5, "spread": 0.02, "ads_spread": 0.002, "move": 0.045, "recoil": 0.016, "hrec": 0.006, "auto": false, "burst": 3, "burst_delay": 0.32, "range": 220.0, "speed": 0.95, "price": 5200, "snd": "shot_kuzgun", "zoom": 2.0, "head": 2.5},
+	"m4k":    {"name": "M4 Karabina", "cat": "ana", "cls": "Makinalı", "dmg": 30, "rpm": 780, "mag": 30, "reserve": 120, "reload": 2.1, "spread": 0.023, "ads_spread": 0.0028, "move": 0.04, "recoil": 0.015, "hrec": 0.007, "auto": true, "range": 165.0, "speed": 0.98, "price": 3400, "snd": "shot_m4k", "zoom": 1.35, "head": 2.5},
+	"usp":    {"name": "USP .45 Taktik", "cat": "tabanca", "cls": "Tabanca", "dmg": 29, "rpm": 400, "mag": 12, "reserve": 60, "reload": 1.6, "spread": 0.017, "ads_spread": 0.0035, "move": 0.013, "recoil": 0.022, "hrec": 0.006, "auto": false, "range": 85.0, "speed": 1.08, "price": 1600, "snd": "shot_usp", "zoom": 1.2, "head": 2.6},
+	"kartal": {"name": "Kartal .44 Toplu", "cat": "tabanca", "cls": "Tabanca", "dmg": 68, "rpm": 130, "mag": 6, "reserve": 30, "reload": 2.4, "spread": 0.019, "ads_spread": 0.0028, "move": 0.04, "recoil": 0.065, "hrec": 0.013, "auto": false, "range": 125.0, "speed": 1.05, "price": 3000, "snd": "shot_kartal", "zoom": 1.25, "head": 2.7},
+	"akm":    {"name": "AKM", "cat": "ana", "cls": "Makinalı", "dmg": 34, "rpm": 600, "mag": 30, "reserve": 120, "reload": 2.5, "spread": 0.029, "ads_spread": 0.0042, "move": 0.05, "recoil": 0.022, "hrec": 0.009, "auto": true, "range": 160.0, "speed": 0.95, "price": 3000, "snd": "shot_akm", "zoom": 1.25, "head": 2.6},
 	"knife":  {"name": "Savaş Bıçağı", "cat": "bicak", "cls": "Bıçak", "dmg": 55, "rpm": 110, "melee": true, "speed": 1.15, "price": 0, "head": 1.0},
 	"karambit": {"name": "Karambit", "cat": "bicak", "cls": "Bıçak", "dmg": 60, "rpm": 130, "melee": true, "speed": 1.17, "price": 2000, "head": 1.0},
 	"hancer": {"name": "Osmanlı Hançeri", "cat": "bicak", "cls": "Bıçak", "dmg": 58, "rpm": 125, "melee": true, "speed": 1.17, "price": 2600, "head": 1.0},
@@ -378,6 +378,7 @@ func _att(pid: String, fx: String = "") -> Node3D:
 	if not ResourceLoader.exists(path):
 		return null
 	var n: Node3D = (load(path) as PackedScene).instantiate()
+	n.set_meta("att", true)
 	MatLib.apply(n, "std")
 	if fx != "":
 		# special variants: the animated / patterned finish goes over the body, never over glass or reticles
@@ -396,7 +397,22 @@ func _att(pid: String, fx: String = "") -> Node3D:
 func parts_visual(gun: Node3D, id: String, parts = null) -> void:
 	## real modelled attachments (tools/attachments.py) mounted on the weapon's markers
 	var ps: Array = wparts(id) if parts == null else parts
-	if ps.is_empty() or gun == null:
+	if gun == null:
+		return
+	# v4.1: re-applicable (online puppets change parts): drop old attachments, restore the markers
+	for c in gun.find_children("*", "Node3D", true, false):
+		if c.has_meta("att"):
+			c.queue_free()
+	for nm in ["muzzle", "sight", "mag"]:
+		var mk := gun.find_child(nm, true, false) as Node3D
+		if mk:
+			if mk.has_meta("p0"):
+				mk.position = mk.get_meta("p0")
+				mk.scale = mk.get_meta("s0", Vector3.ONE)
+			else:
+				mk.set_meta("p0", mk.position)
+				mk.set_meta("s0", mk.scale)
+	if ps.is_empty():
 		return
 	var mz := gun.find_child("muzzle", true, false) as Node3D
 	var sg := gun.find_child("sight", true, false) as Node3D
@@ -490,6 +506,7 @@ const CREDITS := [
 	["RPK-16", "FamousUnityHubSoldier", "Sketchfab Standard · sketchfab.com"],
 	["Müzik: Movement Proposition, Mechanolith, Heroic Age, Darkest Child", "Kevin MacLeod (incompetech.com)", "CC BY 4.0 · creativecommons.org/licenses/by/4.0"],
 	["Silah sesleri: The Free Firearm Sound Library", "Still North Media", "CC0 · github.com/buddingmonkey/FreeFirearmsSFXLibrary"],
+	["Deagle / AWM atış sesleri (freesound)", "areniporgen, elliotlp, qubodup — GunLib derlemesi", "CC0 · github.com/Deases/GunLib"],
 	["Oculus Audio Pack 01 (adım, bıçak, ortam sesleri)", "Oculus VR, LLC", "CC BY 4.0 · developers.meta.com/vr/downloads/package/oculus-audio-pack-1"],
 	["SCAR-H, MP5, UMP-45 modelleri: Flat Guns West/East", "fps-asset-kit", "CC0 · github.com/petroulacl/fps-asset-kit"],
 	["Impact Sounds (mermi çarpma)", "Kenney", "CC0 · kenney.nl"],
@@ -1029,14 +1046,14 @@ func _set_bus(n: String, v: float) -> void:
 const DEFAULT_BINDS := {
 	"move_forward": [KEY_W], "move_back": [KEY_S], "move_left": [KEY_A], "move_right": [KEY_D],
 	"jump": [KEY_SPACE], "crouch": [KEY_CTRL, KEY_C], "walk": [KEY_SHIFT], "reload": [KEY_R], "use": [KEY_E],
-	"slot1": [KEY_1], "slot2": [KEY_2], "slot3": [KEY_3], "slot4": [KEY_4], "grenade": [KEY_X], "drop": [KEY_G], "spray": [KEY_T], "radio": [KEY_B], "inspect": [KEY_F], "voice": [KEY_V], "team_chat": [KEY_Y],
-	"scoreboard": [KEY_TAB], "pause": [KEY_ESCAPE], "chat": [KEY_ENTER], "last_weapon": [KEY_Q], "buy_menu": [KEY_F1], "ping": [KEY_Z],
+	"slot1": [KEY_1], "slot2": [KEY_2], "slot3": [KEY_3], "slot4": [KEY_4], "grenade": [KEY_X], "drop": [KEY_G], "spray": [KEY_T], "radio": [KEY_F1], "radio_enemy": [KEY_F2], "radio_help": [KEY_F3], "radio_ok": [KEY_F4], "inspect": [KEY_F], "voice": [KEY_V], "team_chat": [KEY_Y],
+	"scoreboard": [KEY_TAB], "pause": [KEY_ESCAPE], "chat": [KEY_ENTER], "last_weapon": [KEY_Q], "buy_menu": [KEY_B], "ping": [KEY_Z],
 }
 const BIND_NAMES := {
 	"move_forward": "İleri", "move_back": "Geri", "move_left": "Sol", "move_right": "Sağ", "jump": "Zıpla", "crouch": "Eğil",
 	"walk": "Yürü (sessiz)", "reload": "Şarjör Değiştir", "use": "Kullan", "slot1": "Ana Silah", "slot2": "Tabanca", "slot3": "Bıçak",
 	"slot4": "Bomba", "grenade": "Hızlı Bomba", "inspect": "Silahı İncele", "voice": "Sesli Konuş (bas-konuş)", "team_chat": "Takım Sohbeti", "chat": "Sohbet", "scoreboard": "Skor Tablosu", "last_weapon": "Son Silah", "buy_menu": "Silah Menüsü", "ping": "İşaret Koy (takıma göster)",
-	"drop": "Silahı Yere At", "spray": "Sprey Boya", "radio": "Telsiz Mesajları",
+	"drop": "Silahı Yere At", "spray": "Sprey Boya", "radio": "Telsiz Menüsü", "radio_enemy": "Hızlı: Düşman görüldü", "radio_help": "Hızlı: Yardım lazım", "radio_ok": "Hızlı: Anlaşıldı",
 }
 
 func setup_input() -> void:
@@ -1057,6 +1074,12 @@ func apply_binds() -> void:
 	if not settings.get("binds_v38", false):
 		settings["binds_v38"] = true
 		for a in ["grenade", "chat", "buy_menu"]:
+			b.erase(a)
+		settings["binds"] = b
+	# v4.1: B = weapon menu again (as in Zula / CS), the radio lives on F1 (F2-F4 = quick call-outs)
+	if not settings.get("binds_v41b", false):
+		settings["binds_v41b"] = true
+		for a in ["radio", "buy_menu"]:
 			b.erase(a)
 		settings["binds"] = b
 	for a in DEFAULT_BINDS.keys():

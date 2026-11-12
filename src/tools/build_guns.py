@@ -12,7 +12,7 @@ os.makedirs(BAK, exist_ok=True)
 SR = 44100
 
 def load(p):
-    sr, x = wavfile.read(SRC + p)
+    sr, x = wavfile.read(p if p.startswith("/") else SRC + p)
     x = x.astype(np.float32)
     if x.dtype != np.float32 or np.abs(x).max() > 2: x /= 2 ** 31 if np.abs(x).max() > 70000 else 32768.0
     if x.ndim > 1: x = x.mean(axis=1)
@@ -37,12 +37,14 @@ def hp(x, f, o=2):
 def lp(x, f, o=2):
     return sosfilt(butter(o, f, 'lowpass', fs=SR, output='sos'), x)
 
-def finish(x, dur, peak=0.93, pitch=1.0, hpf=45, bright=0.0):
+def finish(x, dur, peak=0.93, pitch=1.0, hpf=45, bright=0.0, low=0.0, lpf=None):
     if pitch != 1.0:
         up = int(round(100 / pitch)); x = resample_poly(x, up, 100)
     x = x[:int(dur * SR)].copy()
     x = hp(x, hpf)
     if bright > 0: x = x + hp(x, 3000) * bright
+    if low > 0: x = x + lp(x, 220) * low
+    if lpf: x = lp(x, lpf)
     x = x / (np.abs(x).max() + 1e-9) * 1.8
     # soft limiter: knee at 0.5, keeps the transient punch without hard clipping
     a = np.abs(x); k = 0.5
@@ -58,15 +60,18 @@ def save(name, x):
     if os.path.exists(p) and not os.path.exists(BAK + name + ".wav"): shutil.copy(p, BAK + name + ".wav")
     wavfile.write(p, SR, (np.clip(x, -1, 1) * 32767).astype(np.int16))
 
-def gun(name, src, dur, pitch=1.0, far=None, far_dur=None, bright=0.0, peak=0.93):
+def gun(name, src, dur, pitch=1.0, far=None, far_dur=None, bright=0.0, peak=0.93, low=0.0, lpf=None):
     x = load(src)
     st = shots(x)
     takes = [x[s:s + int(dur * 1.2 * SR)] for s in st if s + int(0.2 * SR) < len(x)]
     # prefer the cleanest takes (peak ratio = least clipped / most consistent)
     takes = sorted(takes, key=lambda t: -np.sqrt(np.mean(t[:int(0.05 * SR)] ** 2)))[:3]
+    # drop echoes / weak onsets (they would sound like a distant shot after normalising)
+    pk = [np.abs(t[:int(0.05 * SR)]).max() for t in takes]
+    takes = [t for t, q in zip(takes, pk) if q >= 0.6 * max(pk)]
     while len(takes) < 3: takes.append(takes[0])
     for vi, t in enumerate(takes):
-        save(name if vi == 0 else f"{name}_v{vi}", finish(t, dur, peak, pitch * (1 + (vi - 1) * 0.012), bright=bright))
+        save(name if vi == 0 else f"{name}_v{vi}", finish(t, dur, peak, pitch * (1 + (vi - 1) * 0.012), bright=bright, low=low, lpf=lpf))
     fn = name.replace("shot_", "shotfar_")
     if far:
         y = load(far); s = shots(y)[0]
@@ -75,22 +80,41 @@ def gun(name, src, dur, pitch=1.0, far=None, far_dur=None, bright=0.0, peak=0.93
         save(fn, finish(lp(takes[0], 1400), dur * 1.4, 0.6, pitch))
     print(name, len(st), "shots found")
 
-gun("shot_ak", "AK-47/C_28P.wav", 0.75, far="AK-47/C_31P.wav", far_dur=1.2)
-gun("shot_m4", "AR-15/D_32P.wav", 0.7, far="AR-15/D_24P.wav", far_dur=1.2, bright=0.1)
-gun("shot_scar", "Savage 10 .300 Blackout/T_27P.wav", 0.85, pitch=0.97)
-gun("shot_smg", "Carl Gustav M45/G_31P.wav", 0.5)
-gun("shot_ump", "1911/A_42P.wav", 0.5, pitch=0.98)          # UMP-45 / Vector: real .45 ACP (1911)
-gun("shot_p90", "PPSh/P_30P.wav", 0.42, pitch=1.08)
-# v3.8: own voices for the new models (real recordings of the same calibre / action)
-gun("shot_vector", "1911/A_42P.wav", 0.4, pitch=1.06, bright=0.08)              # Vector .45 ACP, very fast cyclic
-gun("shot_aug", "AR-15/D_24P.wav", 0.68, pitch=1.03, bright=0.15)              # AUG A3 5.56, bullpup: crisper
-gun("shot_m249", "AR-15/D_32P.wav", 0.8, pitch=0.93, far="AR-15/D_24P.wav", far_dur=1.3)  # M249 5.56 belt-fed: heavier
-gun("shot_pistol", "Walther PPQ/X_39P.wav", 0.55)
-gun("shot_deagle", "1911/A_42P.wav", 0.75, pitch=0.9)
-gun("shot_revolver", "Smith & Wesson 642/V_27P.wav", 0.75, pitch=0.92)
-gun("shot_shotgun", "Nova/O_21P.wav", 1.0)
-gun("shot_sniper", "Tikka/W_29P.wav", 1.4, far="Tikka/W_24P.wav", far_dur=1.8)
-gun("shot_kar", "Tikka/W_29P.wav", 1.3, pitch=1.05)
+# v4.1: every weapon has its OWN voice — 27 weapons, real recordings of the closest action/calibre
+# from the full CC0 Free Firearm Sound Library (+3 CC0 freesound takes via GunLib), each with its own EQ/tail.
+GL = "/home/claude/ext_audio/gunlib/wav/"
+# assault rifles / battle rifles / LMG
+gun("shot_ak", "AK-47/C_28P.wav", 0.75, far="AK-47/C_31P.wav", far_dur=1.2, low=0.25)
+gun("shot_akm", "SKS/U_14P.wav", 0.75, pitch=0.97, far="AK-47/C_31P.wav", far_dur=1.2, lpf=9000, low=0.35)   # 7.62x39, darker
+gun("shot_rpk", "AK-47/C_31P.wav", 0.95, pitch=0.9, low=0.5, far="AK-47/C_31P.wav", far_dur=1.4)             # long barrel LMG
+gun("shot_m4", "AR-15/D_32P.wav", 0.7, far="AR-15/D_24P.wav", far_dur=1.2, bright=0.12)
+gun("shot_m4k", "AR-15/D_32P.wav", 0.55, pitch=1.07, bright=0.3)                                             # short-barrel carbine: sharp crack
+gun("shot_aug", "AR-15/D_24P.wav", 0.68, pitch=1.03, bright=0.18)
+gun("shot_kuzgun", "Marlin 336/I_22P.wav", 0.8, pitch=1.04, far="Marlin 336/I_17P.wav", far_dur=1.3, low=0.2)
+gun("shot_scar", "Savage 10 .300 Blackout/T_27P.wav", 0.85, pitch=0.95, far="Savage 10 .300 Blackout/T_17P.wav", far_dur=1.3, low=0.35)
+gun("shot_m249", "AR-15/D_32P.wav", 0.85, pitch=0.86, far="AR-15/D_24P.wav", far_dur=1.4, low=0.5)
+# SMGs
+gun("shot_smg", "Carl Gustav M45/G_31P.wav", 0.5, far="Carl Gustav M45/G_20P.wav", far_dur=0.9)              # MP5
+gun("shot_vityaz", "Carl Gustav M45/G_20P.wav", 0.5, pitch=1.05, bright=0.1)
+gun("shot_uzi", "Bersa/F_47P.wav", 0.42, pitch=1.1, bright=0.2, far="Bersa/F_41P.wav", far_dur=0.8)
+gun("shot_ump", "1911/A_34P.wav", 0.5, pitch=0.95, low=0.3, far="1911/A_34P.wav", far_dur=0.9)                # .45 ACP thump
+gun("shot_vector", "Bersa/F_41P.wav", 0.38, pitch=1.0, bright=0.15)
+gun("shot_p90", "PPSh/P_30P.wav", 0.42, pitch=1.15, bright=0.2, far="PPSh/P_22P.wav", far_dur=0.9)
+# pistols / revolvers
+gun("shot_pistol", "Walther PPQ/X_39P.wav", 0.55, far="Walther PPQ/X_31P.wav", far_dur=1.0)                  # Glock
+gun("shot_usp", "Walther PPQ/X_31P.wav", 0.55, pitch=0.96, lpf=10000, low=0.2)
+gun("shot_m1911", "1911/A_42P.wav", 0.6, far="1911/A_34P.wav", far_dur=1.0)
+gun("shot_fn502", "Ruger Mark III/R_35P.wav", 0.45, far="Ruger Mark III/R_30P.wav", far_dur=0.8)            # .22 LR: small, snappy
+gun("shot_deagle", GL + "deagle_shot.wav", 0.8, low=0.3)
+gun("shot_revolver", "Smith & Wesson 642/V_27P.wav", 0.75, pitch=0.92, far="Smith & Wesson 642/V_22P.wav", far_dur=1.2)
+gun("shot_kartal", "Smith & Wesson 642/V_22P.wav", 0.85, pitch=0.8, low=0.5)                                # .44: deeper boom
+# shotguns
+gun("shot_shotgun", "Nova/O_21P.wav", 1.0, far="Nova/O_17P.wav", far_dur=1.5)                                # SPAS
+gun("shot_r870", "Model 12/K_22P.wav", 1.0, far="Model 12/K_17P.wav", far_dur=1.5, low=0.2)
+# bolt actions
+gun("shot_sniper", "Tikka/W_29P.wav", 1.4, far="Tikka/W_24P.wav", far_dur=1.8)                               # AWP
+gun("shot_awm", GL + "awp_shot.wav", 1.0, low=0.4, far="Tikka/W_24P.wav", far_dur=1.8)
+gun("shot_kar", "Arisaka/E_25P.wav", 1.3, far="Arisaka/E_18P.wav", far_dur=1.7)
 y = load("AK-47/C_31P.wav"); s = shots(y)[0]; save("shot_far", finish(lp(y[s:s + int(1.3 * SR)], 1800), 1.3, 0.6))
 y = load("Tikka/W_24P.wav"); s = shots(y)[0]; save("shot_far_heavy", finish(lp(y[s:s + int(1.8 * SR)], 1500), 1.8, 0.65))
 print("done")

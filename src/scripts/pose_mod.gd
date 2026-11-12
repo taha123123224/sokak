@@ -31,8 +31,66 @@ static func _upper(bn: String) -> bool:
 			return true
 	return false
 
+var throw_k := -1.0         # v4.1: 0..1 while the bot throws a grenade (procedural overarm throw)
+var fwd_world := Vector3.FORWARD
+var _ua := -2
+var _fa := -1
+var _hd := -1
+var _lua := -1
+var _lfa := -1
+var _lhd := -1
+
+func _aim_bone(sk: Skeleton3D, b: int, child: int, want: Vector3, w: float) -> void:
+	## rotate bone b (skeleton space) so that the segment b -> child points along `want`
+	var gp := sk.get_bone_global_pose(b)
+	var cp := sk.get_bone_global_pose(child)
+	var cur := (cp.origin - gp.origin).normalized()
+	var wd := want.normalized()
+	if cur.length() < 0.5 or wd.length() < 0.5:
+		return
+	var full := Quaternion(cur, wd)
+	var q := Quaternion.IDENTITY.slerp(full, w)
+	var ng := Transform3D(Basis(q) * gp.basis, gp.origin)
+	sk.set_bone_global_pose(b, ng)
+
+func _throw_pose(sk: Skeleton3D) -> void:
+	if _ua == -2:
+		_ua = sk.find_bone("Bip01 R UpperArm"); _fa = sk.find_bone("Bip01 R Forearm"); _hd = sk.find_bone("Bip01 R Hand")
+		_lua = sk.find_bone("Bip01 L UpperArm"); _lfa = sk.find_bone("Bip01 L Forearm"); _lhd = sk.find_bone("Bip01 L Hand")
+	if _ua < 0 or _fa < 0 or _hd < 0:
+		return
+	var inv := sk.global_transform.basis.inverse()
+	var f := (inv * fwd_world).normalized()
+	var u := (inv * Vector3.UP).normalized()
+	var r := f.cross(u).normalized()
+	var k := throw_k
+	var w := smoothstep(0.0, 0.15, k) * (1.0 - smoothstep(0.75, 1.0, k))
+	var ua_d: Vector3; var fa_d: Vector3
+	if k < 0.4:
+		var e := smoothstep(0.0, 0.4, k)
+		ua_d = (-u).lerp(u * 0.55 - f * 0.55 + r * 0.55, e)
+		fa_d = (-u * 0.3 + f).lerp(u * 0.9 - f * 0.2, e)
+	elif k < 0.55:
+		var e2 := smoothstep(0.4, 0.55, k)
+		ua_d = (u * 0.55 - f * 0.55 + r * 0.55).lerp(f * 0.9 + u * 0.35 + r * 0.25, e2)
+		fa_d = (u * 0.9 - f * 0.2).lerp(f + u * 0.15, e2)
+	else:
+		var e3 := smoothstep(0.55, 1.0, k)
+		ua_d = (f * 0.9 + u * 0.35 + r * 0.25).lerp(f * 0.4 - u * 0.8 - r * 0.1, e3)
+		fa_d = (f + u * 0.15).lerp(f * 0.6 - u * 0.6, e3)
+	_aim_bone(sk, _ua, _fa, ua_d, w)
+	_aim_bone(sk, _fa, _hd, fa_d, w)
+	# off hand points at the target during the wind-up (classic throw stance)
+	if _lua >= 0 and _lfa >= 0 and _lhd >= 0:
+		var lw := w * (1.0 - smoothstep(0.45, 0.7, k))
+		_aim_bone(sk, _lua, _lfa, f * 0.85 + u * 0.25 - r * 0.25, lw)
+		_aim_bone(sk, _lfa, _lhd, f + u * 0.2, lw)
+
 func _process_modification() -> void:
 	var sk := get_skeleton()
+	if sk != null and throw_k >= 0.0:
+		_throw_pose(sk)
+		return
 	if sk == null or weight <= 0.001 or not poses.has(kind):
 		return
 	var d: Dictionary = poses[kind]

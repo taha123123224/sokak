@@ -547,7 +547,7 @@ func _prewarm() -> void:
 	tmp.queue_free()
 	SFX.silent = false
 	# pre-load all sound streams into memory
-	for snd in ["shot_scar", "shot_ump", "shot_revolver", "shot_kar", "shotfar_ak", "equip_pistol", "equip_heavy", "shot_ak", "shot_m4", "shot_smg", "shot_p90", "shot_shotgun", "shot_sniper", "shot_pistol", "shot_deagle", "shot_far", "shot_far_heavy",
+	for snd in ["shot_scar", "shot_ump", "shot_revolver", "shot_kar", "shotfar_ak", "equip_pistol", "equip_heavy", "shot_ak", "shot_m4", "shot_smg", "shot_p90", "shot_shotgun", "shot_sniper", "shot_pistol", "shot_deagle", "shot_far", "shot_far_heavy", "shot_akm", "shot_rpk", "shot_m4k", "shot_kuzgun", "shot_vityaz", "shot_uzi", "shot_usp", "shot_m1911", "shot_fn502", "shot_kartal", "shot_r870", "shot_awm", "shot_aug", "shot_vector", "shot_m249",
 			"headshot", "kill", "multikill", "gore0", "gore1", "bodyfall", "explosion", "mag_out", "mag_in", "bolt_back", "bolt_fwd", "pump", "shell_in", "hitmarker", "whiz"]:
 		SFX.get_stream(snd)
 
@@ -1024,6 +1024,34 @@ var test_follow: Array = []
 var _dr_acc := 0.0
 var _dr_n := 0
 var _dr_scale := -1.0
+var _dr_low_t := 0.0
+func _perf_step_down() -> void:
+	var st: Dictionary = GS.settings
+	var what := ""
+	if bool(st.get("volumetric", false)):
+		st["volumetric"] = false; what = "hacimsel sis"
+	elif bool(st.get("ssil", false)):
+		st["ssil"] = false; what = "dolaylı ışık"
+	elif bool(st.get("ssr", false)):
+		st["ssr"] = false; what = "yansımalar"
+	elif bool(st.get("ssao", false)):
+		st["ssao"] = false; what = "ortam gölgesi"
+	elif int(st.get("shadows", 0)) > 0:
+		st["shadows"] = int(st["shadows"]) - 1; what = "gölge kalitesi"
+	elif bool(st.get("glow", false)):
+		st["glow"] = false; what = "parlama"
+	elif float(st.get("draw_distance", 1.0)) > 0.5:
+		st["draw_distance"] = maxf(0.5, float(st["draw_distance"]) - 0.2); what = "görüş mesafesi"
+	if what == "":
+		return
+	GS.apply_settings()
+	if world_env and world_env.environment:
+		var e := world_env.environment
+		e.ssao_enabled = bool(st["ssao"]); e.ssil_enabled = bool(st["ssil"]); e.ssr_enabled = bool(st["ssr"])
+		e.glow_enabled = bool(st["glow"]); e.volumetric_fog_enabled = e.volumetric_fog_enabled and bool(st["volumetric"])
+		e.fog_depth_end = 520.0 * float(st["draw_distance"])
+	if hud and hud.has_method("info_toast"):
+		hud.info_toast("⚙", "PERFORMANS", "FPS düşük: %s otomatik kısıldı" % what, UI.ACCENT2)
 func _dyn_res(delta: float) -> void:
 	if not bool(GS.settings.get("dyn_res", true)) or paused or loading != null and is_instance_valid(loading):
 		return
@@ -1040,9 +1068,17 @@ func _dyn_res(delta: float) -> void:
 	var target := float(GS.settings.get("dyn_target", 60))
 	var old := _dr_scale
 	if fps < target * 0.92:
-		_dr_scale = maxf(0.67, _dr_scale - (0.1 if fps < target * 0.7 else 0.05))
+		_dr_scale = maxf(0.55, _dr_scale - (0.1 if fps < target * 0.7 else 0.05))
 	elif fps > target * 1.35 and _dr_scale < user_s:
 		_dr_scale = minf(user_s, _dr_scale + 0.05)
+	# v4.1: still far too slow at the lowest render scale -> switch off the heaviest effects one by one
+	if fps < target * 0.6 and _dr_scale <= 0.551:
+		_dr_low_t += 1.5
+		if _dr_low_t >= 7.5:
+			_dr_low_t = 0.0
+			_perf_step_down()
+	else:
+		_dr_low_t = 0.0
 	if absf(old - _dr_scale) > 0.001:
 		vp.scaling_3d_scale = _dr_scale
 		if player and player.vm_vp:
@@ -1894,6 +1930,38 @@ func test_hook(i: int) -> void:
 		player.alive = false
 		player.vm_rect.visible = false
 		start_spectate()
+		return
+	if i == 98:
+		# ground items test: an ammo pouch and a dropped rifle 2.5 m ahead
+		ensure_pickups()
+		var f2: Vector3 = -player.cam.global_basis.z; f2.y = 0; f2 = f2.normalized()
+		var p0: Vector3 = player.global_position + f2 * 2.2
+		pickups.drop_bag(p0 + f2.cross(Vector3.UP) * 0.5)
+		pickups.drop_weapon("ak47", 30, 90, p0 - f2.cross(Vector3.UP) * 0.6 + Vector3.UP * 0.6, Vector3.ZERO)
+		return
+	if i == 97:
+		# bot grenade-throw pose test: a bot 4 m ahead, shown side-on, throwing to the right
+		for c in combatants:
+			if not c["is_player"]:
+				var b = c["node"]
+				var f: Vector3 = -player.cam.global_basis.z; f.y = 0; f = f.normalized()
+				var rt := f.cross(Vector3.UP)
+				var q := PhysicsRayQueryParameters3D.create(player.global_position + Vector3.UP, player.global_position + Vector3.UP + f * 6.0)
+				q.exclude = [player.get_rid()]
+				var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(q)
+				var dd: float = 4.0 if hit.is_empty() else clampf(player.global_position.distance_to(hit["position"]) - 1.0, 2.0, 4.0)
+				b.global_position = player.global_position + f * dd
+				b.reset_physics_interpolation()
+				b._nade_tgt = b.global_position + rt * 15.0
+				b.target = null
+				b._start_throw()
+				b.throw_k = float(OS.get_environment("THK")) if OS.has_environment("THK") else 0.3
+				b.aim_yaw = atan2(-rt.x, -rt.z)
+				b.rotation.y = b.aim_yaw; b.model.rotation.y = PI
+				b.pose.throw_k = b.throw_k
+				b.pose.fwd_world = rt
+				b.set_physics_process(false)
+				break
 		return
 	if i == 23:
 		hud.force_board = true

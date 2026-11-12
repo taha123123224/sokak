@@ -3,8 +3,8 @@ extends Node3D
 ## and the ammo bag every fallen soldier leaves behind (walk over it: mermi for your guns).
 ## Weapons keep their magazine / reserve. Items fade out after a while so the map stays clean.
 
-const WEAPON_LIFE := 45.0
-const BAG_LIFE := 30.0
+const WEAPON_LIFE := 10.0
+const BAG_LIFE := 10.0
 const PICK_R := 1.9
 const BAG_R := 1.35
 
@@ -29,46 +29,72 @@ func drop_weapon(wid: String, mag: int, res: int, pos: Vector3, vel: Vector3) ->
 		w.rotation = Vector3(0, 0, -PI * 0.5)
 		w.rotate_object_local(Vector3.UP, PI * 0.5)
 		MatLib.apply(w, GS.wskin(wid) if GS.owned(wid) else "std")
+		w.scale = Vector3.ONE * 0.85
 	_glow_ring(root, Color(1.0, 0.75, 0.3))
 	items.append({"kind": "w", "node": root, "wid": wid, "mag": mag, "res": res, "t": 0.0, "vel": vel, "rest": false,
 		"spin": randf_range(-6.0, 6.0)})
 	_cap()
 
+func _box(root: Node3D, sz: Vector3, pos: Vector3, mt: Material) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new(); bm.size = sz
+	mi.mesh = bm
+	mi.material_override = mt
+	mi.position = pos
+	root.add_child(mi)
+	return mi
+
+static var _nylon: StandardMaterial3D
+static var _strap: StandardMaterial3D
+static var _metal: StandardMaterial3D
 func drop_bag(pos: Vector3) -> void:
+	## v4.1: small coyote-tan ammo pouch (flap, straps, buckle) with a floating ammo icon
 	var root := Node3D.new()
 	add_child(root)
 	root.global_position = pos + Vector3(0, 0.3, 0)
-	var mi := MeshInstance3D.new()
-	var bx := BoxMesh.new()
-	bx.size = Vector3(0.36, 0.2, 0.26)
-	mi.mesh = bx
-	var mt := StandardMaterial3D.new()
-	mt.albedo_color = Color(0.3, 0.32, 0.22)
-	mt.roughness = 0.9
-	mi.material_override = mt
-	root.add_child(mi)
-	var strap := MeshInstance3D.new()
-	var sb := BoxMesh.new(); sb.size = Vector3(0.38, 0.04, 0.06)
-	strap.mesh = sb
-	var sm := StandardMaterial3D.new(); sm.albedo_color = Color(0.12, 0.12, 0.1)
-	strap.material_override = sm
-	strap.position.y = 0.11
-	root.add_child(strap)
-	_glow_ring(root, Color(0.5, 0.9, 1.0))
+	if _nylon == null:
+		_nylon = StandardMaterial3D.new(); _nylon.albedo_color = Color(0.46, 0.39, 0.28); _nylon.roughness = 0.95
+		_strap = StandardMaterial3D.new(); _strap.albedo_color = Color(0.16, 0.15, 0.12); _strap.roughness = 0.8
+		_metal = StandardMaterial3D.new(); _metal.albedo_color = Color(0.25, 0.25, 0.27); _metal.metallic = 0.8; _metal.roughness = 0.35
+	var body := Node3D.new()
+	root.add_child(body)
+	_box(body, Vector3(0.22, 0.12, 0.15), Vector3(0, 0.06, 0), _nylon)
+	_box(body, Vector3(0.23, 0.025, 0.155), Vector3(0, 0.127, -0.005), _nylon)          # flap
+	_box(body, Vector3(0.225, 0.07, 0.012), Vector3(0, 0.1, 0.078), _nylon)             # flap front
+	for x in [-0.06, 0.06]:
+		_box(body, Vector3(0.025, 0.13, 0.16), Vector3(x, 0.065, 0.002), _strap)
+		_box(body, Vector3(0.03, 0.02, 0.01), Vector3(x, 0.09, 0.083), _metal)
+	_box(body, Vector3(0.2, 0.012, 0.012), Vector3(0, 0.03, 0.078), _strap)            # molle row
+	# floating ammo marker (always faces the camera, constant size)
+	var ic := Label3D.new()
+	ic.text = "▮▮▮"
+	ic.font = UI.font("BarlowSemiCondensed-Bold")
+	ic.font_size = 40
+	ic.outline_size = 10
+	ic.modulate = Color(1.0, 0.82, 0.35)
+	ic.outline_modulate = Color(0, 0, 0, 0.6)
+	ic.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	ic.fixed_size = true
+	ic.pixel_size = 0.0007
+	ic.no_depth_test = false
+	ic.position.y = 0.42
+	ic.name = "icon"
+	root.add_child(ic)
+	_glow_ring(root, Color(1.0, 0.8, 0.35))
 	items.append({"kind": "b", "node": root, "t": 0.0, "vel": Vector3(randf_range(-1, 1), 2.0, randf_range(-1, 1)), "rest": false, "spin": 2.0})
 	_cap()
 
 func _glow_ring(root: Node3D, c: Color) -> void:
+	## a thin soft disc under the item (not a big torus)
 	var ring := MeshInstance3D.new()
-	var tm := TorusMesh.new()
-	tm.inner_radius = 0.32; tm.outer_radius = 0.36
-	ring.mesh = tm
-	var rm := StandardMaterial3D.new()
-	rm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	rm.albedo_color = Color(c.r, c.g, c.b, 0.55)
-	rm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	rm.emission_enabled = true; rm.emission = c; rm.emission_energy_multiplier = 1.5
-	ring.material_override = rm
+	var qm := QuadMesh.new(); qm.size = Vector2(0.62, 0.62); qm.orientation = PlaneMesh.FACE_Y
+	ring.mesh = qm
+	var sm := ShaderMaterial.new()
+	var sh := Shader.new()
+	sh.code = "shader_type spatial; render_mode unshaded, blend_add, cull_disabled, depth_draw_never; uniform vec4 c : source_color; void fragment(){ float r = length(UV - 0.5) * 2.0; float a = smoothstep(1.0, 0.85, r) * smoothstep(0.62, 0.86, r) * 0.9 + (1.0 - smoothstep(0.0, 0.9, r)) * 0.12; ALBEDO = c.rgb; ALPHA = a * c.a; }"
+	sm.shader = sh
+	sm.set_shader_parameter("c", Color(c.r, c.g, c.b, 0.8))
+	ring.material_override = sm
 	ring.name = "ring"
 	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(ring)
@@ -110,12 +136,17 @@ func _process(delta: float) -> void:
 			it["vel"] = v
 		var ring := n.get_node_or_null("ring") as MeshInstance3D
 		if ring:
-			ring.position.y = -0.04
-			var pulse := 0.85 + 0.15 * sin(it["t"] * 4.0)
+			ring.position.y = 0.01
+			var pulse := 0.9 + 0.1 * sin(it["t"] * 4.0)
 			ring.scale = Vector3.ONE * pulse
 			ring.visible = it["rest"]
-		if it["t"] > life - 3.0:
-			n.visible = fmod(it["t"], 0.3) < 0.2
+		var ic := n.get_node_or_null("icon") as Label3D
+		if ic:
+			ic.position.y = 0.42 + 0.04 * sin(it["t"] * 3.0)
+		if it["t"] > life - 2.0:
+			# shrink away in the last two seconds
+			var k := clampf((life - it["t"]) / 2.0, 0.0, 1.0)
+			n.scale = Vector3.ONE * maxf(k, 0.05)
 		keep.append(it)
 	items = keep
 	_player_logic()

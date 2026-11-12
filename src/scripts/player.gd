@@ -276,6 +276,10 @@ func _unhandled_input(e: InputEvent) -> void:
 	if e.is_action_pressed("radio") and alive and match_node and match_node.has_method("ensure_comms"):
 		match_node.ensure_comms().toggle_radio()
 		return
+	for qa in [["radio_enemy", 1], ["radio_help", 2], ["radio_ok", 4]]:
+		if e.is_action_pressed(qa[0]) and alive and match_node and match_node.has_method("ensure_comms"):
+			match_node.ensure_comms().send_radio(int(qa[1]))
+			return
 	if e.is_action_pressed("spray") and alive and match_node and match_node.has_method("ensure_comms"):
 		match_node.ensure_comms().try_spray()
 	if e.is_action_pressed("slot1") and slots.has("ana"): switch_to(slots["ana"])
