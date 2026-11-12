@@ -416,7 +416,61 @@ func _voice_ui() -> void:
 	if Voice.is_sending():
 		voice_lbl.text += "   " + "▮".repeat(int(clampf(Voice.level * 40.0, 0, 10))) + "▯".repeat(10 - int(clampf(Voice.level * 40.0, 0, 10)))
 
+## v3.5.1 Kurt Adam: wolf gauge above the health panel + transform screen effects
+var _wolf_ui: PanelContainer
+var _wolf_bar: ProgressBar
+var _wolf_lbl: Label
+var _wolf_ov: ColorRect
+func _wolf_update() -> void:
+	if player == null or not ("wolf_ctl" in player) or player.wolf_ctl == null:
+		return
+	var wc = player.wolf_ctl
+	if _wolf_ui == null:
+		_wolf_ui = PanelContainer.new()
+		_wolf_ui.add_theme_stylebox_override("panel", UI.sb(Color(0.03, 0.02, 0.03, 0.78), Color(1, 0.3, 0.2, 0.5), 1, 6, 8))
+		_wolf_ui.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+		_wolf_ui.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		_wolf_ui.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		_wolf_ui.offset_bottom = -96
+		_wolf_ui.custom_minimum_size = Vector2(340, 0)
+		_wolf_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(_wolf_ui)
+		var v := UI.vbox(3)
+		_wolf_ui.add_child(v)
+		_wolf_lbl = UI.lbl("", 15, Color(1, 0.6, 0.45), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+		v.add_child(_wolf_lbl)
+		_wolf_bar = UI.bar(0, 100, Color(1, 0.3, 0.15), 10)
+		v.add_child(_wolf_bar)
+		_wolf_ov = ColorRect.new()
+		_wolf_ov.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_wolf_ov.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var sh := Shader.new()
+		sh.code = "shader_type canvas_item; uniform float k = 0.0; uniform float flash = 0.0; void fragment(){ vec2 d = UV - 0.5; float v = smoothstep(0.25, 0.75, length(d * vec2(1.2, 1.0))); COLOR = vec4(mix(vec3(0.35, 0.0, 0.0), vec3(1.0, 0.25, 0.1), flash), (v * 0.55 * k) + flash * 0.45); }"
+		var sm := ShaderMaterial.new(); sm.shader = sh
+		_wolf_ov.material = sm
+		root.add_child(_wolf_ov)
+		root.move_child(_wolf_ov, 1)
+	if wc.wolf:
+		_wolf_bar.value = wc.wolf_t / wc.WOLF_TIME * 100.0
+		_wolf_lbl.text = "KURT FORMU  •  %d sn   [ÇİFT ZIPLA: TAKLA • İLERİ+DUVAR: TIRMAN]" % int(ceil(wc.wolf_t))
+	else:
+		_wolf_bar.value = wc.energy
+		_wolf_lbl.text = ("[3] KURDA DÖNÜŞ HAZIR!" if wc.energy >= 100.0 else "KURT ENERJİSİ  %%%d" % int(wc.energy))
+		_wolf_lbl.modulate = Color(1, 1, 1, 0.6 + 0.4 * sin(Time.get_ticks_msec() * 0.008)) if wc.energy >= 100.0 else Color.WHITE
+	(_wolf_ov.material as ShaderMaterial).set_shader_parameter("k", 1.0 if wc.wolf else 0.0)
+
+func wolf_fx(on: bool) -> void:
+	_wolf_update()
+	if _wolf_ov:
+		var sm := _wolf_ov.material as ShaderMaterial
+		var tw := _wolf_ov.create_tween()
+		tw.tween_method(func(x): sm.set_shader_parameter("flash", x), 1.0, 0.0, 0.9).set_ease(Tween.EASE_OUT)
+	center_msg("KURDA DÖNÜŞTÜN!" if on else "İNSAN FORMUNA DÖNDÜN", Color(1, 0.35, 0.2) if on else Color(0.8, 0.85, 1.0))
+	if player and "shake" in player:
+		player.shake = maxf(player.shake, 0.9 if on else 0.4)
+
 func _process(delta: float) -> void:
+	_wolf_update()
 	if match_node and match_node.net and root:
 		_voice_ui()
 	if player == null or match_node == null:
@@ -685,7 +739,10 @@ func inspect_card(wid: String) -> void:
 	tv.add_child(UI.lbl(str(GS.SKINS.get(sk, {}).get("name", sk)).to_upper(), 16, rc, "Rajdhani-SemiBold"))
 	var lv: int = GS.wlvl(wid)
 	if lv > 0:
-		v.add_child(UI.lbl("★".repeat(min(lv, 10)) + "  SEVİYE %d" % lv, 15, UI.GOLD, "Rajdhani-Bold"))
+		var lh := UI.hbox(8)
+		v.add_child(lh)
+		lh.add_child(lvl_badge(lv, 18))
+		lh.add_child(UI.lbl("SİLAH SEVİYESİ  +%d" % lv, 15, GS.lvl_color(lv).lightened(0.2), "Rajdhani-Bold"))
 	var stw: Dictionary = GS.stats_for(wid)
 	v.add_child(UI.lbl("HASAR %d   ·   ŞARJÖR %d   ·   %s" % [int(stw.get("dmg", 0)), int(stw.get("mag", 0)), str(GS.WEAPONS[wid].get("cls", ""))], 14, UI.DIM, "Rajdhani-SemiBold"))
 	root.add_child(insp_card)
@@ -847,6 +904,9 @@ func _kill_banner(head: bool, wid: String, streak: int) -> void:
 		wt.texture = wi; wt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; wt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		wt.custom_minimum_size = Vector2(64, 22); wt.modulate = Color(1, 1, 1, 0.85)
 		ph.add_child(wt)
+	var kl: int = GS.wlvl(wid)
+	if kl > 0:
+		ph.add_child(lvl_badge(kl, 15))
 	ph.add_child(UI.lbl("+150" if head else "+100", 19, Color(1, 1, 1, 0.9), "Rajdhani-Bold"))
 	kb.add_child(plate)
 	plate.position = Vector2(0, 0)

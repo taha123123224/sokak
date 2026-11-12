@@ -20,7 +20,7 @@ export default {
     const url = new URL(req.url);
     const m = url.pathname.match(/^\/room\/([A-Za-z0-9_-]{3,24})$/);
     if (url.pathname === "/" || url.pathname === "/health") {
-      return new Response(JSON.stringify({ ok: true, service: "sokak-relay", version: 2 }), { headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({ ok: true, service: "sokak-relay", version: 3 }), { headers: { "content-type": "application/json" } });
     }
     if (!m) return new Response("not found", { status: 404 });
     if (req.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });

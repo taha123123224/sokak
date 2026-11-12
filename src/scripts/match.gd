@@ -346,6 +346,10 @@ func _build() -> void:
 	# v3.1 cinematic look, matching the map key art: warm low sun on the old-town maps
 	if MAP_LOOK.has(map_id) and not OS.has_environment("ENVPRESET"):
 		map_data["env"]["preset"] = MAP_LOOK[map_id]
+	if mode == "kurt" and not OS.has_environment("ENVPRESET"):
+		# Kurt Adam is always played at night: moonlight, dark blue fog
+		map_data["env"]["preset"] = "night"
+		map_data["env"]["fog"] = maxf(float(map_data["env"].get("fog", 0.006)), 0.012)
 	if OS.has_environment("ENVPRESET"):
 		map_data["env"]["preset"] = OS.get_environment("ENVPRESET")
 	var ps: PackedScene = GS.map_scene(map_id)
@@ -511,6 +515,14 @@ func _build() -> void:
 		combatants.append({"node": b, "name": bn, "team": bt, "kills": 0, "deaths": 0, "score": 0, "head": 0, "is_player": false, "gg": 0, "lvl": randi_range(5, 80)})
 	for c in combatants:
 		_spawn(c, true)
+	if mode == "kurt":
+		for c in combatants:
+			var wc = preload("res://scripts/wolf.gd").new()
+			wc.host = c["node"]
+			wc.is_player = c["is_player"]
+			if OS.has_environment("WOLFFULL"): wc.energy = 100.0
+			c["node"].wolf_ctl = wc
+			c["node"].add_child(wc)
 	if OS.has_environment("DBGLOAD"): print("SPAWNED")
 	_fill_gun_pool()
 	_loading_roster()
@@ -768,6 +780,7 @@ func _setup_env(env_cfg: Dictionary) -> void:
 		"day":      {"elev": -52.0, "az": 35.0, "sun": Color(1.0, 0.93, 0.82), "se": 2.3, "top": Color("4a76ad"), "hor": Color("c2cfdc"), "amb": Color(0.72, 0.73, 0.76), "ae": 0.85, "fog": Color("bfcad6"), "exp": 0.97, "sat": 0.93, "fill": Color(0.8, 0.84, 0.92)},
 		"golden":   {"elev": -36.0, "az": 220.0, "sun": Color(1.0, 0.83, 0.62), "se": 2.3, "top": Color("4570a8"), "hor": Color("dcbf9f"), "amb": Color(0.72, 0.7, 0.7), "ae": 0.82, "fog": Color("d9c0a4"), "exp": 0.96, "sat": 1.0, "fill": Color(0.7, 0.75, 0.92)},
 		"sunset":   {"elev": -22.0, "az": 280.0, "sun": Color(1.0, 0.74, 0.52), "se": 2.15, "top": Color("41689f"), "hor": Color("e0ae8e"), "amb": Color(0.7, 0.66, 0.68), "ae": 0.8, "fog": Color("d9ab8e"), "exp": 0.95, "sat": 0.98, "fill": Color(0.62, 0.66, 0.9)},
+		"night":    {"elev": -38.0, "az": 140.0, "sun": Color(0.62, 0.72, 1.0), "se": 0.75, "top": Color("08101f"), "hor": Color("2b3350"), "amb": Color(0.3, 0.34, 0.48), "ae": 0.62, "fog": Color("1d2438"), "exp": 1.05, "sat": 0.85, "fill": Color(0.4, 0.48, 0.85)},
 		"overcast": {"elev": -55.0, "az": 120.0, "sun": Color(1.0, 0.96, 0.9), "se": 1.9, "top": Color("5a7fa8"), "hor": Color("c0ccd8"), "amb": Color(0.7, 0.72, 0.76), "ae": 0.75, "fog": Color("c2ccd6"), "exp": 1.0, "sat": 0.92, "fill": Color(0.8, 0.84, 0.9)},
 	}
 	var c: Dictionary = P.get(preset, P["day"])
@@ -798,6 +811,13 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	sm.ground_energy_multiplier = 0.6
 	sm.sky_cover = load("res://assets/tex/clouds.png") if ResourceLoader.exists("res://assets/tex/clouds.png") else null
 	sm.sky_cover_modulate = Color(1, 1, 1, 0.9)
+	if str(env_cfg.get("preset", "")) == "night":
+		# moonlit night: dim blue-grey clouds, a big pale moon, dark ground, cool ambient
+		sm.sky_cover_modulate = Color(0.16, 0.19, 0.28, 0.85)
+		sm.ground_bottom_color = Color(0.03, 0.035, 0.05)
+		sm.sun_angle_max = 2.5
+		sm.sun_curve = 0.05
+		sm.sky_energy_multiplier = 0.55
 	sky.sky_material = sm
 	# soft fill light from the opposite side (lifts shadows, no extra shadow pass)
 	var fill := DirectionalLight3D.new()
@@ -813,6 +833,9 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	e.ambient_light_color = c["amb"]
 	e.ambient_light_sky_contribution = 0.5
 	e.ambient_light_energy = c["ae"]
+	if str(env_cfg.get("preset", "")) == "night":
+		e.ambient_light_sky_contribution = 0.25
+		e.ambient_light_energy = 0.42
 	e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	e.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env_exp = float(c["exp"])
@@ -1367,6 +1390,8 @@ func gg_level(n) -> int:
 func on_death(victim, attacker, wid: String, head: bool) -> void:
 	if OS.has_environment("PERF"): print("EV death t=%.1f" % (Time.get_ticks_msec() / 1000.0))
 	var __t := Time.get_ticks_usec()
+	if attacker != null and is_instance_valid(attacker) and attacker != victim and "wolf_ctl" in attacker and attacker.wolf_ctl:
+		attacker.wolf_ctl.on_kill()
 	_sp_on_death(victim, attacker, wid, head)
 	var __d := Time.get_ticks_usec() - __t
 	if __d > 3000: print("SPIKE match.gd.on_death ", __d / 1000.0, "ms")
@@ -1756,6 +1781,15 @@ func test_hook(i: int) -> void:
 		c.far = 2000
 		c.current = true
 		if player: player.vm_rect.visible = false
+	elif i == 90:
+		# kurt mode: transform the player (and let bots charge instantly)
+		if player.wolf_ctl:
+			player.wolf_ctl.energy = 100.0
+			player.wolf_ctl.transform()
+		for c in combatants:
+			if not c["is_player"] and c["node"].wolf_ctl:
+				c["node"].wolf_ctl.energy = 100.0
+				c["node"].wolf_ctl._auto_t = 99.0
 	elif i == 12:
 		# free camera: CAM="x,y,z,tx,ty,tz" (Godot coordinates); CAMS="a;b;c" = one per shot
 		var cs: String = OS.get_environment("CAM")

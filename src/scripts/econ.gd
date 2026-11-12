@@ -12,6 +12,24 @@ const PACKS := [["Demir Paketi", "demir", 50, 600], ["Krom Paketi", "krom", 25, 
 const MATS := ["demir", "krom", "titanyum", "kobalt"]
 const STARTER := ["ak47", "mp5", "glock", "knife", "frag"]
 const FREE_CHARS := ["takim", "deri", "asker1"]
+## v3.5.1 Sezon Pasosu: pass XP comes from every match (same as level XP) and +500 per claimed mission
+const PASS_XP := 1000
+const PASS_SEASON := "SEZON 1: KOZMİK SAVAŞ"
+const PASS := [
+	{"type": "gold", "n": 1000}, {"type": "mat", "id": "demir", "n": 40}, {"type": "crate", "id": "sokak", "n": 1}, {"type": "mat", "id": "krom", "n": 20},
+	{"type": "skin", "wid": "ak47", "id": "neon"}, {"type": "gold", "n": 2000}, {"type": "mat", "id": "titanyum", "n": 6}, {"type": "crate", "id": "operasyon", "n": 1},
+	{"type": "char", "id": "kot"}, {"type": "skin", "wid": "glock", "id": "siber"}, {"type": "mat", "id": "kobalt", "n": 3}, {"type": "gold", "n": 3000},
+	{"type": "crate", "id": "efsane", "n": 1}, {"type": "weapon", "id": "vector", "days": 7}, {"type": "skin", "wid": "mp5", "id": "aurora"}, {"type": "mat", "id": "krom", "n": 40},
+	{"type": "mat", "id": "titanyum", "n": 10}, {"type": "crate", "id": "ejder", "n": 1}, {"type": "gold", "n": 4000}, {"type": "weapon", "id": "scar", "days": 0},
+	{"type": "mat", "id": "kobalt", "n": 5}, {"type": "skin", "wid": "knife", "id": "lav"}, {"type": "crate", "id": "kozmik", "n": 1}, {"type": "char", "id": "patron"},
+	{"type": "gold", "n": 6000}, {"type": "mat", "id": "titanyum", "n": 15}, {"type": "mat", "id": "kobalt", "n": 8}, {"type": "crate", "id": "kozmik", "n": 2},
+	{"type": "skin", "wid": "mp5", "id": "nebula"}, {"type": "skin", "wid": "ak47", "id": "hologram"},
+]
+
+static func pass_add(p: Dictionary, n: int) -> void:
+	var ps: Dictionary = p.get("pass", {"xp": 0, "claimed": []})
+	ps["xp"] = int(ps.get("xp", 0)) + maxi(n, 0)
+	p["pass"] = ps
 
 static func default_profile_base() -> Dictionary:
 	var owned := {}
@@ -242,11 +260,29 @@ static func act(p: Dictionary, cat: Dictionary, a: String, args: Dictionary, now
 						else:
 							p["mats"][k] = int(p["mats"].get(k, 0)) + int(ms["reward"][k])
 					mm["claimed"][mid] = true
+					pass_add(p, 500)
 					return _ok()
 			return _err("Görev bulunamadı")
 		"match_start":
 			p["_t0"] = now
 			return _ok()
+		"pass_claim":
+			var tier := int(args.get("tier", 0))
+			var pl: Array = cat.get("pass", PASS)
+			if tier < 1 or tier > pl.size():
+				return _err("Geçersiz seviye")
+			var ps: Dictionary = p.get("pass", {"xp": 0, "claimed": []})
+			var cl: Array = ps.get("claimed", [])
+			if cl.has(tier):
+				return _err("Ödül zaten alındı")
+			if int(ps.get("xp", 0)) < tier * int(cat.get("pass_xp", PASS_XP)):
+				return _err("Bu seviyeye henüz ulaşmadın")
+			var it: Dictionary = (pl[tier - 1] as Dictionary).duplicate()
+			_grant(p, cat, it, now)
+			cl.append(tier)
+			ps["claimed"] = cl
+			p["pass"] = ps
+			return _ok(it)
 		"match_end":
 			return _match_end(p, args, now)
 		"sync":
@@ -346,6 +382,8 @@ static func _grant(p: Dictionary, cat: Dictionary, it: Dictionary, now: float) -
 				it["ext"] = true
 			else:
 				_give_weapon(p, it["id"], 0.0 if days == 0 else now + days * DAY)
+		"crate":
+			_crate_add(p, str(it["id"]), int(it.get("n", 1)))
 		"char":
 			var own: Array = p.get("chars", FREE_CHARS.duplicate())
 			if own.has(it["id"]):
@@ -373,6 +411,7 @@ static func _match_end(p: Dictionary, s: Dictionary, now: float) -> Dictionary:
 	var mats := {"demir": (randi_range(6, 14) + kills) if full else 0, "krom": randi_range(2, 6) if full and randf() < 0.75 else 0,
 		"titanyum": randi_range(1, 3) if full and randf() < 0.35 + (0.2 if won else 0.0) else 0, "kobalt": 1 if full and randf() < 0.12 + (0.1 if won else 0.0) else 0}
 	var ups := _add_xp(p, xp)
+	pass_add(p, xp)
 	var rpd := rp_delta(won, kills, head, bool(s.get("ranked", false))) if full else 0
 	var rp_old := int(p.get("rp", 0))
 	p["rp"] = maxi(0, rp_old + rpd)

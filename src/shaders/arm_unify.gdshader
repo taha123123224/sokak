@@ -15,7 +15,9 @@ void fragment() {
 	float lum = dot(c, vec3(0.3, 0.59, 0.11));
 	float skin = smoothstep(0.06, 0.16, c.r - c.b) * smoothstep(0.18, 0.35, c.r);
 	float sleeve;
-	if (sleeve_v >= 0.0) {
+	if (sleeve_v < -1.5) {
+		sleeve = 1.0;                 // wolf: the whole arm is fur
+	} else if (sleeve_v >= 0.0) {
 		sleeve = smoothstep(sleeve_v - 0.01, sleeve_v + 0.01, UV.y);
 	} else {
 		sleeve = (1.0 - skin) * smoothstep(0.1, 0.18, lum);

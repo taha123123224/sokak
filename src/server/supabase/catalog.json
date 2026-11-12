@@ -107,7 +107,13 @@
 				"durbun",
 				"sarjor",
 				"tutamak",
-				"lazer"
+				"lazer",
+				"sus_kisa",
+				"sus_ejder",
+				"sus_plazma",
+				"durbun_holo",
+				"optik_nebula",
+				"kompen_kuantum"
 			],
 			"price": 1500,
 			"skins": [
@@ -119,7 +125,12 @@
 		},
 		"kozmik": {
 			"chars": [],
-			"parts": [],
+			"parts": [
+				"sus_plazma",
+				"durbun_holo",
+				"optik_nebula",
+				"kompen_kuantum"
+			],
 			"price": 7000,
 			"skins": [
 				"hologram",
@@ -494,6 +505,22 @@
 			"price": 1400,
 			"slot": "optik"
 		},
+		"durbun_holo": {
+			"fits": [
+				"ak47",
+				"m4a1",
+				"mp5",
+				"p90",
+				"vityaz",
+				"rpk16",
+				"uzi",
+				"kuzgun",
+				"m4k",
+				"akm"
+			],
+			"price": 3200,
+			"slot": "optik"
+		},
 		"kompen": {
 			"fits": [
 				"ak47",
@@ -525,6 +552,39 @@
 				"akm"
 			],
 			"price": 700,
+			"slot": "namlu"
+		},
+		"kompen_kuantum": {
+			"fits": [
+				"ak47",
+				"m4a1",
+				"mp5",
+				"p90",
+				"spas",
+				"awp",
+				"kar98",
+				"scar",
+				"ump45",
+				"aug",
+				"vector",
+				"m249",
+				"revolver",
+				"glock",
+				"deagle",
+				"r870",
+				"fn502",
+				"m1911",
+				"vityaz",
+				"rpk16",
+				"awm",
+				"uzi",
+				"kuzgun",
+				"m4k",
+				"usp",
+				"kartal",
+				"akm"
+			],
+			"price": 2200,
 			"slot": "namlu"
 		},
 		"lazer": {
@@ -574,6 +634,22 @@
 				"akm"
 			],
 			"price": 800,
+			"slot": "optik"
+		},
+		"optik_nebula": {
+			"fits": [
+				"ak47",
+				"m4a1",
+				"mp5",
+				"p90",
+				"vityaz",
+				"rpk16",
+				"uzi",
+				"kuzgun",
+				"m4k",
+				"akm"
+			],
+			"price": 2400,
 			"slot": "optik"
 		},
 		"sarjor": {
@@ -640,6 +716,99 @@
 			"price": 900,
 			"slot": "namlu"
 		},
+		"sus_ejder": {
+			"fits": [
+				"ak47",
+				"m4a1",
+				"mp5",
+				"p90",
+				"awp",
+				"kar98",
+				"scar",
+				"ump45",
+				"aug",
+				"vector",
+				"m249",
+				"revolver",
+				"glock",
+				"deagle",
+				"fn502",
+				"m1911",
+				"vityaz",
+				"rpk16",
+				"awm",
+				"uzi",
+				"kuzgun",
+				"m4k",
+				"usp",
+				"kartal",
+				"akm"
+			],
+			"price": 2600,
+			"slot": "namlu"
+		},
+		"sus_kisa": {
+			"fits": [
+				"ak47",
+				"m4a1",
+				"mp5",
+				"p90",
+				"awp",
+				"kar98",
+				"scar",
+				"ump45",
+				"aug",
+				"vector",
+				"m249",
+				"revolver",
+				"glock",
+				"deagle",
+				"fn502",
+				"m1911",
+				"vityaz",
+				"rpk16",
+				"awm",
+				"uzi",
+				"kuzgun",
+				"m4k",
+				"usp",
+				"kartal",
+				"akm"
+			],
+			"price": 1600,
+			"slot": "namlu"
+		},
+		"sus_plazma": {
+			"fits": [
+				"ak47",
+				"m4a1",
+				"mp5",
+				"p90",
+				"awp",
+				"kar98",
+				"scar",
+				"ump45",
+				"aug",
+				"vector",
+				"m249",
+				"revolver",
+				"glock",
+				"deagle",
+				"fn502",
+				"m1911",
+				"vityaz",
+				"rpk16",
+				"awm",
+				"uzi",
+				"kuzgun",
+				"m4k",
+				"usp",
+				"kartal",
+				"akm"
+			],
+			"price": 2800,
+			"slot": "namlu"
+		},
 		"tutamak": {
 			"fits": [
 				"ak47",
@@ -667,6 +836,152 @@
 			"slot": "alt"
 		}
 	},
+	"pass": [
+		{
+			"n": 1000,
+			"type": "gold"
+		},
+		{
+			"id": "demir",
+			"n": 40,
+			"type": "mat"
+		},
+		{
+			"id": "sokak",
+			"n": 1,
+			"type": "crate"
+		},
+		{
+			"id": "krom",
+			"n": 20,
+			"type": "mat"
+		},
+		{
+			"id": "neon",
+			"type": "skin",
+			"wid": "ak47"
+		},
+		{
+			"n": 2000,
+			"type": "gold"
+		},
+		{
+			"id": "titanyum",
+			"n": 6,
+			"type": "mat"
+		},
+		{
+			"id": "operasyon",
+			"n": 1,
+			"type": "crate"
+		},
+		{
+			"id": "kot",
+			"type": "char"
+		},
+		{
+			"id": "siber",
+			"type": "skin",
+			"wid": "glock"
+		},
+		{
+			"id": "kobalt",
+			"n": 3,
+			"type": "mat"
+		},
+		{
+			"n": 3000,
+			"type": "gold"
+		},
+		{
+			"id": "efsane",
+			"n": 1,
+			"type": "crate"
+		},
+		{
+			"days": 7,
+			"id": "vector",
+			"type": "weapon"
+		},
+		{
+			"id": "aurora",
+			"type": "skin",
+			"wid": "mp5"
+		},
+		{
+			"id": "krom",
+			"n": 40,
+			"type": "mat"
+		},
+		{
+			"id": "titanyum",
+			"n": 10,
+			"type": "mat"
+		},
+		{
+			"id": "ejder",
+			"n": 1,
+			"type": "crate"
+		},
+		{
+			"n": 4000,
+			"type": "gold"
+		},
+		{
+			"days": 0,
+			"id": "scar",
+			"type": "weapon"
+		},
+		{
+			"id": "kobalt",
+			"n": 5,
+			"type": "mat"
+		},
+		{
+			"id": "lav",
+			"type": "skin",
+			"wid": "knife"
+		},
+		{
+			"id": "kozmik",
+			"n": 1,
+			"type": "crate"
+		},
+		{
+			"id": "patron",
+			"type": "char"
+		},
+		{
+			"n": 6000,
+			"type": "gold"
+		},
+		{
+			"id": "titanyum",
+			"n": 15,
+			"type": "mat"
+		},
+		{
+			"id": "kobalt",
+			"n": 8,
+			"type": "mat"
+		},
+		{
+			"id": "kozmik",
+			"n": 2,
+			"type": "crate"
+		},
+		{
+			"id": "nebula",
+			"type": "skin",
+			"wid": "mp5"
+		},
+		{
+			"id": "hologram",
+			"type": "skin",
+			"wid": "ak47"
+		}
+	],
+	"pass_xp": 1000,
 	"sets": 5,
 	"skins": {
 		"altin": {
@@ -1035,6 +1350,16 @@
 			"pellets": 1,
 			"price": 3200,
 			"rpm": 900.0,
+			"throwable": false
+		},
+		"pence": {
+			"cat": "bicak",
+			"dmg": 68.0,
+			"head": 1.0,
+			"melee": true,
+			"pellets": 1,
+			"price": 0,
+			"rpm": 160.0,
 			"throwable": false
 		},
 		"r870": {

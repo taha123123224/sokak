@@ -802,6 +802,8 @@ var net_t := 0.0
 var _net_force := false
 
 var dmg_from_player := 0.0
+var wolf := false            # v3.5.1 Kurt Adam
+var wolf_ctl
 var net_skin := ""     # online: skin / attachments / health of the remote player's weapon (death card)
 var net_parts: Array = []
 var net_hp := -1.0
@@ -826,6 +828,14 @@ func net_state(d: Dictionary) -> void:
 	var pa = d.get("pa", [])
 	net_parts = (pa as Array).slice(0, 6) if pa is Array else []
 	net_hp = float(d.get("hp", -1))
+	var wf := bool(d.get("wf", false))
+	if wf != wolf:
+		if wolf_ctl == null:
+			wolf_ctl = preload("res://scripts/wolf.gd").new()
+			wolf_ctl.host = self
+			wolf_ctl.remote = true
+			add_child(wolf_ctl)
+		wolf_ctl.set_remote(wf)
 	net_t = Time.get_ticks_msec() / 1000.0
 	var w := str(d.get("w", wid))
 	if w != wid and GS.WEAPONS.has(w):
@@ -894,7 +904,7 @@ func _sp_take_damage(amount: float, attacker, pos: Vector3, headshot: bool, w: S
 		hit_react = 1.0
 		hit_head = headshot
 		return
-	health -= amount
+	health -= amount * (wolf_ctl.DMG_TAKEN if wolf and wolf_ctl else 1.0)
 	if attacker == match_node.player:
 		dmg_from_player += amount
 		_hit_flash(headshot)

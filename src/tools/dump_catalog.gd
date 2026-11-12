@@ -27,7 +27,7 @@ static func run() -> void:
 	for id in g.CHARACTERS.keys():
 		ch[id] = {"price": int(g.CHARACTERS[id]["price"])}
 	var out := {"weapons": w, "skins": sk, "parts": parts, "crates": cr, "chars": ch, "missions": g.MISSIONS,
-		"packs": e.PACKS, "featured": e.FEATURED, "chances": e.CHANCES, "max_lvl": e.CHANCES.size(), "sets": e.SET_COUNT,
+		"packs": e.PACKS, "featured": e.FEATURED, "chances": e.CHANCES, "max_lvl": e.CHANCES.size(), "sets": e.SET_COUNT, "pass": e.PASS, "pass_xp": e.PASS_XP,
 		"default": e.default_profile_base()}
 	var f := FileAccess.open("res://server/supabase/catalog.json", FileAccess.WRITE)
 	f.store_string(JSON.stringify(out, "\t"))

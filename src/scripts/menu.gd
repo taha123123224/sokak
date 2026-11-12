@@ -6,29 +6,61 @@ static func _make_glow_shader() -> Shader:
 	var sh := Shader.new()
 	sh.code = """
 shader_type canvas_item;
+// v3.5.1 upgrade energy: soft wide light sweep with a hot core + chromatic fringes,
+// flowing energy plasma inside the silhouette, hex grid shimmer, pulsing aura and sparkles on the rim
 uniform float sweep = -1.0;
 uniform vec4 glow_col : source_color = vec4(1.0, 0.7, 0.25, 1.0);
 uniform float glow = 0.0;
 uniform float outline = 0.0;
+float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vnoise(vec2 p) {
+	vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y);
+}
+float fbm(vec2 p) { float v = 0.0; float a = 0.5; for (int i = 0; i < 4; i++) { v += a * vnoise(p); p *= 2.03; a *= 0.5; } return v; }
+float hexline(vec2 p) {
+	p *= vec2(1.0, 1.1547);
+	p.x += mod(floor(p.y), 2.0) * 0.5;
+	vec2 f = abs(fract(p) - 0.5);
+	return smoothstep(0.42, 0.5, max(f.x * 1.5 + f.y, f.y * 2.0));
+}
 void fragment() {
 	vec4 t = texture(TEXTURE, UV);
 	float a = t.a;
+	vec2 px = TEXTURE_PIXEL_SIZE;
 	float m = 0.0;
-	for (int r = 1; r <= 3; r++) {
+	for (int r = 1; r <= 4; r++) {
 		float rad = float(r) * 4.0;
-		for (int k = 0; k < 8; k++) {
-			float ang = float(k) * 0.785398;
-			m = max(m, texture(TEXTURE, UV + vec2(cos(ang), sin(ang)) * TEXTURE_PIXEL_SIZE * rad).a * (1.0 - float(r - 1) * 0.28));
+		for (int k = 0; k < 10; k++) {
+			float ang = float(k) * 0.6283;
+			m = max(m, texture(TEXTURE, UV + vec2(cos(ang), sin(ang)) * px * rad).a * (1.0 - float(r - 1) * 0.22));
 		}
 	}
 	float edge = clamp(m - a, 0.0, 1.0);
-	float d = (UV.x + (1.0 - UV.y) * 0.35) - sweep;
-	// narrow light sweep + soft bloom that brightens the skin instead of painting over it
-	float band = (1.0 - smoothstep(0.0, 0.035, abs(d))) * 0.85 + (1.0 - smoothstep(0.0, 0.012, abs(d - 0.05))) * 0.45;
+	float tm = TIME;
 	float lum = dot(t.rgb, vec3(0.3, 0.55, 0.15));
-	vec3 col = t.rgb * (1.0 + glow * 0.12) + glow_col.rgb * (band * (0.35 + lum * 0.65) + glow * 0.1 * lum) * a;
-	col = mix(col, glow_col.rgb * 1.4, edge * outline * 0.75);
-	COLOR = vec4(col, max(a, edge * outline * 0.85) * COLOR.a);
+	// diagonal sweep: wide soft halo + hot core + chromatic fringes
+	float d = (UV.x + (1.0 - UV.y) * 0.45) - sweep;
+	float halo = exp(-d * d * 60.0);
+	float core = exp(-d * d * 1400.0);
+	vec3 fringe = vec3(exp(-pow(d + 0.012, 2.0) * 2200.0), exp(-d * d * 2200.0), exp(-pow(d - 0.012, 2.0) * 2200.0));
+	// flowing plasma inside the weapon
+	vec2 q = UV * vec2(7.0, 3.0);
+	float fl = fbm(q + vec2(tm * 0.6, -tm * 0.25) + fbm(q * 1.7 - tm * 0.3) * 1.6);
+	float plasma = smoothstep(0.55, 0.85, fl) * (0.25 + glow * 0.6);
+	float hx = hexline(UV * vec2(38.0, 14.0)) * (0.5 + 0.5 * sin(tm * 3.0 + UV.x * 12.0)) * (0.08 + glow * 0.25 + halo * 0.6);
+	vec3 gc = glow_col.rgb;
+	vec3 col = t.rgb * (1.0 + glow * 0.1 + halo * 0.35);
+	col += gc * (halo * 0.45 + plasma + hx) * a * (0.4 + lum * 0.9);
+	col += (vec3(1.0) * core * 0.9 + fringe * gc * 0.7) * a;
+	// rim aura: pulsing, noisy, with sparkles travelling along the outline
+	float pul = 0.75 + 0.25 * sin(tm * 4.0);
+	float rn = fbm(UV * vec2(24.0, 9.0) + vec2(tm * 1.2, 0.0));
+	float sp = step(0.985, h21(floor(UV / px / 3.0) + floor(tm * 8.0))) * edge;
+	float rim = edge * outline * (0.55 + 0.45 * rn) * pul;
+	col = mix(col, gc * 1.6, clamp(rim * 0.8, 0.0, 1.0));
+	col += vec3(1.0) * sp * outline * 1.5;
+	COLOR = vec4(col, max(a, (rim + sp * outline) * 0.9) * COLOR.a);
 }
 """
 	return sh
@@ -652,7 +684,7 @@ func thumb_rect(id: String, skin: String, size: Vector2) -> TextureRect:
 # ================================================================ top bar
 ## CS2-style top bar: a soft dark gradient (no hard box) with icon buttons on the left, the page tabs centred
 ## with the LOBİ tab in the middle, and currencies + level on the right; friends live in a slim rail on the right edge.
-const NAV_L := [["bag", "ÇANTA"], ["market", "MARKET"], ["crate", "KASA"]]
+const NAV_L := [["bag", "ÇANTA"], ["market", "MARKET"], ["crate", "KASA"], ["pass", "SEZON"]]
 const NAV_R := [["rooms", "ODALAR"], ["leader", "SIRALAMA"], ["mods", "EKLENTİLER"]]
 var friends_rail: VBoxContainer
 
@@ -1140,6 +1172,7 @@ func show_page(p: String) -> void:
 		"bag": _page_bag()
 		"market": _page_market()
 		"crate": _page_crate()
+		"pass": _page_pass()
 		"mods": _page_mods()
 		"rooms": _page_rooms()
 		"room": _page_room()
@@ -1488,7 +1521,7 @@ func _page_lobby() -> void:
 	news.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
 	right.add_child(news)
 	var nimg := TextureRect.new()
-	var nimg_p := "res://assets/ui/load_fabrika.jpg"
+	var nimg_p := "res://assets/ui/pass_banner.jpg"
 	nimg.texture = load(nimg_p) if ResourceLoader.exists(nimg_p) else load("res://assets/ui/map_liman.jpg")
 	nimg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	nimg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -1508,8 +1541,8 @@ func _page_lobby() -> void:
 	nv.alignment = BoxContainer.ALIGNMENT_END
 	nm2.add_child(nv)
 	nv.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, UI.ACCENT2, "Rajdhani-Bold"))
-	nv.add_child(UI.lbl("KOZMİK KASA", 26, Color.WHITE, "RussoOne-Regular"))
-	nv.add_child(_wrap("4 yeni hareketli efsanevi kaplama: Hologram, Plazma Fırtınası, Kozmik Nebula, Magma Çekirdeği! Yenilenen yükseltme ekranı ve malzeme kutuları.", 15))
+	nv.add_child(UI.lbl("KURT ADAM MODU", 26, Color.WHITE, "RussoOne-Regular"))
+	nv.add_child(_wrap("Gece çöktü: 3'e bas, kurda dönüş! Yeni SEZON PASOSU ile 30 seviye ödül, hareketli özel eklentiler ve yeni silah seviye rozetleri.", 15))
 	var mp := UI.glass(12, 4)
 	right.add_child(mp)
 	var mv := UI.vbox(7)
@@ -2266,7 +2299,13 @@ func _upgrade_dialog(id: String) -> void:
 	gm.shader = UPGRADE_GLOW
 	gm.set_shader_parameter("sweep", -1.0)
 	gm.set_shader_parameter("glow_col", stage.col)
+	gm.set_shader_parameter("glow", 0.25 if lvl > 0 else 0.08)
+	gm.set_shader_parameter("outline", 0.45 if lvl > 0 else 0.15)
 	tr.material = gm
+	# idle: a slow light pass every few seconds so the weapon never looks static
+	var itw := tr.create_tween().set_loops()
+	itw.tween_interval(1.6)
+	itw.tween_method(func(x): gm.set_shader_parameter("sweep", x), -0.5, 1.7, 1.4).set_trans(Tween.TRANS_SINE)
 	var big := UI.lbl("", 64, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
 	big.add_theme_constant_override("outline_size", 10)
 	big.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
@@ -2366,6 +2405,7 @@ func _upgrade_dialog(id: String) -> void:
 	bh.add_child(go)
 	go.pressed.connect(func():
 		go.disabled = true
+		itw.kill()
 		var ur: Dictionary = await _act("upgrade", {"wid": id})
 		if not ur["ok"]:
 			go.disabled = false
@@ -2449,6 +2489,200 @@ func _upgrade_dialog(id: String) -> void:
 				t4.tween_property(v, "position:x", 0.0, 0.04)
 			_refresh_currency()
 			get_tree().create_timer(2.2).timeout.connect(func(): if page == "bag": show_page("bag"))))
+
+# ================================================================ SEZON PASOSU (v3.5.1)
+func _pass_reward_name(it: Dictionary) -> String:
+	match str(it.get("type", "")):
+		"gold": return "%s ALTIN" % UI.money(int(it["n"]))
+		"mat": return "%d %s" % [int(it["n"]), str(GS.MATS.get(it["id"], it["id"])).to_upper()]
+		"crate": return ("%d× " % int(it.get("n", 1)) if int(it.get("n", 1)) > 1 else "") + str(GS.CRATES.get(it["id"], {}).get("name", "Kasa")).to_upper()
+		"skin": return "%s | %s" % [str(GS.WEAPONS.get(it["wid"], {}).get("name", it["wid"])).to_upper(), str(GS.SKINS.get(it["id"], {}).get("name", it["id"]))]
+		"weapon": return str(GS.WEAPONS.get(it["id"], {}).get("name", it["id"])).to_upper() + ("  •  KALICI" if int(it.get("days", 0)) == 0 else "  •  %d GÜN" % int(it["days"]))
+		"char": return "AJAN: " + str(GS.CHARACTERS.get(it["id"], {}).get("name", it["id"])).to_upper()
+	return ""
+
+func _pass_reward_art(it: Dictionary, sz: Vector2) -> Control:
+	match str(it.get("type", "")):
+		"gold", "mat":
+			var ci := CurIcon.new()
+			if it["type"] == "gold": ci.kind = "gold"
+			else: ci.kind = "gem"; ci.mat = str(it["id"])
+			ci.custom_minimum_size = sz * 0.62
+			return ci
+		"crate":
+			var tx := _crate_tex(str(it["id"]))
+			if tx == null and str(it["id"]) == "sokak" and ResourceLoader.exists("res://assets/ui/icons/crate.png"):
+				tx = load("res://assets/ui/icons/crate.png")
+			if tx:
+				var tr := TextureRect.new(); tr.texture = tx
+				tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				tr.custom_minimum_size = sz
+				return tr
+		"skin":
+			var v := UI.vbox(2)
+			var th := thumb_rect(str(it["wid"]), str(it["id"]), Vector2(sz.x, sz.y * 0.62))
+			th.custom_minimum_size = Vector2(sz.x, sz.y * 0.62)
+			v.add_child(th)
+			return v
+		"weapon":
+			var th2 := thumb_rect(str(it["id"]), "std", Vector2(sz.x, sz.y * 0.6))
+			th2.custom_minimum_size = Vector2(sz.x, sz.y * 0.6)
+			return th2
+		"char":
+			var ag := _agent_art(str(it["id"]), sz * Vector2(0.75, 1.0), true)
+			if ag:
+				return ag
+	return Control.new()
+
+func _pass_reward_col(it: Dictionary) -> Color:
+	match str(it.get("type", "")):
+		"skin": return GS.RARITY_COLORS[clampi(int(GS.SKINS.get(it["id"], {}).get("rarity", 0)), 0, 3)]
+		"crate": return GS.CRATES.get(it["id"], {}).get("color", UI.ACCENT)
+		"weapon": return Color("ff4d5e")
+		"char": return Color("4fb3ff")
+		"mat": return PACK_COL.get(str(it["id"]), UI.ACCENT)
+	return UI.GOLD
+
+func _page_pass() -> void:
+	soldier.visible = false
+	var dim := ColorRect.new()
+	dim.color = Color(0.016, 0.019, 0.025, 0.95)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(dim)
+	var root := MarginContainer.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	for sd in ["left", "right"]:
+		root.add_theme_constant_override("margin_" + sd, 44)
+	root.add_theme_constant_override("margin_top", 86)
+	root.add_theme_constant_override("margin_bottom", 26)
+	content.add_child(root)
+	var v := UI.vbox(14)
+	root.add_child(v)
+	var ps: Dictionary = GS.profile.get("pass", {"xp": 0, "claimed": []})
+	var pxp := int(ps.get("xp", 0))
+	var claimed: Array = ps.get("claimed", [])
+	var per: int = GS.Econ.PASS_XP
+	var tiers: Array = GS.Econ.PASS
+	var cur_t: int = mini(pxp / per, tiers.size())
+	# banner
+	var ban := Control.new()
+	ban.custom_minimum_size = Vector2(0, 230)
+	ban.clip_contents = true
+	v.add_child(ban)
+	if ResourceLoader.exists("res://assets/ui/pass_banner.jpg"):
+		var bt := TextureRect.new()
+		bt.texture = load("res://assets/ui/pass_banner.jpg")
+		bt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; bt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		bt.set_anchors_preset(Control.PRESET_FULL_RECT)
+		ban.add_child(bt)
+	var grad := TextureRect.new()
+	var gt := GradientTexture2D.new(); var g := Gradient.new()
+	g.set_color(0, Color(0.016, 0.019, 0.025, 0.95)); g.set_color(1, Color(0.016, 0.019, 0.025, 0.0))
+	gt.gradient = g; gt.fill_from = Vector2(0, 0.5); gt.fill_to = Vector2(0.7, 0.5)
+	grad.texture = gt; grad.set_anchors_preset(Control.PRESET_FULL_RECT); grad.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ban.add_child(grad)
+	var bv := UI.vbox(2)
+	bv.position = Vector2(30, 26)
+	ban.add_child(bv)
+	bv.add_child(UI.lbl("SEZON PASOSU", 16, UI.ACCENT2, "Rajdhani-Bold"))
+	bv.add_child(UI.lbl(GS.Econ.PASS_SEASON, 44, Color.WHITE, "Teko"))
+	bv.add_child(UI.lbl("Her maçta kazandığın XP ve her tamamladığın görev (+500) seni yeni seviyelere taşır. Ödüller ücretsiz!", 16, UI.TEXT, "Rajdhani-SemiBold"))
+	var prog := UI.hbox(14)
+	bv.add_child(prog)
+	var tb := PanelContainer.new()
+	tb.add_theme_stylebox_override("panel", UI.sb(Color(0.7, 0.3, 1.0, 0.2), Color("b84bff"), 2, 8, 6))
+	tb.add_child(UI.lbl("SEVİYE %d / %d" % [cur_t, tiers.size()], 26, Color.WHITE, "Teko"))
+	prog.add_child(tb)
+	var pv := UI.vbox(2)
+	prog.add_child(pv)
+	var into := pxp - cur_t * per if cur_t < tiers.size() else per
+	var bar := UI.bar(into, per, Color("b84bff"), 12)
+	bar.custom_minimum_size = Vector2(420, 12)
+	pv.add_child(bar)
+	pv.add_child(UI.lbl(("SONRAKİ SEVİYEYE %s XP" % UI.money(per - into)) if cur_t < tiers.size() else "TÜM SEVİYELER AÇILDI!", 14, UI.DIM, "Rajdhani-Bold"))
+	var ready := 0
+	for i in cur_t:
+		if not claimed.has(i + 1):
+			ready += 1
+	if ready > 0:
+		var allb := UI.btn("TÜMÜNÜ AL (%d)" % ready, func():
+			for i in cur_t:
+				if not GS.profile.get("pass", {}).get("claimed", []).has(i + 1):
+					var r: Dictionary = await GS.act("pass_claim", {"tier": i + 1})
+					if not r["ok"]:
+						_toast(str(r["err"]), UI.RED)
+						break
+			SFX.play("success")
+			_refresh_currency()
+			show_page("pass"), 18, true, 200, 46)
+		prog.add_child(allb)
+	# tiers
+	var sc := ScrollContainer.new()
+	sc.custom_minimum_size = Vector2(0, 340)
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(sc)
+	var row := UI.hbox(10)
+	sc.add_child(row)
+	for i in tiers.size():
+		row.add_child(_pass_tier_card(i + 1, tiers[i], i + 1 <= cur_t, claimed.has(i + 1)))
+	# scroll to the first unclaimed / current tier
+	var focus: int = maxi(0, mini(cur_t - 2, tiers.size() - 1))
+	sc.ready.connect(func(): sc.scroll_horizontal = focus * 178, CONNECT_DEFERRED)
+	get_tree().create_timer(0.05).timeout.connect(func(): if is_instance_valid(sc): sc.scroll_horizontal = focus * 178)
+
+func _pass_tier_card(tier: int, it: Dictionary, open: bool, got: bool) -> Control:
+	var c := _pass_reward_col(it)
+	var big: bool = tier % 5 == 0
+	var p := PanelContainer.new()
+	var sb := _store_bg(c if open else c.darkened(0.55))
+	if big:
+		sb.border_width_top = 3
+	p.add_theme_stylebox_override("panel", sb)
+	p.custom_minimum_size = Vector2(168, 320)
+	var v := UI.vbox(4)
+	p.add_child(v)
+	var hm := MarginContainer.new()
+	hm.add_theme_constant_override("margin_left", 10); hm.add_theme_constant_override("margin_right", 6)
+	v.add_child(hm)
+	var hh := UI.hbox(6)
+	hm.add_child(hh)
+	var tl := UI.lbl("%d" % tier, 30, (c.lightened(0.3) if open else UI.DIM), "Teko")
+	hh.add_child(tl)
+	hh.add_child(UI.spacer())
+	if big:
+		hh.add_child(_store_grade_chip("BÜYÜK ÖDÜL", c))
+	var art_wrap := CenterContainer.new()
+	art_wrap.custom_minimum_size = Vector2(0, 150)
+	v.add_child(art_wrap)
+	var art := _pass_reward_art(it, Vector2(140, 130))
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if not open:
+		art.modulate = Color(0.45, 0.45, 0.5, 0.8)
+	art_wrap.add_child(art)
+	if open and not got:
+		var tw := art.create_tween().set_loops()
+		tw.tween_property(art, "modulate", Color(1.3, 1.25, 1.15), 0.7).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(art, "modulate", Color.WHITE, 0.7).set_trans(Tween.TRANS_SINE)
+	var nl := UI.lbl(_pass_reward_name(it), 15, Color.WHITE if open else UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+	nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	nl.custom_minimum_size = Vector2(150, 40)
+	v.add_child(nl)
+	v.add_child(UI.spacer())
+	if got:
+		v.add_child(UI.lbl("✓ ALINDI", 18, UI.GREEN, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+	elif open:
+		v.add_child(UI.btn("ÖDÜLÜ AL", func():
+			var r: Dictionary = await _act("pass_claim", {"tier": tier})
+			if r["ok"]:
+				SFX.play("success")
+				var rs: Dictionary = r.get("res", {})
+				_toast(("Ödül alındı: " + _pass_reward_name(it)) if not rs.has("dup") else "Zaten sendeydi: +%s altın" % UI.money(int(rs["dup"])), UI.GREEN)
+				show_page("pass"), 16, true, 0, 40))
+	else:
+		v.add_child(UI.lbl("KİLİTLİ  •  %s XP" % UI.money(tier * GS.Econ.PASS_XP), 14, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+	return p
 
 # ================================================================ MARKET
 func _page_market() -> void:

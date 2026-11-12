@@ -206,37 +206,35 @@ static func slider(minv: float, maxv: float, step: float, value: float, cb: Call
 
 ## "+4" upgrade badge: slanted tier-coloured chip with a chevron and a light sweep that runs over it
 static func lvl_badge(lvl: int, fs: int = 15) -> Control:
+	## v3.5.1 weapon level emblem (Higgsfield art): cyan +1/+2, violet +3/+4, ember +5/+6, gold +7
 	var c: Color = GS.lvl_color(lvl)
-	var p := PanelContainer.new()
-	var sbx := StyleBoxFlat.new()
-	sbx.bg_color = Color(c.r * 0.28, c.g * 0.28, c.b * 0.28, 0.92)
-	sbx.border_color = c
-	sbx.set_border_width_all(0); sbx.border_width_left = 3; sbx.border_width_bottom = 2
-	sbx.skew = Vector2(-0.28, 0)
-	sbx.set_corner_radius_all(3)
-	sbx.content_margin_left = 8; sbx.content_margin_right = 9; sbx.content_margin_top = 0; sbx.content_margin_bottom = 0
-	sbx.shadow_color = Color(c.r, c.g, c.b, 0.45); sbx.shadow_size = 6
-	p.add_theme_stylebox_override("panel", sbx)
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var h := hbox(3)
-	p.add_child(h)
-	var chev := lbl("▲".repeat(1 + int(lvl >= 3) + int(lvl >= 5)), int(fs * 0.6), c.lightened(0.3), "Rajdhani-Bold")
-	chev.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	h.add_child(chev)
-	var t := lbl("+%d" % lvl, fs, Color.WHITE, "RussoOne-Regular")
-	t.add_theme_constant_override("outline_size", 4)
-	t.add_theme_color_override("font_outline_color", Color(c.r * 0.3, c.g * 0.3, c.b * 0.3))
-	h.add_child(t)
-	p.clip_contents = true
-	var sh := ColorRect.new()
-	sh.color = Color(1, 1, 1, 0.55)
-	sh.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	sh.size = Vector2(6, 60); sh.position = Vector2(-20, -10); sh.rotation = 0.35
-	p.add_child(sh)
-	sh.tree_entered.connect(func():
-		var tw := sh.create_tween().set_loops()
-		tw.tween_property(sh, "position:x", 90.0, 0.55).from(-20.0).set_trans(Tween.TRANS_SINE)
-		tw.tween_interval(1.6), CONNECT_ONE_SHOT)
-	return p
+	var tier: int = 0 if lvl <= 2 else (1 if lvl <= 4 else (2 if lvl <= 6 else 3))
+	var box := Control.new()
+	var sz := float(fs) * 2.1
+	box.custom_minimum_size = Vector2(sz * 1.05, sz)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var pth := "res://assets/ui/lvl/t%d.png" % tier
+	if ResourceLoader.exists(pth):
+		var em := TextureRect.new()
+		em.texture = load(pth)
+		em.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		em.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		em.set_anchors_preset(Control.PRESET_FULL_RECT)
+		em.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(em)
+		if lvl >= 5:
+			em.tree_entered.connect(func():
+				var tw := em.create_tween().set_loops()
+				tw.tween_property(em, "modulate", Color(1.35, 1.25, 1.15), 0.6).set_trans(Tween.TRANS_SINE)
+				tw.tween_property(em, "modulate", Color.WHITE, 0.6).set_trans(Tween.TRANS_SINE), CONNECT_ONE_SHOT)
+	var t := lbl("+%d" % lvl, int(fs * 0.95), Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
+	t.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	t.add_theme_constant_override("outline_size", 5)
+	t.add_theme_color_override("font_outline_color", Color(c.r * 0.25, c.g * 0.25, c.b * 0.25))
+	t.set_anchors_preset(Control.PRESET_FULL_RECT)
+	t.offset_top = -sz * 0.04
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(t)
+	return box
 

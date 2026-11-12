@@ -19,6 +19,10 @@ var is_player := true
 var alive := true
 var health := 100.0
 var armor := 100.0
+var wolf := false            # v3.5.1 Kurt Adam mode: in wolf form
+var wolf_ctl                 # wolf.gd controller (kurt mode only)
+var _wolf_jumps := 0
+var flip_t := 0.0
 
 var head: Node3D
 var cam: Camera3D
@@ -241,6 +245,24 @@ func _unhandled_input(e: InputEvent) -> void:
 			_cycle(-1)
 		elif e.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			_cycle(1)
+	if wolf_ctl and e.is_action_pressed("slot3"):
+		# KURT ADAM: 3 = turn into a wolf (when the gauge is full)
+		if wolf_ctl.can_transform():
+			wolf_ctl.transform()
+		elif not wolf and match_node.hud and match_node.hud.has_method("center_msg"):
+			match_node.hud.center_msg("KURT ENERJİSİ %%%d" % int(wolf_ctl.energy), Color(1, 0.4, 0.3))
+		return
+	if wolf:
+		# a wolf only has claws: no switching, reloading or grenades
+		if e.is_action_pressed("jump") and not is_on_floor() and _wolf_jumps < 1:
+			_wolf_jumps += 1
+			velocity.y = JUMP * 1.35
+			flip_t = 0.55
+			SFX.play("knife_swing", -4, 0.7)
+		elif e.is_action_pressed("jump") and is_on_floor():
+			velocity.y = JUMP * wolf_ctl.JUMP
+			_wolf_jumps = 0
+		return
 	if e.is_action_pressed("slot1") and slots.has("ana"): switch_to(slots["ana"])
 	if e.is_action_pressed("slot2") and slots.has("tabanca"): switch_to(slots["tabanca"])
 	if e.is_action_pressed("slot3") and slots.has("bicak"): switch_to(slots["bicak"])
@@ -295,7 +317,16 @@ func _has(id: String) -> bool:
 func _nades_left() -> int:
 	return smokes if cur == "smoke" else grenades
 
+func _ads_mul() -> float:
+	## special attachments that speed up aiming (Kısa Taktik Susturucu, Hologram Dürbün)
+	var m := 1.0
+	for q in GS.wparts(cur):
+		m *= float(GS.PARTS.get(q, {}).get("ads", 1.0))
+	return maxf(m, 0.3)
+
 func _cycle(d: int) -> void:
+	if wolf:
+		return
 	var order: Array = []
 	for c in GS.SLOT_ORDER:
 		if slots.has(c) and (c != "bomba" or grenades > 0):
@@ -337,6 +368,8 @@ func _physics_process(delta: float) -> void:
 		slow_t -= delta
 		spd *= 0.62
 	if Input.is_action_pressed("walk"): spd *= 0.52
+	if wolf:
+		spd *= 1.06          # pence speed 1.55 already applied through wdata
 	if crouching: spd *= 0.48
 	if ads_k > 0.5: spd *= 0.72
 	var wish := (transform.basis * Vector3(input.x, 0, input.y))
@@ -351,6 +384,13 @@ func _physics_process(delta: float) -> void:
 		hv = hv.move_toward(target, 10.0 * delta) if target.length() > 0.1 else hv
 		velocity.y -= GRAV * delta
 	velocity.x = hv.x; velocity.z = hv.y
+	# wolf: holding forward against a wall climbs it (and keeps it there while held)
+	if wolf and not frozen and is_on_wall() and input.y < -0.3:
+		velocity.y = 4.6
+		_wolf_jumps = 0
+	if wolf and is_on_floor():
+		_wolf_jumps = 0
+	flip_t = maxf(flip_t - delta, 0.0)
 	if is_on_floor() and velocity.y <= 0:
 		_try_step(delta)
 	move_and_slide()
@@ -409,6 +449,9 @@ func _process(delta: float) -> void:
 	punch = punch.lerp(Vector3.ZERO, min(delta * 12.0, 1.0))
 	var sh := Vector3(randf_range(-1, 1), randf_range(-1, 1), 0) * shake * 0.03
 	head.rotation = Vector3(pitch, 0, 0) + punch + sh
+	if flip_t > 0.0:
+		# wolf double jump: a full forward flip of the view
+		head.rotation.x -= TAU * smoothstep(0.0, 1.0, 1.0 - flip_t / 0.55)
 	_sync_cam()
 	# timers
 	fire_cd = max(fire_cd - delta, 0.0)
@@ -454,7 +497,7 @@ func _process(delta: float) -> void:
 			inspect_t = 0
 			if wdata.get("scope", false):
 				SFX.play("scope_in", -6)
-	ads_k = move_toward(ads_k, 1.0 if ads else 0.0, delta * (7.0 if not wdata.get("scope", false) else 9.0) * (0.75 if GS.wparts(cur).has("durbun") else 1.0))
+	ads_k = move_toward(ads_k, 1.0 if ads else 0.0, delta * (7.0 if not wdata.get("scope", false) else 9.0) * (0.75 if GS.has_part_base(cur, "durbun") else 1.0) / float(_ads_mul()))
 	if vm_weapon and is_instance_valid(vm_weapon) and vm_weapon.has_meta("glow_mat"):
 		(vm_weapon.get_meta("glow_mat") as ShaderMaterial).set_shader_parameter("power", float(vm_weapon.get_meta("glow_power")) * (1.0 - ads_k * 0.85))
 	var zoom: float = wdata.get("zoom", 1.2)
@@ -929,6 +972,8 @@ func take_damage(amount: float, attacker, pos: Vector3, headshot: bool, wid: Str
 	if not alive or match_node.ended:
 		return
 	var dmg := amount
+	if wolf and wolf_ctl:
+		dmg *= wolf_ctl.DMG_TAKEN
 	var bl: Dictionary = GS.ball(wid) if wid != "" else {}
 	if bl.get("abil", "") == "slow":
 		slow_t = 0.9
@@ -1378,7 +1423,8 @@ func _unify_rig_arms() -> void:
 			if not (mt is StandardMaterial3D):
 				continue
 			var sm := mt as StandardMaterial3D
-			if not _arm_mats.has(sm):
+			var akey = [sm, cur == "pence"]
+			if not _arm_mats.has(akey):
 				var sh := ShaderMaterial.new()
 				sh.shader = preload("res://shaders/arm_unify.gdshader")
 				sh.set_shader_parameter("albedo_tex", sm.albedo_texture)
@@ -1386,10 +1432,15 @@ func _unify_rig_arms() -> void:
 				if sm.normal_enabled and sm.normal_texture:
 					sh.set_shader_parameter("normal_tex", sm.normal_texture)
 					sh.set_shader_parameter("has_normal", true)
-				sh.set_shader_parameter("camo_tex", load("res://assets/tex/arm_acu.png"))
-				sh.set_shader_parameter("sleeve_v", float(fp_meta.get("sleeve_v", -1.0)))
-				_arm_mats[sm] = sh
-			m3.set_surface_override_material(si, _arm_mats[sm])
+				if cur == "pence":
+					sh.set_shader_parameter("camo_tex", load("res://assets/tex/wolf_fur.png"))
+					sh.set_shader_parameter("sleeve_v", -2.0)
+					sh.set_shader_parameter("camo_scale", 7.0)
+				else:
+					sh.set_shader_parameter("camo_tex", load("res://assets/tex/arm_acu.png"))
+					sh.set_shader_parameter("sleeve_v", float(fp_meta.get("sleeve_v", -1.0)))
+				_arm_mats[akey] = sh
+			m3.set_surface_override_material(si, _arm_mats[akey])
 
 static func _rig_cut(src: Animation, s: float, e: float) -> Animation:
 	var a := Animation.new()
@@ -1556,7 +1607,7 @@ func _update_viewmodel(delta: float) -> void:
 	if vm_parts.has("sight") and kind != "knife" and kind != "frag":
 		var sight_rest: Transform3D = (vm_parts["sight"] as Node3D).get_meta("rest")
 		var sp: Vector3 = sight_rest.origin + Vector3(0, float(fp_meta.get("sight_dy", 0.0)), 0)
-		var ads_pos := Vector3(-sp.x, -sp.y, -sp.z - (0.14 if kind != "pistol" else 0.3) - (0.1 if GS.wparts(cur).has("optik") else (0.09 if GS.wparts(cur).has("durbun") else 0.0)))
+		var ads_pos := Vector3(-sp.x, -sp.y, -sp.z - (0.14 if kind != "pistol" else 0.3) - (0.1 if GS.has_part_base(cur, "optik") else (0.09 if GS.has_part_base(cur, "durbun") else 0.0)))
 		if wdata.get("scope", false):
 			ads_pos.z = -sp.z - 0.06
 		pos = hip.lerp(ads_pos, ads_k)

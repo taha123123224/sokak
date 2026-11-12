@@ -44,6 +44,7 @@ var WEAPONS := {
 	"kasap":  {"name": "Kasap Bıçağı", "cat": "bicak", "cls": "Bıçak", "dmg": 50, "rpm": 150, "melee": true, "speed": 1.18, "price": 1200, "head": 1.0},
 	"balta":  {"name": "Taktik Balta", "cat": "bicak", "cls": "Bıçak", "dmg": 75, "rpm": 80, "melee": true, "speed": 1.08, "price": 2800, "head": 1.0},
 	"frag":   {"name": "El Bombası MK3", "cat": "bomba", "cls": "Bomba", "dmg": 130, "count": 2, "throwable": true, "speed": 1.1, "price": 0, "head": 1.0},
+	"pence":  {"name": "Kurt Pençesi", "cat": "bicak", "cls": "Kurt", "dmg": 68, "rpm": 160, "melee": true, "speed": 1.55, "price": 0, "head": 1.0, "hidden": true},
 	"smoke":  {"name": "Sis Bombası M18", "cat": "bomba", "cls": "Bomba", "dmg": 0, "count": 1, "throwable": true, "smoke": true, "speed": 1.1, "price": 0, "head": 1.0, "hidden": true, "base": "frag"},
 }
 const CATS := {"ana": "Ana Silah", "tabanca": "Tabanca", "bicak": "Bıçak", "bomba": "Bomba"}
@@ -95,13 +96,13 @@ var CRATES := {
 	"operasyon": {"name": "Operasyon Kasası", "price": 2000, "color": Color("4fb3ff"), "desc": "Taktik stiller ve %38 silah şansı (AUG, Vector, Vityaz, UZI...). Kasa silahları süreli gelir.",
 		"skins": ["dijital", "karbon", "kar", "kamuflaj", "gece", "buz", "col", "kan", "siber", "okyanus"], "weapons": ["aug", "vector", "scar", "ump45", "m4a1", "p90", "r870", "fn502", "vityaz", "m1911", "uzi", "m4k", "usp", "akm", "kasap"], "wchance": 0.38, "chars": ["asker2", "asker3"]},
 	"eklenti": {"name": "Eklenti Paketi", "price": 1500, "color": Color("7dff6a"), "desc": "Silah eklentileri: susturucu, nişangah, şarjör, tutamak, lazer.",
-		"skins": ["karbon", "dijital"], "weapons": [], "chars": [], "parts": ["sus", "kompen", "optik", "durbun", "sarjor", "tutamak", "lazer"]},
+		"skins": ["karbon", "dijital"], "weapons": [], "chars": [], "parts": ["sus", "kompen", "optik", "durbun", "sarjor", "tutamak", "lazer", "sus_kisa", "sus_ejder", "sus_plazma", "durbun_holo", "optik_nebula", "kompen_kuantum"]},
 	"osmanli": {"name": "Osmanlı Kasası", "price": 2500, "color": Color("2fb6a8"), "desc": "Çini ve turkuaz desenler, Magnum ve Patron karakteri şansı.",
 		"skins": ["cini", "turkuaz", "altin", "kizil", "neon", "lale", "nazar", "mermer", "ayyildiz", "kehribar"], "weapons": ["revolver", "kartal", "deagle", "karambit", "hancer", "m1911"], "wchance": 0.32, "chars": ["patron", "kapson"]},
 	"ejder": {"name": "Ejder Kasası", "price": 6500, "color": Color("ff3b1f"), "desc": "HAREKETLİ efsanevi kaplamalar: Kara Ejderha, Anka Alevi, Kuantum Devresi, Yıldırım Fırtınası!",
 		"skins": ["ejderha", "anka", "kuantum", "yildirim", "lav", "galaksi", "aurora", "buz", "ejder", "kizil"], "weapons": ["awm", "awp", "scar", "rpk16", "m4a1", "ak47"], "wchance": 0.2, "chars": [], "parts": []},
 	"kozmik": {"name": "Kozmik Kasa", "price": 7000, "color": Color("b84bff"), "desc": "YENİ hareketli efsaneviler: Hologram, Plazma Fırtınası, Kozmik Nebula, Magma Çekirdeği!",
-		"skins": ["hologram", "plazma", "nebula", "magma", "kuantum", "yildirim", "galaksi", "aurora", "siber", "neon"], "weapons": ["awm", "scar", "m4a1", "ak47", "vector", "deagle"], "wchance": 0.2, "chars": [], "parts": []},
+		"skins": ["hologram", "plazma", "nebula", "magma", "kuantum", "yildirim", "galaksi", "aurora", "siber", "neon"], "weapons": ["awm", "scar", "m4a1", "ak47", "vector", "deagle"], "wchance": 0.2, "chars": [], "parts": ["sus_plazma", "durbun_holo", "optik_nebula", "kompen_kuantum"]},
 	"efsane": {"name": "Efsane Kasası", "price": 5000, "color": Color("ffb02e"), "desc": "En az Epik garantili! Lav, Buz, Galaksi, Altın.",
 		"skins": ["lav", "buz", "galaksi", "altin", "cini", "turkuaz", "zumrut", "mermer", "aurora", "ayyildiz", "ejder", "kehribar"], "weapons": ["awp", "awm", "scar", "m249", "rpk16", "kuzgun"], "wchance": 0.4, "chars": ["kot", "patron", "asker2"], "parts": ["sus", "optik", "durbun", "sarjor"]},
 }
@@ -146,6 +147,13 @@ const PARTS := {
 	"kompen":  {"name": "Kompansatör", "desc": "Dikey sekme -%22", "slot": "namlu", "price": 700, "pistol": true},
 	"optik":   {"name": "Holografik Nişangah (EXPS)", "desc": "Nişanlı isabet +%30, yakınlaştırma +0.2", "slot": "optik", "price": 800, "pistol": false},
 	"durbun":  {"name": "Taktik Dürbün 3x", "desc": "3 kat yakınlaştırma, nişanlı isabet +%50, nişan alma biraz yavaş", "slot": "optik", "price": 1400, "pistol": false},
+	# v3.5.1 special variants: same mount as their base part, animated pattern + their own stats
+	"sus_ejder":   {"name": "Magma Susturucu", "desc": "HAREKETLİ magma çatlakları. Sessiz atış, hasar sadece -%3", "slot": "namlu", "price": 2600, "pistol": true, "base": "sus", "fx": "magma", "dmg": 0.97},
+	"sus_plazma":  {"name": "Plazma Susturucu", "desc": "HAREKETLİ plazma akışı. Sessiz atış, geri tepme -%8, hasar -%6", "slot": "namlu", "price": 2800, "pistol": true, "base": "sus", "fx": "plazma", "recoil": 0.92},
+	"sus_kisa":    {"name": "Kısa Taktik Susturucu", "desc": "Karbon fiber, kısa gövde. Sessiz atış, hasar -%4, nişan alma +%10 hızlı", "slot": "namlu", "price": 1600, "pistol": true, "base": "sus", "fx": "karbon", "dmg": 0.96, "len": 0.62, "ads": 0.9},
+	"durbun_holo": {"name": "Hologram Dürbün 3x", "desc": "HAREKETLİ hologram gövde. 3x yakınlaştırma, nişanlı isabet +%55, nişan alma normal hızda", "slot": "optik", "price": 3200, "pistol": false, "base": "durbun", "fx": "hologram", "ads": 0.74},
+	"optik_nebula": {"name": "Kozmik Holo Nişangah", "desc": "HAREKETLİ nebula gövde. Nişanlı isabet +%35, yakınlaştırma +0.25", "slot": "optik", "price": 2400, "pistol": false, "base": "optik", "fx": "nebula"},
+	"kompen_kuantum": {"name": "Kuantum Kompansatör", "desc": "HAREKETLİ kuantum devreleri. Dikey sekme -%26", "slot": "namlu", "price": 2200, "pistol": true, "base": "kompen", "fx": "kuantum", "recoil": 0.95},
 	"sarjor":  {"name": "Uzatılmış Şarjör", "desc": "Şarjör +%50, doldurma süresi +%12", "slot": "sarjor", "price": 1000, "pistol": true},
 	"tutamak": {"name": "Ön Tutamak", "desc": "Sekme -%15, yatay sekme -%30", "slot": "alt", "price": 750, "pistol": false},
 	"lazer":   {"name": "Taktik Lazer", "desc": "Belden atış isabeti +%25, hareket isabeti +%30", "slot": "alt", "price": 850, "pistol": true},
@@ -158,13 +166,23 @@ func ball(id: String) -> Dictionary:
 func wparts(id: String) -> Array:
 	return profile.get("wparts", {}).get(id, [])
 
+func pbase(pid: String) -> String:
+	return str(PARTS.get(pid, {}).get("base", pid))
+
+func has_part_base(wid: String, base: String) -> bool:
+	for q in wparts(wid):
+		if pbase(str(q)) == base:
+			return true
+	return false
+
 func part_fits(pid: String, wid: String) -> bool:
 	var w: Dictionary = WEAPONS.get(wid, {})
+	var bpid := pbase(pid)
 	if w.get("melee", false) or w.get("throwable", false):
 		return false
-	if pid in ["optik", "durbun"] and (w.get("scope", false) or wid in ["scar", "ump45", "vector", "m249", "aug"]):
+	if bpid in ["optik", "durbun"] and (w.get("scope", false) or wid in ["scar", "ump45", "vector", "m249", "aug"]):
 		return false   # these already have an optic
-	if w.get("pellets", 0) > 0 and pid in ["sus", "optik", "durbun"]:
+	if w.get("pellets", 0) > 0 and bpid in ["sus", "optik", "durbun"]:
 		return false
 	return w["cat"] == "ana" or bool(PARTS[pid]["pistol"])
 
@@ -200,15 +218,17 @@ func full_stats(id: String, parts = null) -> Dictionary:
 	w.merge(ball(id), true)
 	var ps: Array = wparts(id) if parts == null else parts
 	for pid in ps:
-		match pid:
+		var pd: Dictionary = PARTS.get(pid, {})
+		match pbase(str(pid)):
 			"sus":
-				w["dmg"] = int(round(float(w["dmg"]) * 0.94)); w["silenced"] = true
+				w["dmg"] = int(round(float(w["dmg"]) * float(pd.get("dmg", 0.94)))); w["silenced"] = true
+				w["recoil"] = float(w["recoil"]) * float(pd.get("recoil", 1.0))
 			"kompen":
-				w["recoil"] = float(w["recoil"]) * 0.78
+				w["recoil"] = float(w["recoil"]) * 0.78 * float(pd.get("recoil", 1.0))
 			"optik":
-				w["ads_spread"] = float(w.get("ads_spread", 0.005)) * 0.7; w["zoom"] = float(w.get("zoom", 1.2)) + 0.2
+				w["ads_spread"] = float(w.get("ads_spread", 0.005)) * (0.65 if pd.has("fx") else 0.7); w["zoom"] = float(w.get("zoom", 1.2)) + (0.25 if pd.has("fx") else 0.2)
 			"durbun":
-				w["ads_spread"] = float(w.get("ads_spread", 0.005)) * 0.5; w["zoom"] = 3.0; w["ads_time"] = float(w.get("ads_time", 0.18)) * 1.35
+				w["ads_spread"] = float(w.get("ads_spread", 0.005)) * (0.45 if pd.has("fx") else 0.5); w["zoom"] = 3.0; w["ads_time"] = float(w.get("ads_time", 0.18)) * 1.35
 			"sarjor":
 				w["mag_max"] = int(ceil(float(w["mag_max"]) * 1.5)); w["reload"] = float(w["reload"]) * 1.12
 			"tutamak":
@@ -353,12 +373,24 @@ void fragment() {
 		p.visibility_aabb = AABB(-aabb.size, aabb.size * 2.0)
 		gun.add_child(p)
 
-func _att(pid: String) -> Node3D:
+func _att(pid: String, fx: String = "") -> Node3D:
 	var path := "res://assets/models/att_%s.glb" % pid
 	if not ResourceLoader.exists(path):
 		return null
 	var n: Node3D = (load(path) as PackedScene).instantiate()
 	MatLib.apply(n, "std")
+	if fx != "":
+		# special variants: the animated / patterned finish goes over the body, never over glass or reticles
+		for mi in n.find_children("*", "MeshInstance3D", true, false):
+			var m3 := mi as MeshInstance3D
+			if m3.mesh == null:
+				continue
+			for si in m3.mesh.get_surface_count():
+				var om = m3.get_active_material(si)
+				var nm := str(om.resource_name if om else "")
+				if "glass" in nm or "reticle" in nm or "dot" in nm or not (om is BaseMaterial3D):
+					continue
+				m3.set_surface_override_material(si, MatLib.ext_skin_mat(om as BaseMaterial3D, fx))
 	return n
 
 func parts_visual(gun: Node3D, id: String, parts = null) -> void:
@@ -371,11 +403,15 @@ func parts_visual(gun: Node3D, id: String, parts = null) -> void:
 	var lh := gun.find_child("lhand", true, false) as Node3D
 	var mg := gun.find_child("mag", true, false) as Node3D
 	var pistol: bool = WEAPONS[id]["cat"] == "tabanca"
-	for pid in ps:
+	for pid0 in ps:
+		var pid := pbase(str(pid0))
+		var pfx := str(PARTS.get(pid0, {}).get("fx", ""))
 		match pid:
 			"sus", "kompen":
 				if mz:
-					var a := _att(pid)
+					var a := _att(pid, pfx)
+					if a and PARTS.get(pid0, {}).has("len"):
+						a.scale = Vector3(1.08, 1.08, float(PARTS[pid0]["len"]))
 					if a == null: continue
 					mz.get_parent().add_child(a)
 					a.position = mz.position + Vector3(0, 0, 0.004)
@@ -386,7 +422,7 @@ func parts_visual(gun: Node3D, id: String, parts = null) -> void:
 						mz.position = a.position + tip.position * a.scale
 			"optik", "durbun":
 				if sg:
-					var a := _att(pid)
+					var a := _att(pid, pfx)
 					if a == null: continue
 					sg.get_parent().add_child(a)
 					a.position = sg.position + Vector3(0, -0.02, 0.025)
@@ -429,6 +465,7 @@ var MODES := {
 	"gungame": {"name": "Silah Oyunu", "desc": "Her öldürmede silahın değişir. Son silah bıçak!", "teams": false},
 	"knife": {"name": "Bıçak Arenası", "desc": "Sadece bıçak ve el bombası. Saf refleks.", "teams": false},
 	"sniper": {"name": "Nişancı Düellosu", "desc": "Sadece keskin nişancı tüfekleri. Takımlı.", "teams": true},
+	"kurt": {"name": "Kurt Adam", "desc": "Gece çöktü. Enerjin dolunca 3'e bas ve KURDA DÖNÜŞ: hızlı koşu, çift zıplama taklası, duvara tırmanma, ölümcül pençe!", "teams": true},
 	"sabotaj": {"name": "Sabotaj", "desc": "KARTAL bombayı A ya da B noktasına kurar, AKREP çözer. Turlu, ilk 6 turu alan kazanır.", "teams": true},
 }
 ## CC-BY 4.0 assets: [work, author, licence/link] — shown in Ayarlar > Lisanslar
@@ -539,6 +576,12 @@ func sanitize_profile() -> void:
 			profile["missions"][k] = int(profile["missions"][k])
 	for k in profile["parts"].keys() if profile.get("parts") is Dictionary else []:
 		profile["parts"][k] = int(profile["parts"][k])
+	if profile.get("pass") is Dictionary:
+		var pcl: Array = []
+		for x in profile["pass"].get("claimed", []):
+			pcl.append(int(x))
+		profile["pass"]["claimed"] = pcl
+		profile["pass"]["xp"] = int(profile["pass"].get("xp", 0))
 	for k in profile["crates2"].keys() if profile.get("crates2") is Dictionary else []:
 		profile["crates2"][k] = int(profile["crates2"][k])
 	# items from eklentiler that are not loaded right now are parked, not lost

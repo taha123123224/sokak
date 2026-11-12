@@ -296,9 +296,52 @@ begin
       else p := jsonb_set(p, array['mats', k], to_jsonb(_si(p, array['mats', k]) + _si(ms, array['reward', k]))); end if;
     end loop;
     p := jsonb_set(p, array['missions', 'claimed', id], 'true');
+    p := jsonb_set(p, '{pass}', jsonb_build_object('xp', _si(p, '{pass,xp}') + 500, 'claimed', coalesce(p->'pass'->'claimed', '[]'::jsonb)));
 
   when 'match_start' then
     p := jsonb_set(p, '{_t0}', to_jsonb(nowt));
+
+  when 'pass_claim' then
+    -- v3.5.1 season pass: tier N needs N * pass_xp pass XP, every tier once
+    i := coalesce(floor((args->>'tier')::numeric)::int, 0);
+    if i < 1 or i > jsonb_array_length(coalesce(cat->'pass', '[]')) then raise exception 'Geçersiz seviye'; end if;
+    if coalesce(p->'pass'->'claimed', '[]'::jsonb) @> to_jsonb(i) then raise exception 'Ödül zaten alındı'; end if;
+    if _si(p, '{pass,xp}') < i * coalesce(_si(cat, '{pass_xp}'), 1000) then raise exception 'Bu seviyeye henüz ulaşmadın'; end if;
+    it := cat->'pass'->(i - 1);
+    case it->>'type'
+    when 'mat' then p := jsonb_set(p, array['mats', it->>'id'], to_jsonb(_si(p, array['mats', it->>'id']) + _si(it, '{n}')));
+    when 'gold' then p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + _si(it, '{n}')));
+    when 'crate' then p := _crate_add(p, it->>'id', _si(it, '{n}')::int);
+    when 'skin' then
+      if (p->'owned' ? (it->>'wid')) and not ((p->'owned'->(it->>'wid')->'skins') ? (it->>'id')) then
+        p := jsonb_set(p, array['owned', it->>'wid', 'skins'], (p->'owned'->(it->>'wid')->'skins') || to_jsonb(it->>'id'));
+      else
+        it := it || jsonb_build_object('dup', _si(cat, array['skins', it->>'id', 'price']) / 2);
+        p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + _si(it, '{dup}')));
+      end if;
+    when 'weapon' then
+      wid := it->>'id'; nl := _si(it, '{days}')::int; price := _si(cat, array['weapons', wid, 'price']);
+      if p->'owned' ? wid and coalesce((p->'owned'->wid->>'exp')::float8, 0) <= 0 then
+        it := it || jsonb_build_object('dup', case when nl = 0 then price / 2 else greatest(150, price * nl / 90) end);
+        p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + _si(it, '{dup}')));
+      elsif p->'owned' ? wid then
+        if nl = 0 then p := jsonb_set(p, array['owned', wid], (p->'owned'->wid) - 'exp');
+        else p := jsonb_set(p, array['owned', wid, 'exp'], to_jsonb(floor(greatest((p->'owned'->wid->>'exp')::float8, nowt) + nl * 86400))); end if;
+      else
+        p := _give_weapon(p, wid, case when nl = 0 then 0 else nowt + nl * 86400 end);
+      end if;
+    when 'char' then
+      if (p->'chars') ? (it->>'id') then
+        it := it || '{"dup":1500}'::jsonb;
+        p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + 1500));
+      else
+        p := jsonb_set(p, '{chars}', (p->'chars') || to_jsonb(it->>'id'));
+      end if;
+    else
+      raise exception 'Bilinmeyen ödül';
+    end case;
+    p := jsonb_set(p, '{pass}', jsonb_build_object('xp', _si(p, '{pass,xp}'), 'claimed', coalesce(p->'pass'->'claimed', '[]'::jsonb) || to_jsonb(i)));
+    res := it;
 
   when 'match_end' then
     t0 := coalesce((p->>'_t0')::float8, 0);
@@ -324,6 +367,7 @@ begin
       mats := '{"demir":0,"krom":0,"titanyum":0,"kobalt":0}';
     end if;
     select np, x.ups into p, ups from _add_xp(p, xp) x;
+    p := jsonb_set(p, '{pass}', jsonb_build_object('xp', _si(p, '{pass,xp}') + xp, 'claimed', coalesce(p->'pass'->'claimed', '[]'::jsonb)));
     -- competitive rank points (same rule as econ.gd rp_delta); bot / unranked matches count half
     i := 0;
     if is_full then
