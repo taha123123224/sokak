@@ -500,9 +500,15 @@ var _lb_info: Label
 var _lb_sig := ""
 
 func page_leaderboard() -> void:
-	m.soldier.visible = true
-	var p := UI.panel(UI.BG, UI.LINE, 18)
-	m._margin(p, 28, 18, 560, 24)
+	## v4.0: full-width dark page (like the store), podium on top, rows below
+	m.soldier.visible = false
+	var dim := ColorRect.new()
+	dim.color = Color(0.016, 0.019, 0.025, 0.93)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	m.content.add_child(dim)
+	var p := UI.panel(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 18)
+	m._margin(p, 70, 18, 70, 24)
 	m.content.add_child(p)
 	var v := UI.vbox(12)
 	p.add_child(v)

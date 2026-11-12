@@ -2127,6 +2127,37 @@ func _parts_dialog(id: String) -> void:
 	v.add_child(UI.lbl("Eklentileri Eklenti Paketi kasasından kazanabilir ya da buradan satın alabilirsin. Bir eklentiye sahip olunca tüm uyumlu silahlarına takabilirsin.", 15, UI.DIM, "Rajdhani-SemiBold"))
 
 class UpgStage extends Control:
+	func _draw_atelier() -> void:
+		var ts := atelier.get_size()
+		var k0: float = maxf(size.x / ts.x, size.y / ts.y)
+		var ds := ts * k0
+		var fl := 0.0
+		if weld > 0.0:
+			fl = weld * (0.55 + 0.45 * sin(t * 47.0) * sin(t * 31.0))
+		var lamp := 0.94 + 0.04 * sin(t * 2.3) + 0.02 * sin(t * 13.0)
+		var tint := Color(lamp + flash * 0.5 + fl * 0.5, lamp * 0.98 + flash * 0.45 + fl * 0.3, lamp * 0.95 + flash * 0.4 + fl * 0.12, 1)
+		draw_texture_rect(atelier, Rect2((size - ds) * 0.5, ds), false, tint)
+		# soft vignette
+		for k in 10:
+			var a := 0.035 * k
+			draw_rect(Rect2(Vector2.ZERO, Vector2(size.x, size.y * 0.04 * (10 - k))), Color(0, 0, 0, a * 0.4))
+		# warm light cone from the lamp + level colour on the mat
+		var c := Vector2(size.x * 0.5, size.y * 0.7)
+		for k in 14:
+			draw_circle(c, size.y * (0.5 - k * 0.03), Color(col.r, col.g, col.b, 0.008 * (k + 1) * (0.6 + charge * 1.5 + flash)))
+		# dust motes floating in the lamp light
+		for d3 in dust:
+			var px: float = size.x * (0.3 + 0.4 * fmod(d3.x + t * 0.008 * d3.z, 1.0))
+			var py: float = size.y * fmod(d3.y + t * 0.02 * d3.z, 0.75) + size.y * 0.1
+			draw_circle(Vector2(px, py), 1.2 * d3.z, Color(1, 0.85, 0.6, 0.18 * d3.z))
+		# 7 level pips under the bench edge
+		for i in 7:
+			var x := size.x * 0.5 + (i - 3) * 30.0
+			var on := i < lvl
+			draw_circle(Vector2(x, size.y - 18), 6.0, Color(col.r, col.g, col.b, 0.95) if on else Color(1, 1, 1, 0.15))
+		if flash > 0.0:
+			draw_rect(Rect2(Vector2.ZERO, size), Color(1, 0.9, 0.7, flash * 0.35))
+
 	## upgrade stage behind the weapon: tier glow, 7 level segments on a turning ring,
 	## a charge arc while upgrading and a shockwave + flash on the result
 	var col := Color(0.3, 0.75, 1.0)
@@ -2138,14 +2169,23 @@ class UpgStage extends Control:
 	var t := 0.0
 	var bg: Texture2D = preload("res://assets/ui/upgrade/bg.jpg")
 	var ring: Texture2D = preload("res://assets/ui/upgrade/ring.png")
+	var atelier: Texture2D = null       # v4.0: real gunsmith workshop, the weapon lies on the bench
+	var weld := 0.0                      # welding light flicker while upgrading
+	var dust: Array = []
 	func _process(d: float) -> void:
 		t += d
+		if atelier and dust.is_empty():
+			for i in 40:
+				dust.append(Vector3(randf(), randf(), randf_range(0.3, 1.0)))
 		if burst >= 0.0:
 			burst += d
 			if burst > 1.4: burst = -1.0
 		flash = maxf(flash - d * 2.2, 0.0)
 		queue_redraw()
 	func _draw() -> void:
+		if atelier:
+			_draw_atelier()
+			return
 		var c := size * 0.5
 		var r := minf(size.y * 0.46, 170.0)
 		var p := 0.6 + charge * 0.9 + flash
@@ -2273,7 +2313,7 @@ func _upg_stat(title: String, a: String, b: String, better: bool) -> Control:
 func _upgrade_dialog(id: String) -> void:
 	var lvl := GS.wlvl(id)
 	var cost := GS.upgrade_cost(lvl)
-	var v := _modal(940, 700)
+	var v := _modal(1280, 860)
 	var top := UI.hbox(10)
 	v.add_child(top)
 	var tv0 := UI.vbox(-4)
@@ -2289,12 +2329,13 @@ func _upgrade_dialog(id: String) -> void:
 	# ---- stage: tier ring + weapon
 	var nc: Color = GS.lvl_color(lvl + 1)
 	var stage := UpgStage.new()
-	stage.custom_minimum_size = Vector2(0, 270)
+	stage.atelier = preload("res://assets/ui/upgrade/atelier.jpg")
+	stage.custom_minimum_size = Vector2(0, 430)
 	stage.col = GS.lvl_color(maxi(lvl, 1))
 	stage.lvl = lvl
 	stage.clip_contents = true
 	v.add_child(stage)
-	var tr := thumb_rect(id, GS.wskin(id), Vector2(620, 220))
+	var tr := thumb_rect(id, GS.wskin(id), Vector2(1000, 330))
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stage.add_child(tr)
 	var gm := ShaderMaterial.new()
@@ -2314,8 +2355,8 @@ func _upgrade_dialog(id: String) -> void:
 	big.modulate.a = 0.0
 	stage.add_child(big)
 	var place := func():
-		tr.size = Vector2(620, 220)
-		tr.position = (stage.size - tr.size) / 2
+		tr.size = Vector2(1000, 330)
+		tr.position = Vector2((stage.size.x - tr.size.x) / 2, stage.size.y * 0.76 - tr.size.y / 2)
 		tr.pivot_offset = tr.size / 2
 		big.size = Vector2(stage.size.x, 90)
 		big.position = Vector2(0, stage.size.y / 2 - 45)
@@ -2336,7 +2377,21 @@ func _upgrade_dialog(id: String) -> void:
 	sparks.damping_min = 40; sparks.damping_max = 90
 	sparks.scale_amount_min = 2.0; sparks.scale_amount_max = 5.0
 	stage.add_child(sparks)
-	stage.resized.connect(func(): sparks.position = stage.size / 2)
+	stage.resized.connect(func(): sparks.position = Vector2(stage.size.x / 2, stage.size.y * 0.67))
+	# welding torch: a jet of hot sparks that wanders along the weapon while it is being worked on
+	var weld := CPUParticles2D.new()
+	weld.emitting = false
+	weld.amount = 90
+	weld.lifetime = 0.7
+	weld.direction = Vector2(0, -1)
+	weld.spread = 70
+	weld.initial_velocity_min = 140; weld.initial_velocity_max = 380
+	weld.gravity = Vector2(0, 900)
+	weld.scale_amount_min = 1.5; weld.scale_amount_max = 3.5
+	var wg := Gradient.new()
+	wg.set_color(0, Color(1, 1, 0.9, 1)); wg.add_point(0.3, Color(1, 0.65, 0.2, 1)); wg.set_color(wg.get_point_count() - 1, Color(1, 0.3, 0.05, 0))
+	weld.color_ramp = wg
+	stage.add_child(weld)
 	# ---- level path
 	var track := UpgTrack.new()
 	track.lvl = lvl
@@ -2423,19 +2478,35 @@ func _upgrade_dialog(id: String) -> void:
 		var gtw := create_tween()
 		for k in 5:
 			gtw.tween_method(func(x): gm.set_shader_parameter("sweep", x), -0.4, 1.6, 0.6 - k * 0.09)
+		weld.emitting = true
+		var wtw := create_tween()
+		for k in 6:
+			var wx := stage.size.x * 0.5 + randf_range(-0.32, 0.32) * tr.size.x
+			wtw.tween_property(weld, "position", Vector2(wx, stage.size.y * 0.67 + randf_range(-20, 10)), 0.38)
+		wtw.tween_callback(func(): weld.emitting = false)
+		var wl := create_tween()
+		wl.tween_method(func(x): stage.weld = x, 1.0, 1.0, 2.0)
+		wl.tween_method(func(x): stage.weld = x, 1.0, 0.0, 0.3)
+		for k in 3:
+			get_tree().create_timer(0.55 + k * 0.6).timeout.connect(func():
+				SFX.play("imp_metal%d" % (k % 3), -2, 0.8 + k * 0.08)
+				stage.flash = 0.35
+				var sk := stage.create_tween()
+				sk.tween_property(tr, "position:y", tr.position.y + 6, 0.04)
+				sk.tween_property(tr, "position:y", tr.position.y, 0.12))
 		var tw := create_tween()
 		tw.tween_method(func(x):
 			stage.charge = x
 			pb.value = x
 			gm.set_shader_parameter("glow", x * 0.9)
 			gm.set_shader_parameter("outline", x)
-			tr.position = (stage.size - tr.size) / 2 + Vector2(randf_range(-1, 1), randf_range(-1, 1)) * x * 3.0
+			tr.position = Vector2((stage.size.x - tr.size.x) / 2, stage.size.y * 0.76 - tr.size.y / 2) + Vector2(randf_range(-1, 1), randf_range(-1, 1)) * x * 3.0
 			rim.light_energy = 9.0 + x * 70.0, 0.0, 1.0, 2.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		tw.tween_callback(func():
 			spin_speed = 0.5
 			rim.light_energy = 9
 			stage.charge = 0.0
-			tr.position = (stage.size - tr.size) / 2
+			tr.position = Vector2((stage.size.x - tr.size.x) / 2, stage.size.y * 0.76 - tr.size.y / 2)
 			var ok := bool(up.get("success", false))
 			var nl := int(up.get("lvl", lvl + 1 if ok else lvl))
 			if ok:
@@ -4092,18 +4163,18 @@ func _crate_reveal(it: Dictionary, label: String) -> void:
 	sp.color_ramp = g
 	sp.emitting = false
 	ov.add_child(sp)
-	# ---- timeline
+	# ---- timeline (v4.0): no shaking gift box any more — a clean light burst and the item rises out of it
+	box.visible = false
+	var rays := ColorRect.new()
+	rays.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rays.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var rm := ShaderMaterial.new(); var rs := Shader.new(); rs.code = RAYS_SHADER; rm.shader = rs
+	rm.set_shader_parameter("col", Color(col.r, col.g, col.b, 0.0))
+	rays.material = rm
+	ov.add_child(rays)
+	ov.move_child(rays, 2)
 	var tw := ov.create_tween()
-	tw.tween_property(ov, "color", Color(0.01, 0.012, 0.02, 0.9), 0.25)
-	box.scale = Vector2(0.6, 0.6)
-	tw.parallel().tween_property(box, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	SFX.play("upgrade_charge", -4, 1.2)
-	var shake_n := 10 + rar * 4
-	for k in shake_n:
-		var amp := 3.0 + k * 0.9
-		tw.tween_property(box, "rotation", deg_to_rad(amp * (1 if k % 2 == 0 else -1) * 0.35), 0.05)
-		tw.parallel().tween_property(box, "glow", float(k + 1) / shake_n, 0.05)
-	tw.tween_property(box, "rotation", 0.0, 0.04)
+	tw.tween_property(ov, "color", Color(0.008, 0.01, 0.016, 0.92), 0.2)
 	tw.tween_callback(func():
 		sp.emitting = true
 		SFX.play("success")
@@ -4111,10 +4182,10 @@ func _crate_reveal(it: Dictionary, label: String) -> void:
 		if str(it.get("type", "")) == "skin" and GS.SKINS.get(str(it.get("id", "")), {}).get("anim", false):
 			_dragon_splash(ov, vs, col)
 		if rar >= 3: SFX.play("multikill", -4))
-	tw.tween_property(fl, "color:a", 0.9 if rar >= 2 else 0.55, 0.06)
-	tw.parallel().tween_property(box, "lid", 1.0, 0.35).set_ease(Tween.EASE_OUT)
-	tw.parallel().tween_property(box, "modulate:a", 0.0, 0.35)
-	tw.parallel().tween_property(bg, "power", 1.0 + rar * 0.35, 0.5)
+	tw.tween_property(fl, "color:a", 0.75 if rar >= 2 else 0.4, 0.05)
+	tw.parallel().tween_method(func(x): rm.set_shader_parameter("col", Color(col.r, col.g, col.b, x)), 0.0, 0.55 + rar * 0.15, 0.4)
+	tw.parallel().tween_method(func(x): rm.set_shader_parameter("k", x), 0.0, 1.0, 1.0)
+	tw.parallel().tween_property(bg, "power", 0.8 + rar * 0.3, 0.5)
 	tw.tween_property(fl, "color:a", 0.0, 0.4)
 	img.scale = Vector2(0.3, 0.3)
 	tw.parallel().tween_property(stage, "modulate:a", 1.0, 0.3)
@@ -5044,67 +5115,192 @@ func _bot_reply() -> void:
 
 # ================================================================ PROFILE
 func _page_profile() -> void:
+	## v4.0 player card: banner with the agent, level ring and XP, the rank with its full ladder,
+	## career stats with icons, equipped gear and the best weapon. The soldier stands on the right.
 	set_showcase(GS.active_set().get("ana", "ak47"))
-	var p := UI.panel(UI.BG, UI.LINE, 22)
-	p.position = Vector2(28, 18)
-	p.custom_minimum_size = Vector2(760, 0)
-	content.add_child(p)
-	var v := UI.vbox(12)
-	p.add_child(v)
 	var pr := GS.profile
-	v.add_child(UI.lbl(str(pr["name"]), 44, Color.WHITE, "RussoOne-Regular"))
-	v.add_child(UI.lbl(_rank(int(pr["level"])) + "   •   Seviye %d" % int(pr["level"]), 24, UI.ACCENT2, "Rajdhani-Bold"))
-	v.add_child(UI.bar(float(pr["xp"]), float(GS.xp_for_level(int(pr["level"]))), Color("7fd1ff"), 10))
-	# competitive rank card
+	var st: Dictionary = pr["stats"]
 	var ri: Dictionary = GS.rank_info(int(pr.get("rp", 0)))
-	var rc := UI.panel(Color(ri["color"].r * 0.1, ri["color"].g * 0.1, ri["color"].b * 0.1, 0.92), ri["color"], 14, 2)
-	v.add_child(rc)
-	var rch := UI.hbox(16)
-	rc.add_child(rch)
+	var rcol: Color = ri["color"]
+	var dim := TextureRect.new()
+	var dg := GradientTexture2D.new(); var dgr := Gradient.new()
+	dgr.set_color(0, Color(0.012, 0.014, 0.02, 0.96)); dgr.set_color(1, Color(0.012, 0.014, 0.02, 0.0))
+	dg.gradient = dgr; dg.fill_from = Vector2(0.0, 0.5); dg.fill_to = Vector2(0.75, 0.5)
+	dim.texture = dg
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(dim)
+	var col := UI.vbox(12)
+	col.position = Vector2(36, 16)
+	col.custom_minimum_size = Vector2(860, 0)
+	content.add_child(col)
+	# ---- banner
+	var ban := PanelContainer.new()
+	ban.custom_minimum_size = Vector2(860, 210)
+	ban.add_theme_stylebox_override("panel", UI.sb(Color(0.05, 0.055, 0.07, 1.0), Color(rcol.r, rcol.g, rcol.b, 0.5), 1, 8, 0))
+	ban.clip_contents = true
+	col.add_child(ban)
+	var bart := Control.new()
+	bart.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ban.add_child(bart)
+	var bgp := "res://assets/ui/load_%s.jpg" % ["mahalle", "canakkale", "ayvadisi", "kum"][hash(str(pr["name"])) % 4]
+	if ResourceLoader.exists(bgp):
+		var bimg := TextureRect.new()
+		bimg.texture = load(bgp)
+		bimg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		bimg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		bimg.set_anchors_preset(Control.PRESET_FULL_RECT)
+		bimg.modulate = Color(0.55, 0.55, 0.6)
+		bimg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bart.add_child(bimg)
+	var shade := TextureRect.new()
+	var sg := GradientTexture2D.new(); var sgr := Gradient.new()
+	sgr.set_color(0, Color(0.03, 0.035, 0.05, 0.95)); sgr.set_color(1, Color(0.03, 0.035, 0.05, 0.25))
+	sg.gradient = sgr; sg.fill_from = Vector2(0.3, 0.5); sg.fill_to = Vector2(1.0, 0.5)
+	shade.texture = sg
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bart.add_child(shade)
+	var bh := UI.hbox(18)
+	bh.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bh.offset_left = 18; bh.offset_top = 16; bh.offset_right = -18; bh.offset_bottom = -16
+	bart.add_child(bh)
+	var ag := _agent_art(GS.cur_char(), Vector2(150, 178), true)
+	if ag:
+		var af := PanelContainer.new()
+		af.add_theme_stylebox_override("panel", UI.sb(Color(0, 0, 0, 0.3), rcol, 2, 6, 0))
+		af.add_child(ag)
+		bh.add_child(af)
+	var bv := UI.vbox(2)
+	bv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bh.add_child(bv)
+	bv.add_child(UI.lbl("O Y U N C U   K A R T I", 13, rcol.lightened(0.3), "Rajdhani-Bold"))
+	bv.add_child(UI.lbl(str(pr["name"]), 52, Color.WHITE, "RussoOne-Regular"))
+	bv.add_child(UI.lbl(_rank(int(pr["level"])) + "   •   " + str(GS.CHARACTERS.get(GS.cur_char(), {}).get("name", "")), 20, UI.ACCENT2, "Rajdhani-Bold"))
+	var xr := UI.hbox(10)
+	bv.add_child(xr)
+	var lv := PanelContainer.new()
+	lv.add_theme_stylebox_override("panel", UI.sb(Color(UI.ACCENT.r, UI.ACCENT.g, UI.ACCENT.b, 0.15), UI.ACCENT, 2, 22, 0))
+	lv.custom_minimum_size = Vector2(56, 44)
+	lv.add_child(UI.lbl(str(int(pr["level"])), 30, Color.WHITE, "Teko", HORIZONTAL_ALIGNMENT_CENTER))
+	xr.add_child(lv)
+	var xv := UI.vbox(2)
+	xv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	xr.add_child(xv)
+	var need := GS.xp_for_level(int(pr["level"]))
+	xv.add_child(UI.lbl("SEVİYE %d   •   %s / %s XP" % [int(pr["level"]), UI.money(int(pr["xp"])), UI.money(need)], 15, Color(1, 1, 1, 0.7), "Rajdhani-Bold"))
+	xv.add_child(UI.bar(float(pr["xp"]), float(need), Color("7fd1ff"), 10))
+	# ---- rank + ladder
+	var rk := PanelContainer.new()
+	rk.add_theme_stylebox_override("panel", UI.sb(Color(rcol.r * 0.08, rcol.g * 0.08, rcol.b * 0.08, 0.96), Color(rcol.r, rcol.g, rcol.b, 0.6), 1, 8, 14))
+	col.add_child(rk)
+	var rkh := UI.hbox(16)
+	rk.add_child(rkh)
+	var emb := Control.new()
+	emb.custom_minimum_size = Vector2(120, 120)
+	rkh.add_child(emb)
+	var halo := TextureRect.new()
+	var hg := GradientTexture2D.new(); var hgr := Gradient.new()
+	hgr.set_color(0, Color(rcol, 0.45)); hgr.set_color(1, Color(rcol, 0.0))
+	hg.gradient = hgr; hg.fill = GradientTexture2D.FILL_RADIAL; hg.fill_from = Vector2(0.5, 0.5); hg.fill_to = Vector2(1.0, 0.5)
+	halo.texture = hg; halo.set_anchors_preset(Control.PRESET_FULL_RECT)
+	emb.add_child(halo)
 	var rem := TextureRect.new()
-	rem.texture = ri["icon"]; rem.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; rem.custom_minimum_size = Vector2(110, 110)
+	rem.texture = ri["icon"]; rem.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	rem.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	rch.add_child(rem)
+	rem.set_anchors_preset(Control.PRESET_FULL_RECT)
+	emb.add_child(rem)
 	var rcv := UI.vbox(4)
 	rcv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	rch.add_child(rcv)
-	rcv.add_child(UI.lbl("RÜTBE", 15, UI.DIM, "Rajdhani-Bold"))
-	rcv.add_child(UI.lbl(str(ri["name"]).to_upper(), 34, ri["color"], "RussoOne-Regular"))
-	rcv.add_child(UI.bar(float(ri["prog"]) * 100.0, 100.0, ri["color"], 10))
-	rcv.add_child(UI.lbl("%d RP%s   •   en yüksek: %s" % [int(ri["rp"]), ("  —  sonraki rütbe %d RP" % int(ri["hi"])) if ri["hi"] > ri["lo"] else "", GS.rank_info(int(pr.get("rp_peak", 0)))["name"]], 16, UI.TEXT, "Rajdhani-SemiBold"))
-	rcv.add_child(UI.lbl("Kazanınca +18…31 RP, kaybedince −8…14 RP. Dereceli online maçlar tam, bot maçları yarım puan verir.", 14, UI.DIM, "Rajdhani-SemiBold"))
-	# rank ladder
+	rkh.add_child(rcv)
+	rcv.add_child(UI.lbl("DERECELİ RÜTBE", 14, UI.DIM, "Rajdhani-Bold"))
+	rcv.add_child(UI.lbl(str(ri["name"]).to_upper(), 36, rcol, "RussoOne-Regular"))
+	rcv.add_child(UI.bar(float(ri["prog"]) * 100.0, 100.0, rcol, 10))
+	rcv.add_child(UI.lbl("%d RP%s   •   en yüksek: %s" % [int(ri["rp"]), ("   —   sonraki rütbe %d RP" % int(ri["hi"])) if ri["hi"] > ri["lo"] else "", GS.rank_info(int(pr.get("rp_peak", 0)))["name"]], 16, UI.TEXT, "Rajdhani-SemiBold"))
 	var lad := HBoxContainer.new()
-	lad.add_theme_constant_override("separation", 2)
-	v.add_child(lad)
+	lad.add_theme_constant_override("separation", 1)
+	rcv.add_child(lad)
 	for k in GS.RANKS.size():
 		var tr := TextureRect.new()
 		tr.texture = load("res://assets/ui/ranks/r%d.png" % k); tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tr.custom_minimum_size = Vector2(38, 38); tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.custom_minimum_size = Vector2(30, 30); tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		tr.tooltip_text = "%s — %d RP" % [GS.RANKS[k], int(GS.Econ.RANK_RP[k])]
-		tr.modulate = Color.WHITE if k <= int(ri["i"]) else Color(1, 1, 1, 0.25)
+		tr.modulate = Color.WHITE if k <= int(ri["i"]) else Color(1, 1, 1, 0.2)
 		lad.add_child(tr)
-	var st: Dictionary = pr["stats"]
+	# ---- career stats
 	var grid := GridContainer.new()
 	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 12)
-	v.add_child(grid)
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	col.add_child(grid)
 	var acc: float = 100.0 * float(st.get("hits", 0)) / max(1.0, float(st.get("shots", 0)))
-	for pair in [["Maç", st["matches"]], ["Galibiyet", st["wins"]], ["Öldürme", st["kills"]], ["Ölüm", st["deaths"]], ["K/D", "%.2f" % (float(st["kills"]) / max(1.0, float(st["deaths"])))], ["Kafadan", st["headshots"]], ["İsabet", "%%%.1f" % acc], ["Kazanma", "%%%d" % int(100.0 * float(st["wins"]) / max(1.0, float(st["matches"])))]]:
-		var c := UI.panel(Color(1, 1, 1, 0.04), UI.LINE, 12)
-		c.custom_minimum_size = Vector2(170, 0)
+	var kd: float = float(st["kills"]) / maxf(1.0, float(st["deaths"]))
+	var wr: float = 100.0 * float(st["wins"]) / maxf(1.0, float(st["matches"]))
+	for it in [["K/D", "%.2f" % kd, UI.GREEN if kd >= 1.0 else UI.RED, kd / 2.0], ["KAZANMA", "%%%d" % int(wr), UI.ACCENT, wr / 100.0],
+			["İSABET", "%%%.1f" % acc, Color("7fd1ff"), acc / 60.0], ["KAFADAN", str(st["headshots"]), Color("ff7a5a"), float(st["headshots"]) / max(1.0, float(st["kills"]))],
+			["MAÇ", str(st["matches"]), Color.WHITE, 1.0], ["GALİBİYET", str(st["wins"]), UI.GOLD, wr / 100.0],
+			["ÖLDÜRME", str(st["kills"]), Color.WHITE, 1.0], ["ÖLÜM", str(st["deaths"]), Color(1, 1, 1, 0.6), 1.0]]:
+		var c := PanelContainer.new()
+		c.add_theme_stylebox_override("panel", UI.sb(Color(0.055, 0.062, 0.078, 0.96), Color(1, 1, 1, 0.05), 1, 6, 12))
+		c.custom_minimum_size = Vector2(205, 0)
 		var cv := UI.vbox(0)
 		c.add_child(cv)
-		cv.add_child(UI.lbl(str(pair[1]), 40, Color.WHITE, "Teko"))
-		cv.add_child(UI.lbl(pair[0], 16, UI.DIM, "Rajdhani-Bold"))
+		cv.add_child(UI.lbl(it[0], 14, Color(1, 1, 1, 0.5), "Rajdhani-Bold"))
+		cv.add_child(UI.lbl(it[1], 40, it[2], "Teko"))
+		var pb := UI.bar(clampf(float(it[3]), 0.0, 1.0) * 100.0, 100.0, it[2], 4)
+		cv.add_child(pb)
 		grid.add_child(c)
-	v.add_child(UI.header("SİLAH KOLEKSİYONU", 22))
+	# ---- collection, best weapon, gear
+	var row := UI.hbox(10)
+	col.add_child(row)
 	var owned_n: int = pr["owned"].size()
 	var skins_n := 0
+	var best := ""
+	var best_l := -1
 	for id in pr["owned"].keys():
 		skins_n += pr["owned"][id]["skins"].size() - 1
-	v.add_child(UI.lbl("%d / %d silah   •   %d stil" % [owned_n, GS.WEAPONS.size(), skins_n], 20, Color.WHITE))
+		if GS.WEAPONS.has(id) and GS.wlvl(id) > best_l and not GS.WEAPONS[id].get("throwable", false):
+			best_l = GS.wlvl(id); best = id
+	var cc := PanelContainer.new()
+	cc.add_theme_stylebox_override("panel", UI.sb(Color(0.055, 0.062, 0.078, 0.96), Color(1, 1, 1, 0.05), 1, 6, 12))
+	cc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(cc)
+	var ccv := UI.vbox(4)
+	cc.add_child(ccv)
+	ccv.add_child(UI.lbl("KOLEKSİYON", 14, Color(1, 1, 1, 0.5), "Rajdhani-Bold"))
+	ccv.add_child(UI.lbl("%d / %d silah   •   %d kaplama" % [owned_n, GS.WEAPONS.size(), skins_n], 22, Color.WHITE, "Rajdhani-Bold"))
+	ccv.add_child(UI.bar(float(owned_n), float(GS.WEAPONS.size()), UI.ACCENT, 6))
+	var gl := UI.hbox(6)
+	ccv.add_child(gl)
+	for sl in GS.GEAR_SLOTS:
+		var gid := str(GS.gear_eq().get(sl[0], ""))
+		if gid != "" and GS.GEAR.has(gid) and GS.gear_owned(gid):
+			var gi := TextureRect.new()
+			gi.texture = load("res://assets/ui/gear/%s.png" % gid); gi.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			gi.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED; gi.custom_minimum_size = Vector2(40, 40)
+			gi.tooltip_text = str(GS.GEAR[gid]["name"])
+			gl.add_child(gi)
+	if gl.get_child_count() == 0:
+		gl.add_child(UI.lbl("Ekipman takılı değil  (Market > Ekipman)", 14, UI.DIM, "Rajdhani-SemiBold"))
+	if best != "":
+		var bw := PanelContainer.new()
+		bw.add_theme_stylebox_override("panel", UI.sb(Color(0.055, 0.062, 0.078, 0.96), GS.lvl_color(maxi(best_l, 1)), 1, 6, 12))
+		bw.custom_minimum_size = Vector2(330, 0)
+		row.add_child(bw)
+		var bwv := UI.vbox(2)
+		bw.add_child(bwv)
+		var bwh := UI.hbox(8)
+		bwv.add_child(bwh)
+		bwh.add_child(UI.lbl("EN GÜÇLÜ SİLAH", 14, Color(1, 1, 1, 0.5), "Rajdhani-Bold"))
+		if best_l > 0:
+			bwh.add_child(UI.lvl_badge(best_l, 16))
+		bwv.add_child(thumb_rect(best, GS.wskin(best), Vector2(300, 80)))
+		bwv.add_child(UI.lbl(str(GS.WEAPONS[best]["name"]), 20, Color.WHITE, "Rajdhani-Bold"))
+	# entrance
+	col.modulate.a = 0.0
+	var tw := col.create_tween()
+	tw.tween_property(col, "modulate:a", 1.0, 0.25)
+	tw.parallel().tween_property(col, "position:x", 36.0, 0.35).from(10.0).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 # ================================================================ SETTINGS
 func _page_settings() -> void:
