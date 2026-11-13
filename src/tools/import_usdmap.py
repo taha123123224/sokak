@@ -12,6 +12,11 @@ from mathutils.bvhtree import BVHTree
 U = '/home/claude/usdz/'
 OUT = '/home/claude/sokak/assets/maps/'
 SPECS = {
+    # v4.5 user-supplied indoor facility map (single glb mesh, metres)
+    'cekirdek': dict(usd='/home/claude/usdz/params/source/PARAMS_SET_by_script.glb', glb=True, S=1.0,
+                     env={"preset": "overcast", "fog": 0.0, "sky": "day"},
+                     credit="PARAMS SET (Çekirdek Tesisi haritası)", floor_obj=None, nocol=[], prune=None, max_h=40.0, connect=True),
+
     # v4.3 user-supplied Sketchfab maps
     'kum': dict(usd=U + 'desert/scene.usdc', S=220.0, env={"preset": "golden", "fog": 0.003, "sky": "day"},
                 credit="Desert City — Mikey x pc (CC-BY 4.0)", floor_obj='Ground_EXT', nocol=['Alpha', 'additiveunlit'],
@@ -53,7 +58,10 @@ def build_bvh(objs):
 def run(mid):
     sp = SPECS[mid]
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.ops.wm.usd_import(filepath=sp['usd'])
+    if sp.get('glb'):
+        bpy.ops.import_scene.gltf(filepath=sp['usd'])
+    else:
+        bpy.ops.wm.usd_import(filepath=sp['usd'])
     for o in list(bpy.data.objects):
         if o.type in ('CAMERA', 'LIGHT'):
             bpy.data.objects.remove(o)
@@ -138,6 +146,38 @@ def run(mid):
     print("WALKABLE", len(pts), REJ)
     opn = pts[:, 3]
     pts = pts[:, :3]
+    if sp.get('connect'):
+        # v4.5: keep only the biggest region you can WALK through (grid neighbours, step <= 1.1 m and no wall
+        # in between) so nobody spawns in a sealed room, on a roof or inside a wall cavity
+        n_ = len(pts)
+        key = {(round(p[0] / step), round(p[1] / step)): [] for p in pts}
+        for i, p in enumerate(pts):
+            key[(round(p[0] / step), round(p[1] / step))].append(i)
+        parent = list(range(n_))
+        def fnd(a):
+            while parent[a] != a:
+                parent[a] = parent[parent[a]]; a = parent[a]
+            return a
+        for i, p in enumerate(pts):
+            gx, gy = round(p[0] / step), round(p[1] / step)
+            for dx, dy in ((1, 0), (0, 1)):
+                for j in key.get((gx + dx, gy + dy), []):
+                    q = pts[j]
+                    if abs(q[2] - p[2]) > 1.1:
+                        continue
+                    a = Vector((p[0], p[1], max(p[2], q[2]) + 0.9)); b = Vector((q[0], q[1], max(p[2], q[2]) + 0.9))
+                    d = b - a
+                    if bvh.ray_cast(a, d.normalized(), d.length)[0] is not None:
+                        continue
+                    ra, rb = fnd(i), fnd(j)
+                    if ra != rb:
+                        parent[ra] = rb
+        roots = [fnd(i) for i in range(n_)]
+        from collections import Counter
+        big = Counter(roots).most_common(1)[0][0]
+        sel_c = np.array([r == big for r in roots])
+        print("CONNECTED", int(sel_c.sum()), "of", n_)
+        pts = pts[sel_c]; opn = opn[sel_c]
     # keep the biggest connected-ish region: drop points far from the median cluster
     med = np.median(pts, 0)
     dist = np.linalg.norm(pts[:, :2] - med[:2], axis=1)
@@ -162,6 +202,17 @@ def run(mid):
             yaw = math.atan2(-(0 - p[0]), -(0 - (-p[1])))  # face the map centre
             # world: x = bx, y = bz, z = -by ; yaw so -Z basis looks at the centre
             to = Vector((cen[0] - p[0], 0, -(cen[1] - p[1])))
+            if sp.get('connect'):
+                # face the most open direction (longest clear line of sight), not a wall
+                best, bd = None, -1.0
+                for a in range(24):
+                    d = Vector((math.cos(a * math.pi / 12), math.sin(a * math.pi / 12), 0))
+                    h = bvh.ray_cast(Vector((p[0], p[1], p[2] + 1.6)), d, 60.0)
+                    L = 60.0 if h[0] is None else (h[0] - Vector((p[0], p[1], p[2] + 1.6))).length
+                    L += 4.0 * d.dot(Vector((cen[0] - p[0], cen[1] - p[1], 0)).normalized())
+                    if L > bd:
+                        bd, best = L, d
+                to = Vector((best.x, 0, -best.y))
             yaw = math.atan2(-to.x, -to.z)
             spawns.append({"p": [round(float(p[0]), 2), round(float(p[2]) + 0.1, 2), round(float(-p[1]), 2)], "yaw": round(yaw, 3), "team": team})
     # bounds of the playable area (+ margin) and invisible walls on them

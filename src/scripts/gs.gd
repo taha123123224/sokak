@@ -473,6 +473,7 @@ var MAPS := {
 	"canakkale": {"name": "Çanakkale", "desc": "Boğaz kıyısında taş tabya, top mevzileri ve siper hattı. Gün batımında destansı çatışma.", "size": "Büyük"},
 	"hurda": {"name": "Hurda Sahası", "desc": "Çukurdaki konteyner sahası: hesco bariyerleri, lastikler, sürekli çatışma.", "size": "Küçük", "amb": "amb_site"},
 	"fabrika": {"name": "Paslı Fabrika", "desc": "Terk edilmiş tuğla fabrika kompleksi, avlular, depolar ve bacalar.", "size": "Büyük", "amb": "amb_city"},
+	"cekirdek": {"name": "Çekirdek Tesisi", "desc": "Yeraltı araştırma tesisi: dar koridorlar, metal ızgaralı köprüler, kontrol odaları ve çok katlı salonlar.", "size": "Büyük", "amb": "amb_wind"},
 }
 var MODES := {
 	"ffa": {"name": "Ölüm Maçı", "desc": "Herkes herkese karşı. En çok öldüren kazanır.", "teams": false},
@@ -509,6 +510,7 @@ const CREDITS := [
 	["SCAR-H, MP5, UMP-45 modelleri: Flat Guns West/East", "fps-asset-kit", "CC0 · github.com/petroulacl/fps-asset-kit"],
 	["Impact Sounds (mermi çarpma)", "Kenney", "CC0 · kenney.nl"],
 	["knife Animated (tüm bıçaklarda birinci şahıs kollar ve animasyonlar)", "DJMaesen", "CC-BY 4.0 · sketchfab.com/bumstrum"],
+	["PARAMS SET (Çekirdek Tesisi haritası)", "kullanıcının sağladığı model", "Sketchfab"],
 	["Maps (Hurda Sahası haritası)", "frostychaos144", "CC-BY 4.0 · sketchfab.com/frostychaos144"],
 	["Rust (Paslı Fabrika haritası)", "frostychaos144", "CC-BY 4.0 · sketchfab.com/frostychaos144"],
 	["Howling (Kurt Adam modeli, rig + animasyon: SOKAK)", "Daniele De Filippis", "CC-BY 4.0 · sketchfab.com/danieledefilippis"],

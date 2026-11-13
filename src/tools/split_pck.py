@@ -86,10 +86,30 @@ def main():
     src_path, outdir = sys.argv[1], sys.argv[2]
     N = int(sys.argv[3]) if len(sys.argv) > 3 else 64
     src, verinfo, fb, ents = read_pck(src_path)
+    # imported file -> its source asset (from the small *.import remap files), so that everything that belongs
+    # to one asset group (a map and its textures, a weapon and its textures) lands in the SAME shard: adding
+    # or changing one map then touches one shard instead of dozens
+    src_of = {}
+    for e in ents:
+        if e['path'].endswith('.import') and e['size'] < 8192:
+            src.seek(fb + e['off'])
+            txt = src.read(e['size']).decode('utf-8', 'ignore')
+            for line in txt.splitlines():
+                if line.startswith('path') and '.godot/imported/' in line:
+                    imp = line.split('"')[1].replace('res://', '')
+                    src_of[imp] = e['path'][:-len('.import')]
+    def group(path):
+        sp_ = src_of.get(path)
+        if not sp_:
+            return path
+        d, base = os.path.split(sp_)
+        toks = base.split('.')[0].split('_')
+        stem = '_'.join(toks[:2]) if len(toks[0]) <= 3 and len(toks) > 1 else toks[0]
+        return d + '/' + stem
     main_e, shards = [], {}
     for e in ents:
         if e['path'].startswith('.godot/imported/') and e['size'] >= MIN_SHARD:
-            k = zlib.crc32(e['path'].encode('utf-8')) % N
+            k = zlib.crc32(group(e['path']).encode('utf-8')) % N
             shards.setdefault(k, []).append(e)
         else:
             main_e.append(e)
