@@ -476,6 +476,16 @@ func _build() -> void:
 	tw.tween_property(blk, "color:a", 0.0, 0.45).set_trans(Tween.TRANS_SINE)
 	tw.tween_callback(loading.get_parent().queue_free)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	# v4.7 helicopter insertion + parachute (PUBG-style), then spawn
+	var want_intro: bool = bool(GS.settings.get("insertion", true)) and (OS.has_environment("INTRO") or not "--shot" in str(OS.get_cmdline_user_args()))
+	if want_intro and player and ResourceLoader.exists("res://assets/models/heli_ch47.glb"):
+		countdown = 999.0
+		hud.root.visible = false
+		var ins = preload("res://scripts/insertion.gd").new()
+		add_child(ins)
+		await ins.play(self, player.global_position, float(player.yaw))
+		hud.root.visible = true
+		player.cam.current = true
 	countdown = 3.0
 	hud.show_countdown()
 	if mode == "sabotaj":

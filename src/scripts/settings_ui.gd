@@ -240,6 +240,7 @@ func _build() -> void:
 			_slide("vol_sfx", "Efektler (Silah, Adım)", 0, 1, 0.01, "%.2f")
 			_slide("vol_music", "Müzik", 0, 1, 0.01, "%.2f")
 			_check("announcer", "Yapay zeka anons sesi (Kafadan!, Çifte öldürme!...)")
+			_check("insertion", "Maç başında helikopterden paraşütle iniş")
 			_slide("vol_amb", "Ortam Sesleri", 0, 1, 0.01, "%.2f")
 			_section("SESLİ SOHBET")
 			_check("voice_on", "Sesli sohbet açık (V tuşuna basılı tut: konuş)")

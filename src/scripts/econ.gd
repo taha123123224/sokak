@@ -313,6 +313,47 @@ static func act(p: Dictionary, cat: Dictionary, a: String, args: Dictionary, now
 			ps["claimed"] = cl
 			p["pass"] = ps
 			return _ok(it)
+		"daily_claim":
+			# v4.7 daily login gift: once per day (Turkey time), 7-day streak, modest random rewards
+			var day := int(floor((now + 10800.0) / 86400.0))
+			var dd: Dictionary = p.get("daily", {})
+			if int(dd.get("d", -1)) == day:
+				return _err("Bugünün ödülü zaten alındı")
+			var streak := int(dd.get("s", 0)) + 1 if int(dd.get("d", -9)) == day - 1 else 1
+			if streak > 7:
+				streak = 1
+			var items: Array = []
+			if streak == 7:
+				items.append({"type": "crate", "id": "sokak", "n": 1})
+				items.append({"type": "gold", "n": 300})
+			else:
+				var r := randf()
+				if r < 0.45: items.append({"type": "gold", "n": randi_range(150, 400) + streak * 20})
+				elif r < 0.75: items.append({"type": "mat", "id": "demir", "n": randi_range(10, 25)})
+				elif r < 0.92: items.append({"type": "mat", "id": "krom", "n": randi_range(3, 8)})
+				else: items.append({"type": "mat", "id": "titanyum", "n": randi_range(1, 2)})
+			for it in items:
+				_grant(p, cat, it, now)
+			dd["d"] = day
+			dd["s"] = streak
+			p["daily"] = dd
+			return _ok({"items": items, "streak": streak})
+		"weekly_claim":
+			var day2 := int(floor((now + 10800.0) / 86400.0))
+			var wk := int(floor((day2 + 3) / 7.0))
+			var dw: Dictionary = p.get("daily", {})
+			if int(dw.get("w", -1)) == wk:
+				return _err("Bu haftanın ödülü zaten alındı")
+			var items2: Array = [{"type": "gold", "n": randi_range(600, 1200)}]
+			var r2 := randf()
+			if r2 < 0.5: items2.append({"type": "mat", "id": "krom", "n": randi_range(5, 12)})
+			elif r2 < 0.85: items2.append({"type": "mat", "id": "titanyum", "n": randi_range(2, 4)})
+			else: items2.append({"type": "mat", "id": "kobalt", "n": 1})
+			for it in items2:
+				_grant(p, cat, it, now)
+			dw["w"] = wk
+			p["daily"] = dw
+			return _ok({"items": items2})
 		"match_end":
 			return _match_end(p, args, now)
 		"sync":

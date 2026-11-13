@@ -1082,6 +1082,383 @@ func _cur(kind: String, v: String, c: Color, tip: String = "Altın") -> Control:
 	h.add_child(l)
 	return chip
 
+# ================================================================ v4.7 daily / weekly gifts, level-up
+static func _today() -> int:
+	return int(floor((Time.get_unix_time_from_system() + 10800.0) / 86400.0))
+
+static func _this_week() -> int:
+	return int(floor((_today() + 3) / 7.0))
+
+func _daily_ready() -> bool:
+	return int(GS.profile.get("daily", {}).get("d", -1)) != _today()
+
+func _weekly_ready() -> bool:
+	return int(GS.profile.get("daily", {}).get("w", -1)) != _this_week()
+
+func _streak_next() -> int:
+	var dd: Dictionary = GS.profile.get("daily", {})
+	var s0 := int(dd.get("s", 0))
+	if int(dd.get("d", -9)) == _today():
+		return s0
+	var n := s0 + 1 if int(dd.get("d", -9)) == _today() - 1 else 1
+	return 1 if n > 7 else n
+
+var _daily_popped := false
+func _lobby_popups() -> void:
+	if not is_inside_tree() or page != "lobby":
+		return
+	var lv := int(GS.profile.get("level", 1))
+	var seen := int(GS.settings.get("seen_level", 0))
+	if seen == 0:
+		GS.settings["seen_level"] = lv
+		GS.save_settings()
+	elif lv > seen:
+		GS.settings["seen_level"] = lv
+		GS.save_settings()
+		var n := lv - seen
+		levelup_fx(lv, [{"type": "gold", "n": 500 * n}, {"type": "crate", "id": "sokak", "n": n}])
+		return
+	if not _daily_popped and (_daily_ready() or _weekly_ready()):
+		_daily_popped = true
+		_rewards_dialog()
+
+func _rewards_strip() -> Control:
+	var gp := PanelContainer.new()
+	var ready := _daily_ready() or _weekly_ready()
+	var sb := UI.sb(Color(0.12, 0.08, 0.02, 0.62) if ready else Color(0, 0, 0, 0.45), UI.GOLD if ready else Color(1, 1, 1, 0.1), 1, 4, 10)
+	gp.add_theme_stylebox_override("panel", sb)
+	gp.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	gp.gui_input.connect(func(ev): if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT: _rewards_dialog())
+	var h := UI.hbox(10)
+	gp.add_child(h)
+	var gi := GiftIcon.new()
+	gi.custom_minimum_size = Vector2(38, 38)
+	gi.lit = ready
+	h.add_child(gi)
+	var v := UI.vbox(-2)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(v)
+	v.add_child(UI.lbl("GÜNLÜK & HAFTALIK HEDİYE", 15, Color.WHITE, "Rajdhani-Bold"))
+	var txt := ("Bugünün hediyesi hazır  •  Gün %d/7" % _streak_next()) if _daily_ready() else ("Haftalık hediye hazır!" if _weekly_ready() else "Yarın yeni hediye  •  Seri %d/7" % _streak_next())
+	v.add_child(UI.lbl(txt, 13, UI.GOLD if ready else UI.DIM, "Rajdhani-SemiBold"))
+	var b := UI.btn("AL" if ready else "GÖR", func(): _rewards_dialog(), 14, ready, 64, 32)
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(b)
+	for c in [v]:
+		for cc in c.get_children(): (cc as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if ready:
+		var tw := gp.create_tween().set_loops()
+		tw.tween_property(gp, "modulate", Color(1.15, 1.08, 0.95), 0.8).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(gp, "modulate", Color.WHITE, 0.8).set_trans(Tween.TRANS_SINE)
+	return gp
+
+func _reward_icon(it: Dictionary, sz: float) -> Control:
+	var t := str(it.get("type", ""))
+	if t == "crate":
+		var tr := TextureRect.new()
+		tr.texture = _crate_tex(str(it.get("id", "sokak")))
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.custom_minimum_size = Vector2(sz, sz)
+		return tr
+	var ic := CurIcon.new()
+	ic.kind = "gold" if t == "gold" else "gem"
+	ic.mat = str(it.get("id", "")) if t == "mat" else ""
+	ic.col = UI.GOLD
+	ic.custom_minimum_size = Vector2(sz, sz)
+	return ic
+
+func _reward_text(it: Dictionary) -> String:
+	match str(it.get("type", "")):
+		"gold": return "+%s ALTIN" % UI.money(int(it["n"]))
+		"mat": return "+%d %s" % [int(it["n"]), str(GS.MATS.get(str(it["id"]), str(it["id"]))).to_upper()]
+		"crate": return "+%d %s" % [int(it.get("n", 1)), str(GS.CRATES.get(str(it["id"]), {}).get("name", "KASA")).to_upper()]
+	return "ÖDÜL"
+
+func _rewards_dialog() -> void:
+	var v := _modal(1040, 600)
+	var head := UI.hbox(12)
+	v.add_child(head)
+	var gi := GiftIcon.new(); gi.custom_minimum_size = Vector2(46, 46); gi.lit = true
+	head.add_child(gi)
+	var hv := UI.vbox(-4)
+	head.add_child(hv)
+	hv.add_child(UI.lbl("GÜNLÜK HEDİYE", 34, Color.WHITE, "RussoOne-Regular"))
+	hv.add_child(UI.lbl("Her gün gir, seriyi bozma: 7. gün Sokak Kasası seni bekliyor.", 16, UI.DIM, "Rajdhani-SemiBold"))
+	v.add_child(UI.spacer(false, 0, 6))
+	var row := UI.hbox(10)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(row)
+	var next := _streak_next()
+	var today_ready := _daily_ready()
+	var cards: Array = []
+	for d in range(1, 8):
+		var got: bool = d < next or (d == next and not today_ready)
+		var is_today: bool = d == next and today_ready
+		var c := PanelContainer.new()
+		var cc: Color = UI.GOLD if is_today else (UI.GREEN if got else Color(1, 1, 1, 0.12))
+		var csb := UI.sb(Color(0.07, 0.06, 0.04, 0.92) if is_today else Color(0.04, 0.045, 0.06, 0.85), cc, 2 if is_today else 1, 6, 8)
+		if is_today:
+			csb.shadow_color = Color(1, 0.75, 0.2, 0.35); csb.shadow_size = 14
+		c.add_theme_stylebox_override("panel", csb)
+		c.custom_minimum_size = Vector2(130, 196 if d < 7 else 196)
+		row.add_child(c)
+		cards.append(c)
+		var cv := UI.vbox(4)
+		c.add_child(cv)
+		cv.add_child(UI.lbl("GÜN %d" % d, 18, cc if not got else UI.GREEN, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER))
+		var cen := CenterContainer.new()
+		cen.custom_minimum_size = Vector2(0, 100)
+		cv.add_child(cen)
+		if d == 7:
+			cen.add_child(_reward_icon({"type": "crate", "id": "sokak"}, 92))
+		else:
+			var g2 := GiftIcon.new(); g2.custom_minimum_size = Vector2(70, 70); g2.lit = is_today; g2.dim = got
+			cen.add_child(g2)
+		cv.add_child(UI.lbl("✓ ALINDI" if got else ("SÜRPRİZ KASA" if d == 7 else ("BUGÜN" if is_today else "SÜRPRİZ")), 14, UI.GREEN if got else (UI.GOLD if is_today else UI.DIM), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+		if is_today:
+			c.pivot_offset = Vector2(65, 98)
+			var tw := c.create_tween().set_loops()
+			tw.tween_property(c, "scale", Vector2(1.04, 1.04), 0.6).set_trans(Tween.TRANS_SINE)
+			tw.tween_property(c, "scale", Vector2.ONE, 0.6).set_trans(Tween.TRANS_SINE)
+	v.add_child(UI.spacer(false, 0, 8))
+	var act := UI.hbox(14)
+	act.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(act)
+	if today_ready:
+		act.add_child(UI.btn("HEDİYEYİ AÇ", func():
+			var r: Dictionary = await _act("daily_claim", {})
+			if r["ok"]:
+				_close_modal()
+				var items: Array = r.get("res", {}).get("items", [])
+				reward_fx("G Ü N L Ü K   H E D İ Y E", "GÜN %d" % int(r.get("res", {}).get("streak", next)), "Yarın gel, serini büyüt!", UI.GOLD, items)
+				_refresh_currency()
+				if page == "lobby": show_page("lobby"), 22, true, 300, 58))
+	else:
+		var secs := int((_today() + 1) * 86400 - 10800 - Time.get_unix_time_from_system())
+		act.add_child(UI.lbl("Sonraki hediye  %02d:%02d sonra" % [secs / 3600, (secs % 3600) / 60], 20, UI.DIM, "Rajdhani-Bold"))
+	# weekly
+	v.add_child(UI.spacer(false, 0, 10))
+	var wp := PanelContainer.new()
+	var wr := _weekly_ready()
+	wp.add_theme_stylebox_override("panel", UI.sb(Color(0.08, 0.05, 0.12, 0.85), Color("b84bff") if wr else Color(1, 1, 1, 0.1), 1, 6, 12))
+	v.add_child(wp)
+	var wh := UI.hbox(14)
+	wp.add_child(wh)
+	var g3 := GiftIcon.new(); g3.custom_minimum_size = Vector2(54, 54); g3.lit = wr; g3.purple = true
+	wh.add_child(g3)
+	var wv := UI.vbox(0)
+	wv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	wh.add_child(wv)
+	wv.add_child(UI.lbl("HAFTALIK HEDİYE", 22, Color.WHITE, "RussoOne-Regular"))
+	var wl := 7 - ((_today() + 3) % 7)
+	wv.add_child(UI.lbl("Altın + rastgele malzeme. Her pazartesi yenilenir." if wr else "Bu haftanınkini aldın. Yenisi %d gün sonra." % wl, 15, UI.DIM, "Rajdhani-SemiBold"))
+	if wr:
+		var wb := UI.btn("AL", func():
+			var r2: Dictionary = await _act("weekly_claim", {})
+			if r2["ok"]:
+				_close_modal()
+				reward_fx("H A F T A L I K   H E D İ Y E", "HAFTANIN HEDİYESİ", "Gelecek hafta yine gel!", Color("c070ff"), r2.get("res", {}).get("items", []))
+				_refresh_currency()
+				if page == "lobby": show_page("lobby"), 18, true, 140, 46)
+		wb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		wh.add_child(wb)
+	v.add_child(UI.spacer())
+	var cl := UI.btn("KAPAT", func(): _close_modal(), 16, false, 160, 40)
+	cl.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	v.add_child(cl)
+
+func reward_fx(head: String, title: String, sub: String, col: Color, items: Array, big_level: int = -1) -> void:
+	## reward reveal: dim + light rays, optional level badge, the items pop in one by one
+	SFX.play("success", -2)
+	var layer := Control.new()
+	layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	ui.add_child(layer)
+	var bg := ColorRect.new()
+	bg.color = Color(0.01, 0.012, 0.018, 0.0)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(bg)
+	var rays := ColorRect.new()
+	rays.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rays.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var rm := ShaderMaterial.new(); var rs := Shader.new(); rs.code = RAYS_SHADER; rm.shader = rs
+	rm.set_shader_parameter("col", Color(col.r, col.g, col.b, 0.0))
+	rays.material = rm
+	layer.add_child(rays)
+	var burst := RewardBurst.new()
+	burst.col = col
+	burst.set_anchors_preset(Control.PRESET_FULL_RECT)
+	burst.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(burst)
+	var v := UI.vbox(10)
+	v.set_anchors_preset(Control.PRESET_CENTER)
+	v.offset_left = -560; v.offset_right = 560; v.offset_top = -300; v.offset_bottom = 300
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(v)
+	if big_level >= 0:
+		var cb := CenterContainer.new()
+		cb.custom_minimum_size = Vector2(0, 220)
+		v.add_child(cb)
+		var badge := LvlUpBadge.new()
+		badge.level = big_level
+		badge.col = col
+		badge.custom_minimum_size = Vector2(220, 220)
+		badge.pivot_offset = Vector2(110, 110)
+		badge.scale = Vector2(0.1, 0.1)
+		cb.add_child(badge)
+		var bt := badge.create_tween()
+		bt.tween_interval(0.15)
+		bt.tween_property(badge, "scale", Vector2(1.12, 1.12), 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		bt.tween_property(badge, "scale", Vector2.ONE, 0.25)
+	var hl := UI.lbl(head, 18, col.lightened(0.3), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(hl)
+	var tl := UI.lbl(title, 64, Color.WHITE, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(tl)
+	var row := UI.hbox(16)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(row)
+	var tiles: Array = []
+	for it in items:
+		var tp := PanelContainer.new()
+		tp.add_theme_stylebox_override("panel", UI.sb(Color(0.05, 0.05, 0.07, 0.9), Color(col.r, col.g, col.b, 0.55), 1, 8, 12))
+		tp.custom_minimum_size = Vector2(190, 190)
+		var tv := UI.vbox(6)
+		tp.add_child(tv)
+		var cc := CenterContainer.new()
+		cc.custom_minimum_size = Vector2(0, 120)
+		cc.add_child(_reward_icon(it, 104))
+		tv.add_child(cc)
+		tv.add_child(UI.lbl(_reward_text(it), 20, Color.WHITE, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
+		tp.modulate.a = 0.0
+		tp.pivot_offset = Vector2(95, 95)
+		tp.scale = Vector2(0.6, 0.6)
+		row.add_child(tp)
+		tiles.append(tp)
+	var sl := UI.lbl(sub, 18, Color(1, 1, 1, 0.65), "Rajdhani-SemiBold", HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(sl)
+	var cont := UI.btn("DEVAM", Callable(), 18, true, 220, 50)
+	cont.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	v.add_child(cont)
+	for n in [hl, tl, sl, cont]:
+		(n as Control).modulate.a = 0.0
+	var tw := layer.create_tween()
+	tw.set_parallel()
+	tw.tween_property(bg, "color:a", 0.88, 0.25)
+	tw.tween_method(func(x): rm.set_shader_parameter("col", Color(col.r, col.g, col.b, x)), 0.0, 1.0, 0.4)
+	tw.tween_method(func(x): rm.set_shader_parameter("k", x), 0.0, 1.0, 0.9)
+	var d0 := 0.5 if big_level >= 0 else 0.15
+	tw.tween_property(hl, "modulate:a", 1.0, 0.3).set_delay(d0)
+	tw.tween_property(tl, "modulate:a", 1.0, 0.3).set_delay(d0 + 0.1)
+	for i in tiles.size():
+		var tp2: Control = tiles[i]
+		tw.tween_property(tp2, "modulate:a", 1.0, 0.25).set_delay(d0 + 0.35 + i * 0.22)
+		tw.tween_property(tp2, "scale", Vector2.ONE, 0.45).set_delay(d0 + 0.35 + i * 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		get_tree().create_timer(d0 + 0.35 + i * 0.22).timeout.connect(func(): SFX.play("coin" if SFX.get_stream("coin") else "ui_click", -4))
+	tw.tween_property(sl, "modulate:a", 1.0, 0.3).set_delay(d0 + 0.5 + tiles.size() * 0.22)
+	tw.tween_property(cont, "modulate:a", 1.0, 0.3).set_delay(d0 + 0.6 + tiles.size() * 0.22)
+	var close := func():
+		if not is_instance_valid(layer):
+			return
+		var t2 := layer.create_tween()
+		t2.tween_property(layer, "modulate:a", 0.0, 0.3)
+		t2.tween_callback(layer.queue_free)
+		if page == "lobby":
+			get_tree().create_timer(0.35).timeout.connect(func(): if page == "lobby": _lobby_popups())
+	cont.pressed.connect(close)
+
+func levelup_fx(level: int, items: Array) -> void:
+	SFX.play("levelup" if SFX.get_stream("levelup") else "success", 0)
+	reward_fx("S E V İ Y E   A T L A D I N", "SEVİYE %d" % level, "Tebrikler! Ödüllerin hesabına eklendi.", UI.ACCENT, items, level)
+
+class LvlUpBadge extends Control:
+	var level := 1
+	var col := Color.ORANGE
+	var t := 0.0
+	func _process(d: float) -> void:
+		t += d
+		queue_redraw()
+	func _draw() -> void:
+		var c := size * 0.5
+		var r: float = minf(size.x, size.y) * 0.46
+		for g in 4:
+			_hex(c, r + 10 + g * 7, Color(col.r, col.g, col.b, 0.07))
+		_hex(c, r, col.darkened(0.55))
+		_hex(c, r - 8, Color(0.06, 0.06, 0.08))
+		# rotating highlight arc
+		var a := t * 2.0
+		draw_arc(c, r + 4, a, a + 1.2, 24, Color(1, 1, 1, 0.75), 3.0, true)
+		draw_arc(c, r + 4, a + PI, a + PI + 1.2, 24, Color(col.r, col.g, col.b, 0.9), 3.0, true)
+		var f: Font = UI.font("RussoOne-Regular")
+		var s := str(level)
+		var fs := 96 if level < 100 else 74
+		var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		draw_string(f, Vector2(c.x - w * 0.5, c.y + fs * 0.34), s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+		var f2: Font = UI.font("Rajdhani-Bold")
+		var w2 := f2.get_string_size("SEVİYE", HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+		draw_string(f2, Vector2(c.x - w2 * 0.5, c.y - r * 0.5), "SEVİYE", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, col.lightened(0.4))
+	func _hex(c: Vector2, r: float, cl: Color) -> void:
+		var pts := PackedVector2Array()
+		for i in 6:
+			pts.append(c + Vector2.from_angle(-PI / 2 + i * TAU / 6) * r)
+		draw_colored_polygon(pts, cl)
+
+class RewardBurst extends Control:
+	## sparks flying out from the centre for ~1.5 s
+	var col := Color.WHITE
+	var parts: Array = []
+	var t := 0.0
+	func _ready() -> void:
+		for i in 70:
+			var a := randf() * TAU
+			parts.append([Vector2.from_angle(a) * randf_range(180, 620), randf_range(2.0, 5.0), randf_range(0.6, 1.5)])
+	func _process(d: float) -> void:
+		t += d
+		queue_redraw()
+	func _draw() -> void:
+		if t > 2.0:
+			return
+		var c := size * 0.5 + Vector2(0, -60)
+		for p in parts:
+			var k: float = clampf(t / p[2], 0.0, 1.0)
+			var e := 1.0 - pow(1.0 - k, 3.0)
+			var pos: Vector2 = c + (p[0] as Vector2) * e
+			var a := (1.0 - k)
+			draw_circle(pos, p[1] * 2.2, Color(col.r, col.g, col.b, 0.25 * a))
+			draw_circle(pos, p[1], Color(1, 0.95, 0.8, a))
+
+class GiftIcon extends Control:
+	## a wrapped gift box (bow + ribbon), gently bouncing when lit
+	var lit := false
+	var dim := false
+	var purple := false
+	var t := 0.0
+	func _process(d: float) -> void:
+		t += d
+		if lit:
+			queue_redraw()
+	func _draw() -> void:
+		var s := minf(size.x, size.y)
+		var bob := (sin(t * 4.0) * s * 0.03) if lit else 0.0
+		var c := Vector2(size.x * 0.5, size.y * 0.58 + bob)
+		var box_c := Color("8a3cff") if purple else Color("e0412f")
+		var rib := Color("ffd060")
+		if dim:
+			box_c = box_c.darkened(0.55); rib = rib.darkened(0.5)
+		if lit:
+			draw_circle(c, s * 0.48, Color(rib.r, rib.g, rib.b, 0.16 + 0.06 * sin(t * 3.0)))
+		var w := s * 0.62
+		draw_rect(Rect2(c.x - w * 0.5, c.y - w * 0.28, w, w * 0.62), box_c)
+		draw_rect(Rect2(c.x - w * 0.56, c.y - w * 0.44, w * 1.12, w * 0.2), box_c.lightened(0.15))
+		draw_rect(Rect2(c.x - w * 0.08, c.y - w * 0.44, w * 0.16, w * 0.78), rib)
+		draw_rect(Rect2(c.x - w * 0.5, c.y - w * 0.02, w, w * 0.1), Color(rib.r, rib.g, rib.b, 0.8))
+		var top := Vector2(c.x, c.y - w * 0.44)
+		draw_colored_polygon(PackedVector2Array([top, top + Vector2(-w * 0.34, -w * 0.24), top + Vector2(-w * 0.3, w * 0.02)]), rib)
+		draw_colored_polygon(PackedVector2Array([top, top + Vector2(w * 0.34, -w * 0.24), top + Vector2(w * 0.3, w * 0.02)]), rib)
+		draw_circle(top, w * 0.07, rib.lightened(0.2))
+
 class CurIcon extends Control:
 	## vector currency icons: gold coin, cut gems for upgrade materials, crate
 	var kind := "gold"
@@ -1592,8 +1969,9 @@ func _page_lobby() -> void:
 	nv.alignment = BoxContainer.ALIGNMENT_END
 	nm2.add_child(nv)
 	nv.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, UI.ACCENT2, "Rajdhani-Bold"))
-	nv.add_child(UI.lbl("KURT ADAM MODU", 26, Color.WHITE, "RussoOne-Regular"))
-	nv.add_child(_wrap("Gece çöktü: 3'e bas, kurda dönüş! Yeni SEZON PASOSU ile 30 seviye ödül, hareketli özel eklentiler ve yeni silah seviye rozetleri.", 15))
+	nv.add_child(UI.lbl("HELİKOPTERDEN İNİŞ", 26, Color.WHITE, "RussoOne-Regular"))
+	nv.add_child(_wrap("Her maç Chinook'tan atlayıp paraşütle iniyorsun! Günlük ve haftalık hediyeler, seviye atlama ödülleri, M ile büyük harita.", 15))
+	right.add_child(_rewards_strip())
 	var mp := UI.glass(12, 4)
 	right.add_child(mp)
 	var mv := UI.vbox(7)
@@ -1629,6 +2007,7 @@ func _page_lobby() -> void:
 	pb.anchor_left = 1; pb.anchor_right = 1; pb.anchor_top = 1; pb.anchor_bottom = 1
 	pb.offset_left = -396; pb.offset_right = -22; pb.offset_top = -176; pb.offset_bottom = -26
 	content.add_child(pb)
+	_lobby_popups.call_deferred()
 	var mode_txt := "ÇEVRİMİÇİ" if GS.play_mode == "online" else "BOT MAÇI"
 	var info := UI.lbl(mode_txt + "  ·  " + str(GS.MAPS.size()) + " HARİTA  ·  " + str(GS.MODES.size()) + " MOD", 14, Color(1, 1, 1, 0.8), "Rajdhani-Bold")
 	info.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
@@ -5956,6 +6335,19 @@ func test_hook(i: int) -> void:
 			market_tab = "ekipman"; show_page("market")
 		71:
 			Updater._show_banner({"version": "4.4.1", "build": 99})
+		72:
+			GS.profile.erase("daily")
+			_rewards_dialog()
+		75:
+			GS.profile.erase("daily")
+			var r1: Dictionary = await GS.act("daily_claim", {})
+			var r2: Dictionary = await GS.act("daily_claim", {})
+			var r3: Dictionary = await GS.act("weekly_claim", {})
+			print("DAILY ", r1, " AGAIN ", r2["err"], " WEEKLY ", r3, " PROF ", GS.profile.get("daily"))
+		73:
+			levelup_fx(12, [{"type": "gold", "n": 500}, {"type": "crate", "id": "sokak", "n": 1}])
+		74:
+			reward_fx("G Ü N L Ü K   H E D İ Y E", "GÜN 3", "Yarın gel, serini büyüt!", UI.GOLD, [{"type": "mat", "id": "krom", "n": 6}])
 		70:
 			GS.profile["gold"] = 999999
 			for b in content.find_children("*", "Button", true, false):

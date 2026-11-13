@@ -365,6 +365,49 @@ begin
     p := jsonb_set(p, '{pass}', jsonb_build_object('xp', _si(p, '{pass,xp}'), 'claimed', coalesce(p->'pass'->'claimed', '[]'::jsonb) || to_jsonb(i)));
     res := it;
 
+  when 'daily_claim' then
+    -- v4.7 daily login gift (Turkey time day), 7-day streak, modest random reward; day 7 = Sokak crate
+    i := floor((nowt + 10800) / 86400)::int;
+    if coalesce((p->'daily'->>'d')::int, -1) = i then raise exception 'Bugünün ödülü zaten alındı'; end if;
+    nl := case when coalesce((p->'daily'->>'d')::int, -9) = i - 1 then coalesce((p->'daily'->>'s')::int, 0) + 1 else 1 end;
+    if nl > 7 then nl := 1; end if;
+    if nl = 7 then
+      arr := '[{"type":"crate","id":"sokak","n":1},{"type":"gold","n":300}]'::jsonb;
+    else
+      r := random();
+      if r < 0.45 then arr := jsonb_build_array(jsonb_build_object('type', 'gold', 'n', 150 + floor(random() * 251)::int + nl * 20));
+      elsif r < 0.75 then arr := jsonb_build_array(jsonb_build_object('type', 'mat', 'id', 'demir', 'n', 10 + floor(random() * 16)::int));
+      elsif r < 0.92 then arr := jsonb_build_array(jsonb_build_object('type', 'mat', 'id', 'krom', 'n', 3 + floor(random() * 6)::int));
+      else arr := jsonb_build_array(jsonb_build_object('type', 'mat', 'id', 'titanyum', 'n', 1 + floor(random() * 2)::int));
+      end if;
+    end if;
+    for it in select value from jsonb_array_elements(arr) loop
+      case it->>'type'
+      when 'gold' then p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + _si(it, '{n}')));
+      when 'mat' then p := jsonb_set(p, array['mats', it->>'id'], to_jsonb(_si(p, array['mats', it->>'id']) + _si(it, '{n}')));
+      when 'crate' then p := _crate_add(p, it->>'id', _si(it, '{n}')::int);
+      end case;
+    end loop;
+    p := jsonb_set(p, '{daily}', coalesce(p->'daily', '{}'::jsonb) || jsonb_build_object('d', i, 's', nl));
+    res := jsonb_build_object('items', arr, 'streak', nl);
+
+  when 'weekly_claim' then
+    i := floor((floor((nowt + 10800) / 86400) + 3) / 7)::int;
+    if coalesce((p->'daily'->>'w')::int, -1) = i then raise exception 'Bu haftanın ödülü zaten alındı'; end if;
+    r := random();
+    arr := jsonb_build_array(jsonb_build_object('type', 'gold', 'n', 600 + floor(random() * 601)::int)) ||
+      case when r < 0.5 then jsonb_build_array(jsonb_build_object('type', 'mat', 'id', 'krom', 'n', 5 + floor(random() * 8)::int))
+           when r < 0.85 then jsonb_build_array(jsonb_build_object('type', 'mat', 'id', 'titanyum', 'n', 2 + floor(random() * 3)::int))
+           else '[{"type":"mat","id":"kobalt","n":1}]'::jsonb end;
+    for it in select value from jsonb_array_elements(arr) loop
+      case it->>'type'
+      when 'gold' then p := jsonb_set(p, '{gold}', to_jsonb(_si(p, '{gold}') + _si(it, '{n}')));
+      when 'mat' then p := jsonb_set(p, array['mats', it->>'id'], to_jsonb(_si(p, array['mats', it->>'id']) + _si(it, '{n}')));
+      end case;
+    end loop;
+    p := jsonb_set(p, '{daily}', coalesce(p->'daily', '{}'::jsonb) || jsonb_build_object('w', i));
+    res := jsonb_build_object('items', arr);
+
   when 'match_end' then
     t0 := coalesce((p->>'_t0')::float8, 0);
     p := p - '_t0';
