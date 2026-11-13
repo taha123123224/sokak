@@ -5956,6 +5956,8 @@ func test_hook(i: int) -> void:
 	match i:
 		68:
 			market_tab = "ekipman"; show_page("market")
+		71:
+			Updater._show_banner({"version": "4.4.1", "build": 99})
 		70:
 			GS.profile["gold"] = 999999
 			for b in content.find_children("*", "Button", true, false):

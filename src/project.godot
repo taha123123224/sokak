@@ -25,6 +25,7 @@ driver/enable_input=true
 
 [autoload]
 
+Packs="*res://scripts/packs.gd"
 GS="*res://scripts/gs.gd"
 MatLib="*res://scripts/matlib.gd"
 SFX="*res://scripts/sfx.gd"
