@@ -1,0 +1,450 @@
+{
+ "version": "4.4.0",
+ "build": 58,
+ "parts": [
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part00",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part01",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part02",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part03",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part04",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part05",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part06",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part07",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part08",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part09",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part10",
+   "size": 37815372
+  }
+ ],
+ "pck_size": 981533772,
+ "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
+ "notes": "v4.4: Akıllı güncelleme — artık sadece değişen dosyalar iniyor, her seferinde tüm oyunu indirmek yok • Oyun açıkken yeni sürüm çıkınca ekranda anlık bildirim: ŞİMDİ GÜNCELLE / SONRA • Başlatıcı dosyaları tek tek kontrol edip eksik ya da değişmiş olanları indiriyor",
+ "launcher": {
+  "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/baslatici.pck",
+  "size": 1692560
+ },
+ "packs": [
+  {
+   "f": "SOKAK.pck",
+   "size": 15207096,
+   "md5": "73c43c885c1a00bff634dfcbe5c8b1aa",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/SOKAK_73c43c885c.pck"
+  },
+  {
+   "f": "veri/p00_1193af006f.pck",
+   "size": 14678228,
+   "md5": "1193af006f13ead375579d7d0361eeb4",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p00_1193af006f.pck"
+  },
+  {
+   "f": "veri/p01_cab7e33b02.pck",
+   "size": 25568340,
+   "md5": "cab7e33b02d668ea66fbd57d5d650ca0",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p01_cab7e33b02.pck"
+  },
+  {
+   "f": "veri/p02_acb8132d12.pck",
+   "size": 12843480,
+   "md5": "acb8132d12caa93744b73f4c54af0fc0",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p02_acb8132d12.pck"
+  },
+  {
+   "f": "veri/p03_5b2b51c7b4.pck",
+   "size": 1305744,
+   "md5": "5b2b51c7b4900194df76b773f5dc4c39",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p03_5b2b51c7b4.pck"
+  },
+  {
+   "f": "veri/p04_b1a5b0d7ba.pck",
+   "size": 22253112,
+   "md5": "b1a5b0d7ba5d83b6cfeffdf377508609",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p04_b1a5b0d7ba.pck"
+  },
+  {
+   "f": "veri/p05_3968276133.pck",
+   "size": 29705428,
+   "md5": "3968276133c8aa8e09265645a9d5709b",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p05_3968276133.pck"
+  },
+  {
+   "f": "veri/p06_9dd7a7bc01.pck",
+   "size": 6251104,
+   "md5": "9dd7a7bc0142b4adb7b69c19f40e7c2e",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p06_9dd7a7bc01.pck"
+  },
+  {
+   "f": "veri/p07_eff2db2764.pck",
+   "size": 11786468,
+   "md5": "eff2db27641cb72700a6196488af0c65",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p07_eff2db2764.pck"
+  },
+  {
+   "f": "veri/p08_7af9f91c6e.pck",
+   "size": 6099848,
+   "md5": "7af9f91c6ec4c0ba07255d2bfd8becfa",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p08_7af9f91c6e.pck"
+  },
+  {
+   "f": "veri/p09_efd65ad211.pck",
+   "size": 3782716,
+   "md5": "efd65ad211cfb51a092ef9124e7c0e70",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p09_efd65ad211.pck"
+  },
+  {
+   "f": "veri/p10_dc2875696d.pck",
+   "size": 9399508,
+   "md5": "dc2875696d7007e82872f987cf85af33",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p10_dc2875696d.pck"
+  },
+  {
+   "f": "veri/p11_d37869471f.pck",
+   "size": 64112084,
+   "md5": "d37869471f3093150265808970d4945a",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p11_d37869471f.pck"
+  },
+  {
+   "f": "veri/p12_90a13afdc5.pck",
+   "size": 19363136,
+   "md5": "90a13afdc5cd32a0da662b8694e2538b",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p12_90a13afdc5.pck"
+  },
+  {
+   "f": "veri/p13_0921444a7f.pck",
+   "size": 8120736,
+   "md5": "0921444a7fd00c0f5043fbc7ad536569",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p13_0921444a7f.pck"
+  },
+  {
+   "f": "veri/p14_a27749cd32.pck",
+   "size": 8239840,
+   "md5": "a27749cd32e8fa65ec6579456091d0b4",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p14_a27749cd32.pck"
+  },
+  {
+   "f": "veri/p15_db5d452dc5.pck",
+   "size": 35791908,
+   "md5": "db5d452dc5de7abbb4411add5efa1d97",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p15_db5d452dc5.pck"
+  },
+  {
+   "f": "veri/p16_124e3a6c84.pck",
+   "size": 9726812,
+   "md5": "124e3a6c84a194c48c0a24c3448963a4",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p16_124e3a6c84.pck"
+  },
+  {
+   "f": "veri/p17_d7a24dd1ab.pck",
+   "size": 14260812,
+   "md5": "d7a24dd1ab9ac299cdf54fd3aa430e76",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p17_d7a24dd1ab.pck"
+  },
+  {
+   "f": "veri/p18_76a0559f6c.pck",
+   "size": 5323612,
+   "md5": "76a0559f6c9bfd301db79a969bfde16f",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p18_76a0559f6c.pck"
+  },
+  {
+   "f": "veri/p19_0e445ca9bc.pck",
+   "size": 16016736,
+   "md5": "0e445ca9bcc1c0da562a651eb2a15f54",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p19_0e445ca9bc.pck"
+  },
+  {
+   "f": "veri/p20_65078d5673.pck",
+   "size": 9349928,
+   "md5": "65078d567350616a4dc7e59034407060",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p20_65078d5673.pck"
+  },
+  {
+   "f": "veri/p21_3d58e4cbbb.pck",
+   "size": 14863480,
+   "md5": "3d58e4cbbb6699679d61b444e814f6c6",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p21_3d58e4cbbb.pck"
+  },
+  {
+   "f": "veri/p22_81540e9a61.pck",
+   "size": 10446252,
+   "md5": "81540e9a618a3b2675e69d7f1239ba41",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p22_81540e9a61.pck"
+  },
+  {
+   "f": "veri/p23_d2e35b482e.pck",
+   "size": 24863840,
+   "md5": "d2e35b482e0e49ca9567b020c04de3f0",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p23_d2e35b482e.pck"
+  },
+  {
+   "f": "veri/p24_a85576bb6d.pck",
+   "size": 14980084,
+   "md5": "a85576bb6d3847da25a2427ff1664bc7",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p24_a85576bb6d.pck"
+  },
+  {
+   "f": "veri/p25_092749c43a.pck",
+   "size": 28218316,
+   "md5": "092749c43ae36344983553f75b2ff6ea",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p25_092749c43a.pck"
+  },
+  {
+   "f": "veri/p26_c9b5391a58.pck",
+   "size": 14885228,
+   "md5": "c9b5391a58f9e17539fc6216a548f7c3",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p26_c9b5391a58.pck"
+  },
+  {
+   "f": "veri/p27_a489f5fe65.pck",
+   "size": 19136304,
+   "md5": "a489f5fe651c9efd2e62172859620794",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p27_a489f5fe65.pck"
+  },
+  {
+   "f": "veri/p28_89bcb6758c.pck",
+   "size": 22790260,
+   "md5": "89bcb6758c2bc26716d9373e66108d0b",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p28_89bcb6758c.pck"
+  },
+  {
+   "f": "veri/p29_c5629629d2.pck",
+   "size": 8659676,
+   "md5": "c5629629d2b6b9998210cb3e63a89e79",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p29_c5629629d2.pck"
+  },
+  {
+   "f": "veri/p30_a5e538367b.pck",
+   "size": 10082624,
+   "md5": "a5e538367bf847300e95c74f3a5cf69f",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p30_a5e538367b.pck"
+  },
+  {
+   "f": "veri/p31_448ac6baef.pck",
+   "size": 25950484,
+   "md5": "448ac6baef4ba03d239587f7716d1069",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p31_448ac6baef.pck"
+  },
+  {
+   "f": "veri/p32_67f1c229b8.pck",
+   "size": 7311564,
+   "md5": "67f1c229b838a74c2bc64552bcd363cb",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p32_67f1c229b8.pck"
+  },
+  {
+   "f": "veri/p33_8060fdf52e.pck",
+   "size": 6488208,
+   "md5": "8060fdf52e81ae7fd1960f90ce1b8d22",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p33_8060fdf52e.pck"
+  },
+  {
+   "f": "veri/p34_6b9ceb7bd3.pck",
+   "size": 18203936,
+   "md5": "6b9ceb7bd3ba9258c31b85e19a1b1a50",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p34_6b9ceb7bd3.pck"
+  },
+  {
+   "f": "veri/p35_282189b62e.pck",
+   "size": 7990332,
+   "md5": "282189b62e54a22c78ddbca0acaccba3",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p35_282189b62e.pck"
+  },
+  {
+   "f": "veri/p36_e16eed314c.pck",
+   "size": 8389532,
+   "md5": "e16eed314c90d7fce9236867ef013fba",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p36_e16eed314c.pck"
+  },
+  {
+   "f": "veri/p37_b237ef5305.pck",
+   "size": 6846072,
+   "md5": "b237ef530584f997f71f2cb2491f36c4",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p37_b237ef5305.pck"
+  },
+  {
+   "f": "veri/p38_b19b19d7af.pck",
+   "size": 5337120,
+   "md5": "b19b19d7af95ca5f87bb16eac374b065",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p38_b19b19d7af.pck"
+  },
+  {
+   "f": "veri/p39_1d631490fe.pck",
+   "size": 8936752,
+   "md5": "1d631490fe44a8eeaded479efa49d301",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p39_1d631490fe.pck"
+  },
+  {
+   "f": "veri/p40_0e37da98fc.pck",
+   "size": 13078548,
+   "md5": "0e37da98fce2c2398c1d0caf3bbe37a0",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p40_0e37da98fc.pck"
+  },
+  {
+   "f": "veri/p41_be5c4cb8fc.pck",
+   "size": 7764840,
+   "md5": "be5c4cb8fcb8c82b2787970c7963a6c6",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p41_be5c4cb8fc.pck"
+  },
+  {
+   "f": "veri/p42_d5c9a61155.pck",
+   "size": 19830644,
+   "md5": "d5c9a611553ac4a332f5cee2aa19d1f8",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p42_d5c9a61155.pck"
+  },
+  {
+   "f": "veri/p43_09f068ab52.pck",
+   "size": 12996080,
+   "md5": "09f068ab52beca7529c4e11e2048d6e5",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p43_09f068ab52.pck"
+  },
+  {
+   "f": "veri/p44_e3db5f4fac.pck",
+   "size": 47402796,
+   "md5": "e3db5f4faca5742557e284878cee9395",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p44_e3db5f4fac.pck"
+  },
+  {
+   "f": "veri/p45_0045b8456a.pck",
+   "size": 13010492,
+   "md5": "0045b8456a84c7dc7882912f35537a41",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p45_0045b8456a.pck"
+  },
+  {
+   "f": "veri/p46_7e258e776a.pck",
+   "size": 21077836,
+   "md5": "7e258e776aad87ea086f1bb4da34a347",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p46_7e258e776a.pck"
+  },
+  {
+   "f": "veri/p47_5d9e47a8e0.pck",
+   "size": 20596572,
+   "md5": "5d9e47a8e01ea370505e6a7b60b85979",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p47_5d9e47a8e0.pck"
+  },
+  {
+   "f": "veri/p48_6f3009b892.pck",
+   "size": 13362132,
+   "md5": "6f3009b892f67a7df015d47f4c9a76a8",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p48_6f3009b892.pck"
+  },
+  {
+   "f": "veri/p49_941f3a820b.pck",
+   "size": 6096400,
+   "md5": "941f3a820bf88a41d834321031845f47",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p49_941f3a820b.pck"
+  },
+  {
+   "f": "veri/p50_61b23722ac.pck",
+   "size": 6499300,
+   "md5": "61b23722ac99b03adcbd65db5fe8a0ec",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p50_61b23722ac.pck"
+  },
+  {
+   "f": "veri/p51_0f8273c08e.pck",
+   "size": 27082632,
+   "md5": "0f8273c08ea2e7ae7ea5bab6b97120d8",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p51_0f8273c08e.pck"
+  },
+  {
+   "f": "veri/p52_27f8b4ad02.pck",
+   "size": 9748172,
+   "md5": "27f8b4ad02e886e3a2be5fc87573b257",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p52_27f8b4ad02.pck"
+  },
+  {
+   "f": "veri/p53_9b68d4b77d.pck",
+   "size": 4473612,
+   "md5": "9b68d4b77d0aaf9fc7fc3e7888c606b9",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p53_9b68d4b77d.pck"
+  },
+  {
+   "f": "veri/p54_0c073211a8.pck",
+   "size": 20858724,
+   "md5": "0c073211a877687f2eda68a032c11ff8",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p54_0c073211a8.pck"
+  },
+  {
+   "f": "veri/p55_2bffe61117.pck",
+   "size": 3886816,
+   "md5": "2bffe61117f3cb8eb222373c76e81649",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p55_2bffe61117.pck"
+  },
+  {
+   "f": "veri/p56_bb976d0ec7.pck",
+   "size": 19757296,
+   "md5": "bb976d0ec7ca86b06ca6e32bfc3079c5",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p56_bb976d0ec7.pck"
+  },
+  {
+   "f": "veri/p57_7c9d2b7023.pck",
+   "size": 19192960,
+   "md5": "7c9d2b7023c197fda0609e2979d81cf9",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p57_7c9d2b7023.pck"
+  },
+  {
+   "f": "veri/p58_609e27401d.pck",
+   "size": 17857544,
+   "md5": "609e27401defdf565d4b23c036f3299f",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p58_609e27401d.pck"
+  },
+  {
+   "f": "veri/p59_d73e8b1225.pck",
+   "size": 11554716,
+   "md5": "d73e8b122515361f82d9c39c5d7225c8",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p59_d73e8b1225.pck"
+  },
+  {
+   "f": "veri/p60_b686092007.pck",
+   "size": 4372836,
+   "md5": "b686092007c72d7a4c2571b1e36c6731",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p60_b686092007.pck"
+  },
+  {
+   "f": "veri/p61_325da1db06.pck",
+   "size": 13261036,
+   "md5": "325da1db0632620ffe6cbcda1f086e9e",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p61_325da1db06.pck"
+  },
+  {
+   "f": "veri/p62_eb75ffe8a7.pck",
+   "size": 4867056,
+   "md5": "eb75ffe8a768cfa9a40c3da890c37580",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p62_eb75ffe8a7.pck"
+  },
+  {
+   "f": "veri/p63_966e8021a9.pck",
+   "size": 29348508,
+   "md5": "966e8021a9c4c7b50515c18d47bfc2ba",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p63_966e8021a9.pck"
+  }
+ ],
+ "packs_total": 981544288
+}
