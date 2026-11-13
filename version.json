@@ -1,51 +1,55 @@
 {
- "version": "4.2.1",
- "build": 56,
+ "version": "4.3.0",
+ "build": 57,
  "parts": [
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part00",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v57.pck.part00",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part01",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v57.pck.part01",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part02",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v57.pck.part02",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part03",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v57.pck.part03",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part04",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v57.pck.part04",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part05",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v57.pck.part05",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part06",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v57.pck.part06",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part07",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v57.pck.part07",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part08",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v57.pck.part08",
    "size": 94371840
   },
   {
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v56.pck.part09",
-   "size": 71798672
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v57.pck.part09",
+   "size": 94371840
+  },
+  {
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v57.pck.part10",
+   "size": 37807760
   }
  ],
- "pck_size": 921145232,
+ "pck_size": 981526160,
  "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
- "notes": "v4.2.1: SOKAK Operasyon reklamları artık havada değil — yerde duran ışıklı afiş panoları (12 adet) ve iki ayaklı büyük reklam panoları (4 adet), 5 farklı afiş tasarımı • İnşaat: açık beton zemin, kırmızı kolon kalıpları (üstünde filizler), paletli briket yığınları, yeşil şantiye filesi artık yarı saydam",
+ "notes": "v4.3: Yeni harita ÇÖL ŞEHRİ (Kum Kasabası'nın yerine): kayalıklarla çevrili kubbeli çöl şehri, avlular, minareler, dar sokaklar • Ay Vadisi yerine TERK EDİLMİŞ SOKAK: yıkık beton bloklar, sarkan elektrik telleri, dar ara sokaklar (Kurt Adam modu artık burada) • Yeni yükleme ve harita görselleri",
  "launcher": {
   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/baslatici.pck",
   "size": 1689664

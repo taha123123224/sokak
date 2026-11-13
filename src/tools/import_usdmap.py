@@ -12,7 +12,14 @@ from mathutils.bvhtree import BVHTree
 U = '/home/claude/usdz/'
 OUT = '/home/claude/sokak/assets/maps/'
 SPECS = {
-    'kum': dict(usd=U + '731dc94a-Dust2-short/scene.usdc', S=33.0, env={"preset": "golden", "fog": 0.004, "sky": "day"},
+    # v4.3 user-supplied Sketchfab maps
+    'kum': dict(usd=U + 'desert/scene.usdc', S=220.0, env={"preset": "golden", "fog": 0.003, "sky": "day"},
+                credit="Desert City — Mikey x pc (CC-BY 4.0)", floor_obj='Ground_EXT', nocol=['Alpha', 'additiveunlit'],
+                prune=40.0, dedupe=True, ground={'tex': 'dryground', 'y': -4.6, 'tint': [1.0, 0.9, 0.75]}, area=52.0, max_h=2.2, prune_sep=False, drop_mats=['SkyDome', 'UnitPortrait', 'GridMat', 'No_Name']),
+    'ayvadisi': dict(usd=U + 'abandoned/scene.usdc', S=4.2, env={"preset": "overcast", "fog": 0.014, "sky": "day"},
+                     credit="Abandoned City Street — dasy444 (Sketchfab Standard)", floor_obj='Material_007', nocol=[], prune=None, max_h=2.5, ground={'tex': 'asphalt', 'y': 0.0, 'tint': [0.55, 0.55, 0.55]}),
+
+    'kum_old': dict(usd=U + '731dc94a-Dust2-short/scene.usdc', S=33.0, env={"preset": "golden", "fog": 0.004, "sky": "day"},
                 credit="Dust2-short — frostychaos144 (CC-BY 4.0)", floor_obj='ShortDust2', nocol=[], prune=15.0, ground={'tex': 'dryground', 'y': -0.03, 'tint': [1.0, 0.93, 0.8]}),
     'hurda': dict(usd=U + '65f9ca94-Maps/scene.usdc', S=10.5, env={"preset": "day", "fog": 0.006, "sky": "day"},
                   credit="Maps — frostychaos144 (CC-BY 4.0)", floor_obj='Floor_Concrete', nocol=['Decals', 'Clothes', 'Wood', 'plane1']),
@@ -50,6 +57,20 @@ def run(mid):
     for o in list(bpy.data.objects):
         if o.type in ('CAMERA', 'LIGHT'):
             bpy.data.objects.remove(o)
+    for o in list(bpy.data.objects):
+        if o.type == 'MESH' and any(any(k in (m.name if m else '') for k in sp.get('drop_mats', [])) for m in o.data.materials):
+            bpy.data.objects.remove(o)
+    if sp.get('dedupe'):
+        # the model ships every prop twice (same mesh, two materials): keep one copy
+        seen = set(); gone = 0
+        for o in list(meshes()):
+            bb = [tuple(o.matrix_world @ Vector(c)) for c in o.bound_box]
+            key = (len(o.data.polygons), tuple(round(v, 4) for v in np.mean(bb, 0)), tuple(round(v, 4) for v in np.ptp(np.array(bb), 0)))
+            if key in seen:
+                bpy.data.objects.remove(o); gone += 1
+            else:
+                seen.add(key)
+        print("DEDUPED", gone)
     S = sp['S']
     roots = [o for o in bpy.data.objects if o.parent is None]
     piv = bpy.data.objects.new('maproot', None)
@@ -66,6 +87,8 @@ def run(mid):
     bpy.context.view_layer.update()
     lo, hi = world_bounds(fo)
     alo, ahi = world_bounds(ms)
+    if sp.get('area'):
+        a_ = sp['area']; lo = np.array([-a_, -a_, lo[2]]); hi = np.array([a_, a_, hi[2]])
     print("FLOOR AREA", lo.round(1), hi.round(1), "ALL", alo.round(1), ahi.round(1))
     # walkable sample points
     bvh = build_bvh(ms)
@@ -89,7 +112,7 @@ def run(mid):
                 z = h[0].z - 0.05
             for h in hits[::-1]:
                 p, n = h[0], h[1]
-                if abs(n.z) < 0.85 or p.z > lo[2] + 8.0:
+                if abs(n.z) < 0.85 or p.z > lo[2] + sp.get('max_h', 8.0):
                     REJ['norm' if abs(n.z) < 0.85 else 'high'] += 1
                     continue
                 up = bvh.ray_cast(p + Vector((0, 0, 0.05)), Vector((0, 0, 1)), 2.3)
@@ -103,21 +126,31 @@ def run(mid):
                     if r[0] is not None:
                         ok = False; REJ['side'] += 1; break
                 if ok:
-                    pts.append((p.x, p.y, p.z))
+                    # how open is it around (spawns want elbow room, not a rock crevice)
+                    op = 0
+                    for a in range(8):
+                        d = Vector((math.cos(a * math.pi / 4), math.sin(a * math.pi / 4), 0))
+                        if bvh.ray_cast(p + Vector((0, 0, 1.0)), d, 3.0)[0] is None:
+                            op += 1
+                    pts.append((p.x, p.y, p.z, op))
                 break
     pts = np.array(pts)
     print("WALKABLE", len(pts), REJ)
+    opn = pts[:, 3]
+    pts = pts[:, :3]
     # keep the biggest connected-ish region: drop points far from the median cluster
     med = np.median(pts, 0)
     dist = np.linalg.norm(pts[:, :2] - med[:2], axis=1)
-    pts = pts[dist < np.percentile(dist, 97) + 1e-3]
+    keep = dist < np.percentile(dist, 97) + 1e-3
+    pts = pts[keep]; opn = opn[keep]
+    cen = np.median(pts, 0)
     # team halves along the long axis
     ext = pts.max(0) - pts.min(0)
     ax = 0 if ext[0] >= ext[1] else 1
     mid_v = np.median(pts[:, ax])
     spawns = []
     for team, sel in (('a', pts[:, ax] < mid_v - ext[ax] * 0.12), ('b', pts[:, ax] > mid_v + ext[ax] * 0.12)):
-        cand = pts[sel]
+        cand = pts[sel & (opn >= 6)] if np.sum(sel & (opn >= 6)) >= 8 else pts[sel]
         if len(cand) == 0:
             continue
         # farthest point sampling inside the half
@@ -128,7 +161,7 @@ def run(mid):
         for p in chosen:
             yaw = math.atan2(-(0 - p[0]), -(0 - (-p[1])))  # face the map centre
             # world: x = bx, y = bz, z = -by ; yaw so -Z basis looks at the centre
-            to = Vector((-p[0], 0, p[1]))
+            to = Vector((cen[0] - p[0], 0, -(cen[1] - p[1])))
             yaw = math.atan2(-to.x, -to.z)
             spawns.append({"p": [round(float(p[0]), 2), round(float(p[2]) + 0.1, 2), round(float(-p[1]), 2)], "yaw": round(yaw, 3), "team": team})
     # bounds of the playable area (+ margin) and invisible walls on them
@@ -143,7 +176,7 @@ def run(mid):
         cols.append({"c": [px, H / 2 - 1, -py], "s": [sx, H, sy], "r": [0, 0, 0]})
     if sp.get('prune'):
         # drop the far backdrop pieces (floating city blocks) that sit outside the playable area
-        for o in list(meshes()):
+        for o in (list(meshes()) if sp.get('prune_sep', True) else []):
             bpy.ops.object.select_all(action='DESELECT')
             bpy.context.view_layer.objects.active = o
             o.select_set(True)
