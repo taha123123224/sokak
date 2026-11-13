@@ -1848,8 +1848,6 @@ func _play_go() -> void:
 		return
 	var pool: Array = play_maps if play_maps.size() > 0 else GS.MAPS.keys()
 	var md := play_sel_mode
-	if md == "kurt" and play_maps.size() == 0:
-		pool = ["ayvadisi"]     # Kurt Adam has its own map
 	var tgt := 6 if md == "sabotaj" else (3 if md == "bayrak" else (99 if md == "gungame" else (60 if GS.MODES[md]["teams"] else 40)))
 	var cfg := {"name": "Hızlı Oyun", "map": pool[randi() % pool.size()], "mode": md, "bots": play_bots, "diff": play_diff,
 		"time": play_time, "target": tgt, "team": "a", "no": randi_range(100, 999)}
@@ -5092,7 +5090,7 @@ func _page_rooms() -> void:
 		h.set_anchors_preset(Control.PRESET_FULL_RECT)
 		h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(h)
-		var vals := [str(r["no"]), ("⊘ " if r.get("pass", false) else "") + r["name"], GS.MAPS[r["map"]]["name"], GS.MODES[r["mode"]]["name"], "%d/16" % (r["bots"] + 1), "Bekliyor" if not r.get("playing", false) else "Oyunda"]
+		var vals := [str(r["no"]), ("⊘ " if r.get("pass", false) else "") + r["name"], GS.MAPS.get(r["map"], {"name": str(r["map"])})["name"], GS.MODES[r["mode"]]["name"], "%d/16" % (r["bots"] + 1), "Bekliyor" if not r.get("playing", false) else "Oyunda"]
 		for i in vals.size():
 			var l := UI.lbl(vals[i], 19, Color.WHITE if i != 5 else (UI.GREEN if not r.get("playing", false) else UI.ACCENT2), "Rajdhani-SemiBold" if i != 1 else "Rajdhani-Bold")
 			l.custom_minimum_size = Vector2(cols[i][1], 46)
@@ -5657,7 +5655,7 @@ func _page_profile() -> void:
 	var bart := Control.new()
 	bart.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ban.add_child(bart)
-	var bgp := "res://assets/ui/load_%s.jpg" % ["mahalle", "canakkale", "ayvadisi", "kum"][hash(str(pr["name"])) % 4]
+	var bgp := "res://assets/ui/load_%s.jpg" % ["mahalle", "canakkale", "safranbolu", "liman"][hash(str(pr["name"])) % 4]
 	if ResourceLoader.exists(bgp):
 		var bimg := TextureRect.new()
 		bimg.texture = load(bgp)

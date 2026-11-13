@@ -730,7 +730,7 @@ func _refresh_room() -> void:
 		"host_box": func(box):
 			if host:
 				box.add_child(UI.lbl("ODA AYARLARI", 16, UI.DIM, "Rajdhani-Bold"))
-				box.add_child(UI.lbl("%s  •  %s" % [GS.MAPS[room_cfg["map"]]["name"], GS.MODES[room_cfg["mode"]]["name"]], 18, Color.WHITE, "Rajdhani-Bold"))
+				box.add_child(UI.lbl("%s  •  %s" % [GS.MAPS.get(room_cfg["map"], {"name": str(room_cfg["map"])})["name"], GS.MODES[room_cfg["mode"]]["name"]], 18, Color.WHITE, "Rajdhani-Bold"))
 				box.add_child(UI.lbl(("İlk %d tur" % int(room_cfg.get("target", 6))) if room_cfg["mode"] == "sabotaj" else ("%d dk  •  hedef %d" % [int(room_cfg.get("time", 10)), int(room_cfg.get("target", 50))]), 15, UI.DIM, "Rajdhani-SemiBold"))
 				box.add_child(UI.btn("⚙ HARİTA / MOD / KURALLAR", func():
 					var c: Dictionary = room_cfg.duplicate()

@@ -43,6 +43,8 @@ func _ready() -> void:
 	mode = cfg.get("mode", "ffa")
 	teams = GS.MODES[mode]["teams"]
 	map_id = cfg.get("map", "mahalle")
+	if not GS.MAPS.has(map_id):
+		map_id = "liman"   # a removed map (e.g. from an older client's room) falls back to Liman
 	time_left = float(cfg.get("time", 8)) * 60.0
 	target_score = int(cfg.get("target", 40))
 	SFX.stop_music()
