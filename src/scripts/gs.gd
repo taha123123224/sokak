@@ -474,6 +474,7 @@ var MAPS := {
 	"hurda": {"name": "Hurda Sahası", "desc": "Çukurdaki konteyner sahası: hesco bariyerleri, lastikler, sürekli çatışma.", "size": "Küçük", "amb": "amb_site"},
 	"fabrika": {"name": "Paslı Fabrika", "desc": "Terk edilmiş tuğla fabrika kompleksi, avlular, depolar ve bacalar.", "size": "Büyük", "amb": "amb_city"},
 	"cekirdek": {"name": "Çekirdek Tesisi", "desc": "Yeraltı araştırma tesisi: dar koridorlar, metal ızgaralı köprüler, kontrol odaları ve çok katlı salonlar.", "size": "Büyük", "amb": "amb_wind"},
+	"kereste": {"name": "Kereste Fabrikası", "desc": "Dağların arasında terk edilmiş kereste fabrikası: tomruk yığınları, depolar, kamyonlar ve dar avlular.", "size": "Küçük", "amb": "amb_wind"},
 }
 var MODES := {
 	"ffa": {"name": "Ölüm Maçı", "desc": "Herkes herkese karşı. En çok öldüren kazanır.", "teams": false},
@@ -510,6 +511,7 @@ const CREDITS := [
 	["SCAR-H, MP5, UMP-45 modelleri: Flat Guns West/East", "fps-asset-kit", "CC0 · github.com/petroulacl/fps-asset-kit"],
 	["Impact Sounds (mermi çarpma)", "Kenney", "CC0 · kenney.nl"],
 	["knife Animated (tüm bıçaklarda birinci şahıs kollar ve animasyonlar)", "DJMaesen", "CC-BY 4.0 · sketchfab.com/bumstrum"],
+	["Kereste Fabrikası haritası", "kullanıcının sağladığı model", "Sketchfab"],
 	["PARAMS SET (Çekirdek Tesisi haritası)", "kullanıcının sağladığı model", "Sketchfab"],
 	["Maps (Hurda Sahası haritası)", "frostychaos144", "CC-BY 4.0 · sketchfab.com/frostychaos144"],
 	["Rust (Paslı Fabrika haritası)", "frostychaos144", "CC-BY 4.0 · sketchfab.com/frostychaos144"],
@@ -1046,13 +1048,13 @@ const DEFAULT_BINDS := {
 	"move_forward": [KEY_W], "move_back": [KEY_S], "move_left": [KEY_A], "move_right": [KEY_D],
 	"jump": [KEY_SPACE], "crouch": [KEY_CTRL, KEY_C], "walk": [KEY_SHIFT], "reload": [KEY_R], "use": [KEY_E],
 	"slot1": [KEY_1], "slot2": [KEY_2], "slot3": [KEY_3], "slot4": [KEY_4], "grenade": [KEY_X], "drop": [KEY_G], "spray": [KEY_T], "radio": [KEY_F1], "radio_enemy": [KEY_F2], "radio_help": [KEY_F3], "radio_ok": [KEY_F4], "inspect": [KEY_F], "voice": [KEY_V], "team_chat": [KEY_Y],
-	"scoreboard": [KEY_TAB], "pause": [KEY_ESCAPE], "chat": [KEY_ENTER], "last_weapon": [KEY_Q], "buy_menu": [KEY_B], "ping": [KEY_Z],
+	"scoreboard": [KEY_TAB], "pause": [KEY_ESCAPE], "chat": [KEY_ENTER], "last_weapon": [KEY_Q], "buy_menu": [KEY_B], "ping": [KEY_Z], "big_map": [KEY_M],
 }
 const BIND_NAMES := {
 	"move_forward": "İleri", "move_back": "Geri", "move_left": "Sol", "move_right": "Sağ", "jump": "Zıpla", "crouch": "Eğil",
 	"walk": "Yürü (sessiz)", "reload": "Şarjör Değiştir", "use": "Kullan", "slot1": "Ana Silah", "slot2": "Tabanca", "slot3": "Bıçak",
 	"slot4": "Bomba", "grenade": "Hızlı Bomba", "inspect": "Silahı İncele", "voice": "Sesli Konuş (bas-konuş)", "team_chat": "Takım Sohbeti", "chat": "Sohbet", "scoreboard": "Skor Tablosu", "last_weapon": "Son Silah", "buy_menu": "Silah Menüsü", "ping": "İşaret Koy (takıma göster)",
-	"drop": "Silahı Yere At", "spray": "Sprey Boya", "radio": "Telsiz Menüsü", "radio_enemy": "Hızlı: Düşman görüldü", "radio_help": "Hızlı: Yardım lazım", "radio_ok": "Hızlı: Anlaşıldı",
+	"drop": "Silahı Yere At", "spray": "Sprey Boya", "radio": "Telsiz Menüsü", "radio_enemy": "Hızlı: Düşman görüldü", "radio_help": "Hızlı: Yardım lazım", "radio_ok": "Hızlı: Anlaşıldı", "big_map": "Büyük Harita",
 }
 
 func setup_input() -> void:

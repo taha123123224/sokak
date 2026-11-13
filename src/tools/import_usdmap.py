@@ -12,6 +12,12 @@ from mathutils.bvhtree import BVHTree
 U = '/home/claude/usdz/'
 OUT = '/home/claude/sokak/assets/maps/'
 SPECS = {
+    # v4.6 user-supplied lumber-mill compound in a mountain bowl
+    'kereste': dict(usd='/home/claude/usdz/m2/source/untitled.glb', glb=True, S=60.0,
+                    env={"preset": "golden", "fog": 0.004, "sky": "day"},
+                    credit="Kereste Fabrikası haritası (kullanıcının sağladığı model)", floor_obj='dizhuan002', nocol=[], prune=None,
+                    max_h=3.0, connect=True, ground={'tex': 'dryground', 'y': -0.15, 'tint': [0.85, 0.8, 0.7]}),
+
     # v4.5 user-supplied indoor facility map (single glb mesh, metres)
     'cekirdek': dict(usd='/home/claude/usdz/params/source/PARAMS_SET_by_script.glb', glb=True, S=1.0,
                      env={"preset": "overcast", "fog": 0.0, "sky": "day"},

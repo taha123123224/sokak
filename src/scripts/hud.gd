@@ -748,6 +748,9 @@ func _process(delta: float) -> void:
 		death_timer_lbl.text = ("TUR SONUNU BEKLE  •  BİRAZDAN TAKIM ARKADAŞINI İZLEYECEKSİN" if match_node.sab else "YENİDEN DOĞUYORSUN  %.1f" % max(death_t, 0.0))
 		if _death_bar and is_instance_valid(_death_bar):
 			_death_bar.value = 3.5 - max(death_t, 0.0)
+	# v4.6 full map (M)
+	if Input.is_action_just_pressed("big_map") and not m.ended and not m.paused and not buy_open:
+		toggle_big_map()
 	# weapon menu (B)
 	if Input.is_action_just_pressed("buy_menu") and not m.ended and not m.paused:
 		toggle_buy(not buy_open)
@@ -2002,6 +2005,132 @@ class DmgDir extends Control:
 			var a: float = clamp(d["t"] / 1.2, 0.0, 1.0)
 			var ang := -rel - PI / 2
 			draw_arc(c, 150, ang - 0.25, ang + 0.25, 16, Color(1, 0.1, 0.05, a * 0.85), 10, true)
+
+var big_map: BigMap
+func toggle_big_map() -> void:
+	if big_map and is_instance_valid(big_map):
+		var bm := big_map
+		big_map = null
+		var tw := bm.create_tween()
+		tw.tween_property(bm, "modulate:a", 0.0, 0.15)
+		tw.tween_callback(bm.queue_free)
+		return
+	if match_node.minimap_img == null:
+		return
+	big_map = BigMap.new()
+	big_map.hud = self
+	big_map.tex = minimap.tex if minimap and minimap.tex else ImageTexture.create_from_image(match_node.minimap_img)
+	big_map.set_anchors_preset(Control.PRESET_FULL_RECT)
+	big_map.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	big_map.modulate.a = 0.0
+	root.add_child(big_map)
+	big_map.create_tween().tween_property(big_map, "modulate:a", 1.0, 0.18)
+	SFX.play("ui_click", -10)
+
+class BigMap extends Control:
+	## v4.6 full-screen tactical map (M): north-up top-down map with a grid (A-H / 1-8), your position and
+	## view cone, teammates with names, pinged enemies, bomb sites / flags, and a side panel.
+	var hud
+	var tex: Texture2D
+	var t := 0.0
+	var open_k := 0.0
+	func _process(d: float) -> void:
+		t += d
+		open_k = minf(1.0, open_k + d * 6.0)
+		queue_redraw()
+	func _draw() -> void:
+		var m = hud.match_node
+		var p = hud.player
+		if p == null or tex == null:
+			return
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.01, 0.015, 0.02, 0.78))
+		var side := minf(size.y - 140.0, size.x - 520.0)
+		var ease_k := 1.0 - pow(1.0 - open_k, 3.0)
+		side *= 0.94 + 0.06 * ease_k
+		var o := Vector2((size.x - side) * 0.5 - 120.0, (size.y - side) * 0.5)
+		var r := Rect2(o, Vector2(side, side))
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.05, 0.06, 0.075, 0.95)
+		sb.border_color = Color(1, 1, 1, 0.12); sb.set_border_width_all(1)
+		sb.shadow_color = Color(0, 0, 0, 0.6); sb.shadow_size = 30
+		draw_style_box(sb, r.grow(10))
+		draw_texture_rect(tex, r, false, Color(0.95, 0.95, 0.95))
+		var ts: Vector2 = tex.get_size()
+		var k: float = side / ts.x
+		# grid A-H / 1-8
+		var fb: Font = UI.font("Rajdhani-Bold")
+		for i in 9:
+			var x := o.x + side * i / 8.0
+			var y := o.y + side * i / 8.0
+			draw_line(Vector2(x, o.y), Vector2(x, o.y + side), Color(1, 1, 1, 0.07), 1.0)
+			draw_line(Vector2(o.x, y), Vector2(o.x + side, y), Color(1, 1, 1, 0.07), 1.0)
+			if i < 8:
+				draw_string(fb, Vector2(o.x + side * (i + 0.5) / 8.0 - 5, o.y - 16), "ABCDEFGH"[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 1, 1, 0.45))
+				draw_string(fb, Vector2(o.x - 22, o.y + side * (i + 0.5) / 8.0 + 6), str(i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 1, 1, 0.45))
+		var to_s := func(w: Vector3) -> Vector2: return o + m.world_to_minimap(w) * k
+		# bomb sites
+		if m.sab and m.sab.sites.size() == 2:
+			for st in m.sab.sites:
+				var q: Vector2 = to_s.call(st["pos"])
+				draw_circle(q, 22.0, Color(1, 0.75, 0.3, 0.16))
+				draw_arc(q, 22.0, 0, TAU, 32, Color(1, 0.75, 0.3, 0.8), 2.0, true)
+				draw_string(UI.font("RussoOne-Regular"), q + Vector2(-8, 9), str(st["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color.WHITE)
+		# flags (capture the flag)
+		if m.get("ctf") and m.ctf and "flags" in m.ctf:
+			for tk in m.ctf.flags.keys():
+				var fl = m.ctf.flags[tk]
+				var fpos: Vector3 = fl.get("pos", fl.get("home", Vector3.ZERO))
+				if fl.get("node") and is_instance_valid(fl["node"]):
+					fpos = (fl["node"] as Node3D).global_position
+				var q4: Vector2 = to_s.call(fpos)
+				var fc: Color = GS.TEAM_COLORS.get(tk, Color.WHITE)
+				draw_rect(Rect2(q4 + Vector2(-1, -16), Vector2(2, 18)), Color.WHITE)
+				draw_colored_polygon(PackedVector2Array([q4 + Vector2(1, -16), q4 + Vector2(14, -11), q4 + Vector2(1, -6)]), fc)
+		# combatants
+		var fn: Font = UI.font("Rajdhani-SemiBold")
+		for e in m.combatants:
+			var n = e["node"]
+			if n == p or not n.alive:
+				continue
+			var friendly: bool = m.teams and e["team"] == p.team
+			var pinged: bool = hud.pings.get(n, 0.0) > 0
+			if not friendly and not pinged:
+				continue
+			var q2: Vector2 = to_s.call(n.global_position)
+			var col: Color = GS.TEAM_COLORS.get(e["team"], Color(0.3, 0.6, 1)) if friendly else Color(1, 0.22, 0.18)
+			draw_circle(q2, 8.0, Color(0, 0, 0, 0.6))
+			draw_circle(q2, 6.0, col)
+			if friendly:
+				draw_string(fn, q2 + Vector2(10, 5), str(e["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 1, 1, 0.85))
+			else:
+				draw_arc(q2, 12.0 + sin(t * 8.0) * 2.0, 0, TAU, 20, Color(1, 0.25, 0.2, 0.8), 1.5, true)
+		# me: view cone + arrow (north-up map, so the arrow turns with the player)
+		var me: Vector2 = to_s.call(p.global_position)
+		var fwd := Vector2(-sin(p.yaw), -cos(p.yaw))
+		var cone := PackedVector2Array([me, me + fwd.rotated(-0.55) * 70.0, me + fwd * 78.0, me + fwd.rotated(0.55) * 70.0])
+		draw_colored_polygon(cone, Color(1, 0.85, 0.45, 0.16))
+		draw_circle(me, 14.0 + 3.0 * sin(t * 5.0), Color(1, 0.78, 0.25, 0.18))
+		var tri := PackedVector2Array([me + fwd * 13.0, me + fwd.rotated(2.5) * 10.0, me + fwd * -4.0, me + fwd.rotated(-2.5) * 10.0])
+		draw_colored_polygon(tri, Color(1, 0.8, 0.28))
+		draw_polyline(tri + PackedVector2Array([tri[0]]), Color(0, 0, 0, 0.8), 1.5, true)
+		# north
+		draw_string(UI.font("RussoOne-Regular"), Vector2(o.x + side + 18, o.y + 24), "K ▲", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1, 0.78, 0.3))
+		# side panel
+		var px := o.x + side + 40.0
+		var py := o.y + 70.0
+		var fr: Font = UI.font("RussoOne-Regular")
+		draw_string(fr, Vector2(px, py), GS.MAPS[m.map_id]["name"].to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 34, Color.WHITE)
+		draw_string(fb, Vector2(px, py + 28), GS.MODES[m.mode]["name"].to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, UI.ACCENT)
+		var tl := int(m.time_left)
+		draw_string(fr, Vector2(px, py + 80), "%d:%02d" % [tl / 60, tl % 60], HORIZONTAL_ALIGNMENT_LEFT, -1, 40, Color.WHITE)
+		var cell := Vector2i(clampi(int((me.x - o.x) / side * 8.0), 0, 7), clampi(int((me.y - o.y) / side * 8.0), 0, 7))
+		draw_string(fb, Vector2(px, py + 120), "KONUMUN:  %s%d" % ["ABCDEFGH"[cell.x], cell.y + 1], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1, 0.8, 0.35))
+		var ly := py + 170.0
+		for lg in [[Color(1, 0.8, 0.28), "Sen"], [GS.TEAM_COLORS.get(p.team if "team" in p else "a", Color(0.3, 0.6, 1)), "Takım arkadaşı"], [Color(1, 0.22, 0.18), "İşaretlenen düşman"]]:
+			draw_circle(Vector2(px + 7, ly - 6), 6.0, lg[0])
+			draw_string(fb, Vector2(px + 22, ly), lg[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(1, 1, 1, 0.8))
+			ly += 28.0
+		draw_string(fb, Vector2(px, o.y + side - 4), "M  kapat   •   Z  işaret koy", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 1, 1, 0.4))
 
 class Minimap extends Control:
 	## circular rotating radar: real top-down map photo, compass ring, teammates and pinged enemies

@@ -1,6 +1,6 @@
 {
- "version": "4.5.0",
- "build": 60,
+ "version": "4.6.0",
+ "build": 61,
  "parts": [
   {
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part00",
@@ -49,7 +49,7 @@
  ],
  "pck_size": 981533772,
  "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
- "notes": "v4.5: Yeni harita ÇEKİRDEK TESİSİ — yeraltı araştırma tesisi: dar koridorlar, ızgaralı köprüler, kontrol odaları, çok katlı salonlar • Doğuş noktaları sadece yürünerek ulaşılabilen alanlara konuyor, kapalı oda ya da duvar içinde doğma yok • Doğunca açık alana bakıyorsun • Güncelleme paketleri yeniden düzenlendi: bundan sonra yeni harita gelince sadece o haritanın paketi iniyor",
+ "notes": "v4.6: Yeni harita KERESTE FABRİKASI — dağların arasında terk edilmiş kereste fabrikası: depolar, tomruk yığınları, vinç, dar avlular • YENİ: M tuşu ile büyük taktik harita (ızgara koordinatları, takım arkadaşların, işaretli düşmanlar, bomba noktaları/bayraklar, konumun) • Reklam panoları artık koridorları ve doğuş noktalarını kapatmıyor",
  "launcher": {
   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/baslatici.pck",
   "size": 1692560
@@ -57,9 +57,9 @@
  "packs": [
   {
    "f": "SOKAK.pck",
-   "size": 16711180,
-   "md5": "511f8a2b988f811be721c8c9b30bbc13",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/SOKAK_511f8a2b98.pck"
+   "size": 16736740,
+   "md5": "413997d5f10475f22d7c781233f85a56",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/SOKAK_413997d5f1.pck"
   },
   {
    "f": "veri/p00_79645374ea.pck",
@@ -332,16 +332,16 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p45_a04ec9345f.pck"
   },
   {
-   "f": "veri/p46_c02a2eacde.pck",
-   "size": 21505440,
-   "md5": "c02a2eacde498306eea3abd090ec0e94",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p46_c02a2eacde.pck"
+   "f": "veri/p46_f881cf2064.pck",
+   "size": 22487808,
+   "md5": "f881cf2064bb60def95c4e4714d07d27",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p46_f881cf2064.pck"
   },
   {
-   "f": "veri/p47_f83072d3e7.pck",
-   "size": 13839040,
-   "md5": "f83072d3e720dbd21fb3b1ed552c3bb8",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p47_f83072d3e7.pck"
+   "f": "veri/p47_6ad64f4eb4.pck",
+   "size": 14204224,
+   "md5": "6ad64f4eb423a203b48bc62e4307e50a",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p47_6ad64f4eb4.pck"
   },
   {
    "f": "veri/p49_4ca7326b2c.pck",
@@ -416,10 +416,10 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p61_f75db212e9.pck"
   },
   {
-   "f": "veri/p62_8e3e144a8e.pck",
-   "size": 25876860,
-   "md5": "8e3e144a8edb1fa469b8dfdc4ff7978c",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p62_8e3e144a8e.pck"
+   "f": "veri/p62_fb63f1df77.pck",
+   "size": 31647060,
+   "md5": "fb63f1df77271d8eaca06f428b2831e9",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p62_fb63f1df77.pck"
   },
   {
    "f": "veri/p63_0ac7e8b2af.pck",
@@ -428,5 +428,5 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p63_0ac7e8b2af.pck"
   }
  ],
- "packs_total": 903061400
+ "packs_total": 910204712
 }

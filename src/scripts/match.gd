@@ -1610,6 +1610,16 @@ func _place_posters() -> void:
 		q.collision_mask = 1
 		if not space.intersect_shape(q, 1).is_empty():
 			continue
+		# never block a corridor or a spawn: keep 3 m free in front of the sign and stay away from spawns
+		var fr0 := base + Vector3.UP * 1.0 + n * (depth + 0.1)
+		if not space.intersect_ray(PhysicsRayQueryParameters3D.create(fr0, fr0 + n * 3.0, 1)).is_empty():
+			continue
+		var near_sp := false
+		for sp2 in spawn_points:
+			if (sp2["pos"] as Vector3).distance_to(base) < 4.0:
+				near_sp = true
+		if near_sp:
+			continue
 		var close := false
 		for pq in placed:
 			if pq.distance_to(base) < (9.0 if big else 6.0):
@@ -2047,6 +2057,9 @@ func test_hook(i: int) -> void:
 		player.alive = false
 		player.vm_rect.visible = false
 		start_spectate()
+		return
+	if i == 100:
+		hud.toggle_big_map()
 		return
 	if i == 99:
 		player.money = 1200
