@@ -275,6 +275,11 @@ func _build() -> void:
 	var ps: PackedScene = GS.map_scene(map_id)
 	var vis := ps.instantiate()
 	vis.name = "Map"
+	# v4.8: drop model parts listed in the json (e.g. ugly low-poly backdrop rocks replaced by the surroundings)
+	for hn in map_data.get("hide", []):
+		for nd in vis.find_children("*" + str(hn) + "*", "Node3D", true, false):
+			nd.get_parent().remove_child(nd)
+			nd.queue_free()
 	map_vis = vis
 	add_child(vis)
 	await _progress(30, "Malzemeler ve dokular hazırlanıyor...")
@@ -295,7 +300,8 @@ func _build() -> void:
 			m3.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			m3.visibility_range_end = 900.0 * dd
 		else:
-			m3.visibility_range_end = 320.0 * dd
+			# v4.8: the whole map must stay visible from the helicopter (~200 m away)
+			m3.visibility_range_end = maxf(320.0 * dd, 480.0)
 			m3.visibility_range_end_margin = 20.0
 	await _progress(45, "Çarpışma ve fizik kuruluyor...")
 	navreg = NavigationRegion3D.new()
@@ -347,8 +353,18 @@ func _build() -> void:
 			msb.add_child(mcs)
 			statics.add_child(msb)
 			msb.global_transform = m3.global_transform
+	# v4.8 surroundings: relief terrain, sea, city / forest filler outside the playable area
+	var _osk := preload("res://scripts/outskirts.gd")
+	var use_osk: bool = _osk.has_theme(map_id) and not OS.has_environment("NOOSK")
+	if use_osk:
+		var osk = _osk.new()
+		osk.name = "Outskirts"
+		vis.add_child(osk)
+		var t_osk := Time.get_ticks_msec()
+		osk.build(map_id, bounds, float(map_data.get("ground", {}).get("y", 0.0)), str(GS.settings.get("quality", "high")))
+		print("OUTSKIRTS ", map_id, " ", Time.get_ticks_msec() - t_osk, "ms")
 	# v3.4 imported maps that end in the void: a wide textured ground plane out to the horizon
-	if map_data.has("ground"):
+	if map_data.has("ground") and not use_osk:
 		var gd: Dictionary = map_data["ground"]
 		var gm := MeshInstance3D.new()
 		var pm := PlaneMesh.new()
@@ -386,10 +402,15 @@ func _build() -> void:
 	await _progress(65, "Yol ağı (navigasyon) hesaplanıyor...")
 	if not GS.has_meta("nonav"):
 		await _bake_nav()
+	if OS.has_environment("DBGLOAD"): print("STEP occluders")
 	_add_occluders()
+	if OS.has_environment("DBGLOAD"): print("STEP posters")
 	_place_posters()
+	if OS.has_environment("DBGLOAD"): print("STEP probes")
 	_add_reflection_probes()
+	if OS.has_environment("DBGLOAD"): print("STEP minimap")
 	await _render_minimap()
+	if OS.has_environment("DBGLOAD"): print("STEP minimap done")
 	await _progress(85, "Oyuncular hazırlanıyor...")
 	var char_scenes := {}
 	for cid in GS.CHARACTERS.keys():
@@ -971,7 +992,7 @@ func _build_minimap() -> void:
 
 func _render_minimap() -> void:
 	## real top-down photo of the map (orthographic), stylised for the HUD radar
-	if DisplayServer.get_name() == "headless":
+	if DisplayServer.get_name() == "headless" or OS.has_environment("NOMINIMAP"):
 		return
 	var w: float = bounds[2] - bounds[0]
 	var h: float = bounds[3] - bounds[1]
@@ -2110,6 +2131,31 @@ func test_hook(i: int) -> void:
 	if i == 23:
 		hud.force_board = true
 		return
+	if i == 101:
+		# v4.8 mantle test: a 1.4 m crate right in front of the player, then "press jump"
+		var f: Vector3 = -player.global_transform.basis.z
+		f.y = 0
+		f = f.normalized()
+		var sb := StaticBody3D.new()
+		var cs := CollisionShape3D.new()
+		var bs := BoxShape3D.new()
+		bs.size = Vector3(2.0, 1.4, 2.0)
+		cs.shape = bs
+		sb.add_child(cs)
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new(); bm.size = bs.size
+		mi.mesh = bm
+		sb.add_child(mi)
+		add_child(sb)
+		sb.global_position = player.global_position + f * 1.42 + Vector3.UP * 0.7
+		await get_tree().physics_frame
+		await get_tree().physics_frame
+		var y0: float = player.global_position.y
+		var ok: bool = player._try_mantle()
+		for k in 40:
+			await get_tree().physics_frame
+		print("MANTLE ok=", ok, " y0=", y0, " y1=", player.global_position.y, " crate_top=", sb.global_position.y + 0.7)
+		return
 	if i == 1:
 		var c := Camera3D.new()
 		c.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
@@ -2155,6 +2201,12 @@ func test_hook(i: int) -> void:
 		c.look_at(Vector3(v[3], v[4], v[5]))
 		c.far = 3000
 		c.fov = float(OS.get_environment("FOV")) if OS.has_environment("FOV") else 70.0
+		if OS.has_environment("AIRFOG") and world_env:
+			var fe: Environment = world_env.environment
+			fe.fog_depth_begin = 120.0; fe.fog_depth_end = 2600.0; fe.fog_density = 0.88; fe.fog_depth_curve = 1.4
+		if OS.has_environment("ORTHO"):
+			c.projection = Camera3D.PROJECTION_ORTHOGONAL
+			c.size = float(OS.get_environment("ORTHO"))
 		c.current = true
 		if player: player.vm_rect.visible = false
 		if OS.has_environment("NOHUD") and hud: hud.visible = false

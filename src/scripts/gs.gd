@@ -1052,7 +1052,7 @@ const DEFAULT_BINDS := {
 	"scoreboard": [KEY_TAB], "pause": [KEY_ESCAPE], "chat": [KEY_ENTER], "last_weapon": [KEY_Q], "buy_menu": [KEY_B], "ping": [KEY_Z], "big_map": [KEY_M],
 }
 const BIND_NAMES := {
-	"move_forward": "İleri", "move_back": "Geri", "move_left": "Sol", "move_right": "Sağ", "jump": "Zıpla", "crouch": "Eğil",
+	"move_forward": "İleri", "move_back": "Geri", "move_left": "Sol", "move_right": "Sağ", "jump": "Zıpla / Tırman", "crouch": "Eğil",
 	"walk": "Yürü (sessiz)", "reload": "Şarjör Değiştir", "use": "Kullan", "slot1": "Ana Silah", "slot2": "Tabanca", "slot3": "Bıçak",
 	"slot4": "Bomba", "grenade": "Hızlı Bomba", "inspect": "Silahı İncele", "voice": "Sesli Konuş (bas-konuş)", "team_chat": "Takım Sohbeti", "chat": "Sohbet", "scoreboard": "Skor Tablosu", "last_weapon": "Son Silah", "buy_menu": "Silah Menüsü", "ping": "İşaret Koy (takıma göster)",
 	"drop": "Silahı Yere At", "spray": "Sprey Boya", "radio": "Telsiz Menüsü", "radio_enemy": "Hızlı: Düşman görüldü", "radio_help": "Hızlı: Yardım lazım", "radio_ok": "Hızlı: Anlaşıldı", "big_map": "Büyük Harita",

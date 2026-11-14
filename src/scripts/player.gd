@@ -41,6 +41,13 @@ var eye := EYE_STAND
 var was_on_floor := true
 var step_dist := 0.0
 var land_dip := 0.0
+# v4.8 mantle: climb onto ledges up to ~1.75 m (jump into a wall / crate / platform edge)
+var mantle_t := -1.0
+var mantle_from := Vector3.ZERO
+var mantle_to := Vector3.ZERO
+var _jump_buf := 0.0
+const MANTLE_MAX := 1.75
+const MANTLE_TIME := 0.38
 
 # weapons
 var slots := {}          # cat -> weapon id
@@ -132,7 +139,7 @@ func _ready() -> void:
 	cam = Camera3D.new()
 	cam.fov = GS.settings["fov"]
 	cam.near = 0.05
-	cam.far = 900.0 * float(GS.settings["draw_distance"])
+	cam.far = maxf(900.0 * float(GS.settings["draw_distance"]), 2600.0)   # v4.8 surroundings reach ~2.6 km
 	cam.cull_mask = 0xFFFFF & ~(1 << 19)
 	head.add_child(cam)
 	# the body is physics-interpolated (60 Hz ticks); the camera follows it every rendered frame
@@ -315,8 +322,12 @@ func _unhandled_input(e: InputEvent) -> void:
 		SFX.play("equip", -9, 1.15)
 		if match_node and match_node.hud and match_node.hud.has_method("inspect_card"):
 			match_node.hud.inspect_card(cur)
-	if e.is_action_pressed("jump") and is_on_floor() and not crouching:
-		velocity.y = JUMP
+	if e.is_action_pressed("jump") and alive and not crouching:
+		_jump_buf = 0.3
+		if mantle_t < 0.0 and _try_mantle():
+			return
+		if is_on_floor():
+			velocity.y = JUMP
 
 func equip_from_menu(cat: String, id: String) -> void:
 	var setd: Dictionary = GS.active_set()
@@ -402,6 +413,13 @@ func _physics_process(delta: float) -> void:
 	if not frozen:
 		input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	rotation.y = yaw
+	if mantle_t >= 0.0:
+		_mantle_step(delta)
+		return
+	_jump_buf = maxf(_jump_buf - delta, 0.0)
+	# keep trying while the jump is held into a ledge (jump first, then pull up)
+	if _jump_buf > 0.0 and not is_on_floor() and not frozen and not wolf and velocity.y < 3.5 and _try_mantle():
+		return
 	# crouch
 	var want_crouch: bool = Input.is_action_pressed("crouch") and not frozen
 	if not want_crouch and crouching:
@@ -463,6 +481,66 @@ func _physics_process(delta: float) -> void:
 			SFX.play_var("step_" + match_node.surface, 4, -10 + (linear_to_db(1.0 - g_step) if g_step > 0.0 else 0.0))
 	if global_position.y < -20:
 		take_damage(1000, null, global_position, false, "")
+
+func _try_mantle() -> bool:
+	## a wall right in front, free space on top of it within MANTLE_MAX and head room there -> climb
+	if wolf or crouching:
+		return false
+	var f := -global_transform.basis.z
+	f.y = 0
+	if f.length() < 0.1:
+		return false
+	f = f.normalized()
+	if not test_move(global_transform, f * 0.4):
+		return false
+	var sp0 := get_world_3d().direct_space_state
+	var cq := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.7, global_position + Vector3.UP * (STAND_H + MANTLE_MAX + 0.1))
+	cq.exclude = [get_rid()]
+	cq.collision_mask = 1
+	var ch := sp0.intersect_ray(cq)
+	var max_h := MANTLE_MAX if ch.is_empty() else minf(MANTLE_MAX, (ch["position"] as Vector3).y - global_position.y - STAND_H)
+	var h := 0.45
+	while h <= max_h + 0.001:
+		var up := global_transform.translated(Vector3.UP * h)
+		if not test_move(up, f * 0.7):
+			# find the exact top surface in front
+			var sp := get_world_3d().direct_space_state
+			var o := global_position + f * 0.62 + Vector3.UP * (h + 0.15)
+			var q := PhysicsRayQueryParameters3D.create(o, o + Vector3.DOWN * (h + 0.3))
+			q.exclude = [get_rid()]
+			q.collision_mask = 1
+			var r := sp.intersect_ray(q)
+			if r.is_empty() or (r["normal"] as Vector3).y < 0.7:
+				return false
+			var top: Vector3 = r["position"]
+			if top.y - global_position.y < 0.4:
+				return false        # a normal step handles it
+			var dest := Vector3(top.x, top.y + 0.02, top.z)
+			var t_dest := Transform3D(global_transform.basis, dest)
+			if test_move(t_dest, Vector3.UP * 0.05):
+				return false        # no room to stand up there
+			mantle_from = global_position
+			mantle_to = dest
+			mantle_t = 0.0
+			velocity = Vector3.ZERO
+			SFX.play("land", -8, 1.25)
+			return true
+		h += 0.15
+	return false
+
+func _mantle_step(delta: float) -> void:
+	mantle_t += delta / MANTLE_TIME
+	var k := minf(mantle_t, 1.0)
+	# rise first, then slide forward over the edge
+	var ky := smoothstep(0.0, 0.7, k)
+	var kh := smoothstep(0.35, 1.0, k)
+	global_position = Vector3(lerpf(mantle_from.x, mantle_to.x, kh), lerpf(mantle_from.y, mantle_to.y, ky), lerpf(mantle_from.z, mantle_to.z, kh))
+	land_dip = sin(k * PI) * 0.12
+	velocity = Vector3.ZERO
+	if k >= 1.0:
+		mantle_t = -1.0
+		_jump_buf = 0.0
+		apply_floor_snap()
 
 func _try_step(delta: float) -> void:
 	var hmove := Vector3(velocity.x, 0, velocity.z) * delta

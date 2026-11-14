@@ -1969,8 +1969,8 @@ func _page_lobby() -> void:
 	nv.alignment = BoxContainer.ALIGNMENT_END
 	nm2.add_child(nv)
 	nv.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, UI.ACCENT2, "Rajdhani-Bold"))
-	nv.add_child(UI.lbl("HELİKOPTERDEN İNİŞ", 26, Color.WHITE, "RussoOne-Regular"))
-	nv.add_child(_wrap("Her maç Chinook'tan atlayıp paraşütle iniyorsun! Günlük ve haftalık hediyeler, seviye atlama ödülleri, M ile büyük harita.", 15))
+	nv.add_child(UI.lbl("YÜKSEKTEN İNİŞ & TIRMANMA", 26, Color.WHITE, "RussoOne-Regular"))
+	nv.add_child(_wrap("150 metreden atla, bulutların içinden süzül! Haritaların çevresi baştan yapıldı: şehirler, ormanlar, dağlar, deniz. Yeni: kenara BOŞLUK ile 1,75 m'ye kadar tırman.", 15))
 	right.add_child(_rewards_strip())
 	var mp := UI.glass(12, 4)
 	right.add_child(mp)
