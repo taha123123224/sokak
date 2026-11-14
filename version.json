@@ -1,6 +1,6 @@
 {
- "version": "4.7.0",
- "build": 62,
+ "version": "4.8.0",
+ "build": 63,
  "parts": [
   {
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part00",
@@ -49,7 +49,7 @@
  ],
  "pck_size": 981533772,
  "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
- "notes": "v4.7: HELİKOPTERDEN İNİŞ — her maç Chinook'tan atlayıp paraşütle iniyorsun (Ayarlar > Ses'ten kapatılabilir, BOŞLUK ile geçilir) • GÜNLÜK HEDİYE: 7 günlük seri, her gün sürpriz hediye, 7. gün Sokak Kasası • HAFTALIK HEDİYE: altın + rastgele malzeme • SEVİYE ATLAMA: animasyonlu ödül ekranı",
+ "notes": "v4.8: Helikopter inişi 150 m'den: bulutlar, yükseklik göstergesi, takım paraşütleri, fareyle bakış. Tüm haritaların dış çevresi yenilendi: şehirler, ormanlar, dağlar, deniz, yollar. Yeni tırmanma: kenara BOŞLUK ile 1,75 m'ye kadar tırman. Kereste Fabrikası doğma noktaları düzeltildi.",
  "launcher": {
   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/baslatici.pck",
   "size": 1692560
@@ -57,9 +57,9 @@
  "packs": [
   {
    "f": "SOKAK.pck",
-   "size": 16829036,
-   "md5": "80ea4bf49e4189be00f4bc0cdcb7c198",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/SOKAK_80ea4bf49e.pck"
+   "size": 16930184,
+   "md5": "74a3d2b92463e7e70a252c13fec39a45",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/SOKAK_74a3d2b924.pck"
   },
   {
    "f": "veri/p00_79645374ea.pck",
@@ -80,10 +80,10 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p02_104dc16458.pck"
   },
   {
-   "f": "veri/p03_2673df66e9.pck",
-   "size": 20446600,
-   "md5": "2673df66e99b913aeec00b37cb0e802f",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p03_2673df66e9.pck"
+   "f": "veri/p03_0a351c8f97.pck",
+   "size": 20626008,
+   "md5": "0a351c8f978a8232eb8761352a4ce874",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p03_0a351c8f97.pck"
   },
   {
    "f": "veri/p04_2b7ceb4a08.pck",
@@ -428,5 +428,5 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p63_0ac7e8b2af.pck"
   }
  ],
- "packs_total": 935493596
+ "packs_total": 935774152
 }
