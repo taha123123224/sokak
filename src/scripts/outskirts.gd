@@ -148,6 +148,10 @@ uniform float snow_h = 9999.0;
 uniform float sea_y = -100.0;
 uniform sampler2D troad : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D tcan : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D tasph : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D tpave : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float city_grid = 0.0;      // street grid spacing (same as the building placement), 0 = no city
+uniform float city_r = 0.0;         // how far out the city reaches (rect distance)
 uniform float canopy_k = 0.0;
 uniform vec4 road0 = vec4(0.0);
 uniform vec4 road1 = vec4(0.0);
@@ -186,6 +190,27 @@ void fragment() {
 	float snow = smoothstep(snow_h - 20.0, snow_h + 15.0, wp.y + (m2 - 0.5) * 30.0) * (1.0 - smoothstep(0.45, 0.7, slope));
 	col = mix(col, vec3(0.9, 0.92, 0.95), snow);
 	col *= 0.78 + 0.44 * m1;
+	// v4.9 city blocks: asphalt streets on the same grid the buildings were placed on, lane dashes,
+	// kerbs and paved block interiors, fading out into the countryside at the city edge
+	if (city_grid > 1.0) {
+		float ck = (1.0 - smoothstep(city_r * 0.8, city_r + 60.0, d + (m1 - 0.5) * 120.0)) * step(0.5, d);
+		vec2 g = mod(wp.xz, city_grid);
+		float st = max(1.0 - step(9.0, g.x), 1.0 - step(9.0, g.y));
+		vec3 asph = mix(texture(tasph, wp.xz / 6.0).rgb, texture(tasph, wp.xz / 23.0).rgb, 0.35) * 0.8;
+		vec2 dl = abs(g - 4.5);
+		float dash = step(fract((g.x < 9.0 ? wp.z : wp.x) / 6.0), 0.5);
+		float lane = (g.x < 9.0 ? step(dl.x, 0.09) : 0.0) + (g.y < 9.0 && g.x >= 9.0 ? step(dl.y, 0.09) : 0.0);
+		asph = mix(asph, vec3(0.78, 0.76, 0.7), clamp(lane, 0.0, 1.0) * dash * 0.85);
+		vec3 pave = mix(texture(tpave, wp.xz / 3.0).rgb, texture(tpave, wp.xz / 17.0).rgb, 0.4) * vec3(0.44, 0.44, 0.43);
+		// some blocks are small parks / yards
+		vec2 blk = floor(wp.xz / city_grid);
+		float pk = fract(sin(dot(blk, vec2(12.9898, 78.233))) * 43758.5453);
+		pave = mix(pave, ca * 0.0 + mix(texture(tb, wp.xz / 6.0).rgb, texture(tb, wp.xz / 31.0).rgb, 0.5) * tint_b, step(0.78, pk));
+		float kerb = max(step(9.0, g.x) * (1.0 - step(9.6, g.x)), step(9.0, g.y) * (1.0 - step(9.6, g.y))) * (1.0 - st);
+		vec3 cityc = mix(pave, asph, st);
+		cityc = mix(cityc, vec3(0.62, 0.61, 0.58), kerb);
+		col = mix(col, cityc, ck);
+	}
 	// access roads (same formula as road_d() on the CPU side)
 	float rd = 1e9;
 	vec4 rr[3] = vec4[3](road0, road1, road2);
@@ -255,8 +280,8 @@ func _terrain() -> void:
 	sm.shader = sh
 	sm.set_shader_parameter("ta", _tex(th["near"]))
 	sm.set_shader_parameter("tb", _tex(th["far"]))
-	sm.set_shader_parameter("tr", _tex("dryground"))
-	sm.set_shader_parameter("tint_r", Vector3(0.52, 0.5, 0.48))
+	sm.set_shader_parameter("tr", _tex("rockface"))
+	sm.set_shader_parameter("tint_r", Vector3(0.95, 0.93, 0.9))
 	sm.set_shader_parameter("mac", MatLib.tex("macro_noise.png"))
 	var tn: Array = th["tn"]; var tf: Array = th["tf"]
 	sm.set_shader_parameter("tint_a", Vector3(tn[0], tn[1], tn[2]))
@@ -268,6 +293,12 @@ func _terrain() -> void:
 	sm.set_shader_parameter("sea_y", sea_y if th.has("sea") else -100.0)
 	sm.set_shader_parameter("troad", _tex(th.get("road_tex", "asphalt")))
 	sm.set_shader_parameter("tcan", MatLib.tex("forest_canopy.png"))
+	sm.set_shader_parameter("tasph", _tex("asphalt"))
+	sm.set_shader_parameter("tpave", _tex("paver"))
+	var cs: String = th.get("city", "")
+	if cs in ["apt", "industrial", "port"]:
+		sm.set_shader_parameter("city_grid", 46.0 if cs == "apt" else 38.0)
+		sm.set_shader_parameter("city_r", float(th.get("b1", 400.0)) * 0.75)
 	sm.set_shader_parameter("canopy_k", float(th.get("canopy", 1.0 if th.get("trees", "") == "conifer" else 0.55)))
 	var rl: Array = th.get("roads", [])
 	for i in mini(rl.size(), 3):
@@ -349,9 +380,9 @@ void fragment() {
 		vec3 alb = mix(wall, glass, win);
 		if (kind == 0.0 && v > 3.0 && v < size.y - 2.3) {
 			// textured facade bays (2 windows x 1 storey) on the upper floors
-			vec3 ft = texture(facade, vec2(u / 6.2, -(v - 3.0) / fh)).rgb;
+			vec3 ft = texture(facade, vec2(u / 6.4, -(v - 3.0) / 6.0)).rgb;
 			float lum = dot(ft, vec3(0.33));
-			vec3 tinted = ft * 0.72 * bc / vec3(0.86, 0.82, 0.73);
+			vec3 tinted = ft * 0.8 * bc / vec3(0.84, 0.77, 0.64);
 			alb = mix(ft * 0.8, tinted, smoothstep(0.42, 0.6, lum)) * (0.85 + 0.25 * n);
 			win = 1.0 - smoothstep(0.3, 0.45, lum);
 		}
@@ -530,7 +561,7 @@ func _flush_buildings() -> void:
 	sm.set_shader_parameter("mac", MatLib.tex("macro_noise.png"))
 	sm.set_shader_parameter("night", float(th.get("night", 0.0)))
 	sm.set_shader_parameter("pal", _pal)
-	sm.set_shader_parameter("facade", MatLib.tex("facade_apt.png"))
+	sm.set_shader_parameter("facade", MatLib.tex("facade_hf.png"))
 	mmi.material_override = sm
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mmi)
@@ -789,25 +820,67 @@ func _tree_mesh(kind: String, far: bool) -> Mesh:
 
 const TREE_SHADER := """
 shader_type spatial;
-render_mode specular_disabled;
+render_mode cull_disabled, diffuse_lambert_wrap, specular_disabled, depth_prepass_alpha;
+// v4.9 photographic tree billboards (Higgsfield-generated, background removed) from a 3x3 atlas:
+// row 0 spruce, row 1 broadleaf / poplar, row 2 olive. Cylindrical billboard that leans back a little
+// when seen from above (helicopter), soft wind sway, a fake rounded-crown normal for nice lighting.
+uniform sampler2D atlas : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
+varying vec3 tint;
 varying float hy;
-varying vec3 vc;
-void vertex() { hy = VERTEX.y; vc = COLOR.rgb * INSTANCE_CUSTOM.rgb; }
+void vertex() {
+	vec3 org = MODEL_MATRIX[3].xyz;
+	float sx = length(MODEL_MATRIX[0].xyz);
+	float sy = length(MODEL_MATRIX[1].xyz);
+	vec3 tc = CAMERA_POSITION_WORLD - org;
+	vec3 fw = normalize(vec3(tc.x, 0.0001, tc.z));
+	vec3 rt = normalize(cross(vec3(0.0, 1.0, 0.0), fw));
+	float lean = clamp(normalize(tc).y, 0.0, 1.0) * 0.3;
+	vec3 up = normalize(vec3(0.0, 1.0, 0.0) + fw * lean);
+	float k = UV.y;                   // 0 top .. 1 bottom
+	float sway = sin(TIME * 0.9 + org.x * 0.13 + org.z * 0.07) * 0.018 * (1.0 - k) * (1.0 - k) * sy;
+	vec3 wp = org + rt * (VERTEX.x * sx + sway) + up * (VERTEX.y * sy);
+	POSITION = PROJECTION_MATRIX * VIEW_MATRIX * vec4(wp, 1.0);
+	vec3 n = normalize(fw * 0.75 + rt * (UV.x * 2.0 - 1.0) * 0.8 + vec3(0.0, 1.0, 0.0) * (0.35 + 0.6 * (1.0 - k)));
+	NORMAL = mat3(VIEW_MATRIX) * n;
+	float cell = INSTANCE_CUSTOM.a;
+	vec2 cc = vec2(mod(cell, 3.0), floor(cell / 3.0));
+	UV = (cc * vec2(320.0, 640.0) + vec2(4.0, 2.0) + UV * vec2(312.0, 636.0)) / vec2(1024.0, 2048.0);
+	tint = INSTANCE_CUSTOM.rgb;
+	hy = 1.0 - k;
+}
 void fragment() {
-	// darker towards the trunk / inside the crown, lit tips on top
-	ALBEDO = vc * 0.75 * mix(0.4, 1.05, smoothstep(0.05, 1.0, hy));
+	vec4 c = texture(atlas, UV);
+	ALPHA = c.a;
+	ALPHA_SCISSOR_THRESHOLD = 0.45;
+	ALBEDO = c.rgb * tint;
 	ROUGHNESS = 1.0;
+	BACKLIGHT = c.rgb * 0.35;
+	AO = mix(0.55, 1.0, smoothstep(0.0, 0.7, hy));
+	AO_LIGHT_AFFECT = 0.3;
 }
 """
 
+const TREE_ASPECT := [0.462, 0.446, 0.479, 0.561, 0.728, 0.301, 0.603, 0.704, 0.624]
+
+func _tree_cell(kind: String) -> int:
+	var r := rng.randf()
+	match kind:
+		"conifer":
+			return rng.randi() % 3 if r < 0.88 else 3 + rng.randi() % 2
+		"olive":
+			return 6 + rng.randi() % 3 if r < 0.8 else (5 if r < 0.9 else 3)
+		_:
+			if r < 0.62: return 3 + rng.randi() % 2
+			if r < 0.82: return 5         # poplar
+			return rng.randi() % 3
+
 func _trees() -> void:
 	var kind: String = th.get("trees", "broad")
-	var n := int(float(th.get("n_tree", 1000)) * q)
+	var n := int(float(th.get("n_tree", 1000)) * q * 1.6)
 	var xf := []; var cols := []
-	var xf2 := []; var cols2 := []
 	var tries := 0
 	var tree_from := 4.0 if th.get("city", "") in ["sheds", "facility"] else 6.0
-	while xf.size() + xf2.size() < n and tries < n * 5:
+	while xf.size() < n and tries < n * 5:
 		tries += 1
 		var p := _pick_pos(tree_from, 1100.0, 1.9)
 		var x := p.x; var z := p.z
@@ -824,17 +897,37 @@ func _trees() -> void:
 			continue
 		if h < gy - 0.5 and th.has("sea"):
 			continue
-		var s := rng.randf_range(8.0, 16.0) if kind == "conifer" else (rng.randf_range(4.0, 6.0) if kind == "olive" else rng.randf_range(6.0, 12.0))
-		var tf := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s * rng.randf_range(0.85, 1.15), s, s * rng.randf_range(0.85, 1.15))), Vector3(x, h - 0.2, z))
-		var near := rdist(x, z) < 260.0
-		(xf if near else xf2).append(tf)
-		var tint := Color(rng.randf_range(0.85, 1.2), rng.randf_range(0.88, 1.1), rng.randf_range(0.7, 0.95)) * rng.randf_range(0.8, 1.1)
-		(cols if near else cols2).append(tint)
+		var cell := _tree_cell(kind)
+		var hh := rng.randf_range(11.0, 22.0) if cell < 3 else (rng.randf_range(4.5, 7.5) if cell >= 6 else (rng.randf_range(12.0, 18.0) if cell == 5 else rng.randf_range(7.0, 13.0)))
+		var w := hh * float(TREE_ASPECT[cell]) / 0.98 * 1.0
+		# quad mesh is 1 x 1 with its base at y = 0; scale x = width, y = height
+		xf.append(Transform3D(Basis().scaled(Vector3(w, hh, 1.0)), Vector3(x, h - 0.25, z)))
+		var tint := Color(rng.randf_range(0.82, 1.08), rng.randf_range(0.86, 1.06), rng.randf_range(0.78, 1.0)) * rng.randf_range(0.8, 1.05)
+		tint.a = float(cell)
+		cols.append(tint)
+	if xf.is_empty():
+		return
+	var qm := QuadMesh.new()
+	qm.size = Vector2(1, 1)
+	qm.center_offset = Vector3(0, 0.5, 0)
 	var m := ShaderMaterial.new()
 	var sh := Shader.new()
 	sh.code = TREE_SHADER
 	m.shader = sh
-	if not xf.is_empty():
-		_mm_simple("far_trees", _tree_mesh(kind, false), xf, cols, m)
-	if not xf2.is_empty():
-		_mm_simple("far_trees2", _tree_mesh(kind, true), xf2, cols2, m)
+	m.set_shader_parameter("atlas", MatLib.tex("trees_atlas.png"))
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_custom_data = true
+	mm.mesh = qm
+	mm.instance_count = xf.size()
+	for i in xf.size():
+		mm.set_instance_transform(i, xf[i])
+		mm.set_instance_custom_data(i, cols[i])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "far_trees"
+	mmi.multimesh = mm
+	mmi.material_override = m
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# billboards rotate in the shader: give the culler a generous box
+	mmi.extra_cull_margin = 30.0
+	add_child(mmi)

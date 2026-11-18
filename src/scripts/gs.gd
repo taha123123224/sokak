@@ -488,6 +488,8 @@ var MODES := {
 }
 ## CC-BY 4.0 assets: [work, author, licence/link] — shown in Ayarlar > Lisanslar
 const CREDITS := [
+	["PBR dokular: asfalt, kaldırım, beton, sıva, çim, toprak, kaya, ahşap, sac, pas, kiremit (22 set)", "Poly Haven", "CC0 · polyhaven.com"],
+	["Ağaç ve apartman cephesi görselleri", "Higgsfield (GPT Image) ile üretildi", "SOKAK için üretildi"],
 	["M4 - FPS Weapon Animations Pack v.1 (M4A1 birinci şahıs)", "BarcodeGames", "CC-BY 4.0 · sketchfab.com"],
 	["Sniper animated (AWM birinci şahıs)", "DJMaesen", "CC-BY 4.0 · sketchfab.com/bumstrum"],
 	["Sniper (AWM)", "DJMaesen", "CC-BY 4.0 · sketchfab.com/bumstrum"],
@@ -859,7 +861,7 @@ func default_settings() -> Dictionary:
 		"quality": "high", "resolution_scale": 1.0, "upscaler": "fsr2", "fullscreen": true, "window_mode": "", "resolution": "auto", "ui_scale": 1.0, "vsync": false, "fps_cap": -1,
 		"msaa": 0, "taa": false, "fxaa": true, "shadows": 2, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false,
 		"dyn_res": true, "dyn_target": 75,
-		"motion_blur": false, "draw_distance": 1.0, "sharpen": 0.3, "brightness": 1.0, "color_pack": "canli", "spray": "gg", "show_fps": true, "perf_overlay": 1, "grass": true, "shadow_dist": 1.0, "announcer": true, "insertion": true,
+		"motion_blur": false, "draw_distance": 1.0, "sharpen": 0.3, "brightness": 1.0, "color_pack": "dogal", "spray": "gg", "show_fps": true, "perf_overlay": 1, "grass": true, "shadow_dist": 1.0, "announcer": true, "insertion": true,
 		"vol_master": 0.8, "vol_sfx": 1.0, "vol_music": 0.5, "vol_amb": 0.6, "vol_voice": 1.0, "voice_on": true, "voice_mode": "ptt",
 		"xh_style": 0, "xh_color": "3dff8a", "xh_size": 7.0, "xh_gap": 5.0, "xh_thick": 2.0, "xh_dot": false, "xh_outline": true, "xh_dynamic": true, "xh_alpha": 1.0,
 		"hit_marker": true, "kill_feed": true, "blood": true, "minimap": true, "damage_numbers": true,

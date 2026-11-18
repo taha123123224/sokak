@@ -61,16 +61,16 @@ var DEFS := {
 	"river_bed": ["dirt", 0.25, Color(0.7, 0.62, 0.55), 0.95, 0, {}],
 	"log_wood": ["woodbeam", 0.9, Color(0.75, 0.62, 0.5), -1, 0, {}],
 	"pine_needles": ["grass", 1.4, Color(0.42, 0.62, 0.44), 0.92, 0, {"sss": true}],
-	"snow": ["dirt", 0.08, Color(1.6, 1.62, 1.7), 0.75, 0, {}],
-	"mountain_rock": ["dirt", 0.06, Color(0.5, 0.52, 0.58), 0.95, 0, {}],
+	"snow": ["snow", 0.2, Color(1.0, 1.0, 1.02), -1, 0, {}],
+	"mountain_rock": ["rockface", 0.08, Color(0.85, 0.85, 0.88), -1, 0, {}],
 	"ruin_stone": ["stonewall", 0.55, Color(0.95, 0.93, 0.88), -1, 0, {}],
 	"ruin_stone_dark": ["ashlar", 0.6, Color(0.62, 0.62, 0.66), 0.92, 0, {}],
 	"path_stone": ["cobble", 0.5, Color(0.9, 0.88, 0.85), -1, 0, {}],
 	# İnşaat / Çanakkale
 	"site_dirt": ["dryground", 0.22, Color(0.92, 0.9, 0.9), 0.97, 0, {}],
 	"gravel": ["gravel2", 0.45, Color(0.92, 0.9, 0.87), 0.95, 0, {}],
-	"sand": ["dirt", 0.35, Color(1.22, 1.08, 0.86), 0.98, 0, {}],
-	"rebar_rust": ["paintmetal", 2.0, Color(0.5, 0.28, 0.16), 0.75, 0.6, {}],
+	"sand": ["sand", 0.3, Color(1.0, 0.97, 0.92), -1, 0, {}],
+	"rebar_rust": ["rust", 2.0, Color(1, 1, 1), -1, -1, {}],
 	"crane_yellow": ["paintmetal", 0.8, Color(0.82, 0.6, 0.12), 0.55, 0.3, {}],
 	"scaffold_net": ["", 1.0, Color(0.08, 0.26, 0.16, 0.8), 0.9, 0, {"cull": false}],
 	"fence_mesh": ["corrugated", 2.0, Color(0.7, 0.72, 0.74), 0.4, 0.8, {}],
@@ -84,13 +84,13 @@ var DEFS := {
 	"cable_black": ["", 1.0, Color(0.04, 0.04, 0.04), 0.6, 0, {}],
 	"dry_grass": ["grass", 0.26, Color(0.95, 0.9, 0.72), 0.95, 0, {}],
 	"path_dirt": ["dirt", 0.3, Color(1.0, 0.95, 0.88), 0.97, 0, {}],
-	"cliff_rock": ["stonewall", 0.3, Color(0.78, 0.72, 0.64), 0.9, 0, {}],
+	"cliff_rock": ["rockface", 0.12, Color(0.95, 0.9, 0.82), -1, 0, {}],
 	"far_hills": ["grass", 0.02, Color(0.6, 0.65, 0.48), 0.95, 0, {}],
 	"fort_stone": ["stonewall", 1.1, Color(0.88, 0.83, 0.74), -1, 0, {}],
 	"earth": ["dirt", 0.4, Color(0.82, 0.76, 0.7), 0.98, 0, {}],
 	"cannon_iron": ["paintmetal", 1.5, Color(0.16, 0.16, 0.17), 0.45, 0.85, {}],
 	"canvas": ["cloth_cotton", 0.8, Color(0.75, 0.7, 0.55), 0.9, 0, {"cull": false}],
-	"rock": ["stonewall", 0.8, Color(0.8, 0.76, 0.7), 0.9, 0, {}],
+	"rock": ["rockface", 0.35, Color(0.95, 0.92, 0.88), -1, 0, {}],
 	"dirt": ["dirt", 0.3, Color(0.95, 0.92, 0.88), 0.95, 0, {}],
 	"marble": ["concrete", 0.3, Color(1.0, 0.98, 0.95), 0.35, 0, {}],
 	"glass_window": ["", 1.0, Color(0.1, 0.13, 0.16), 0.04, 0.3, {"spec": 0.9}],
@@ -118,6 +118,10 @@ var DEFS := {
 	"headlight": ["", 1.0, Color(0.95, 0.95, 0.9), 0.1, 0.2, {"emit": Color(1, 1, 0.9), "emit_e": 0.3}],
 	"dumpster": ["paintmetal", 0.6, Color(0.14, 0.36, 0.2), -1, 0.3, {}],
 	"sandbag": ["sandbag", 1.5, Color(1, 1, 1), -1, 0, {}],
+	# v4.9 Poly Haven sets
+	"rust_metal": ["rust", 0.5, Color(1, 1, 1), -1, -1, {}],
+	"diamond_plate": ["diamondplate", 0.6, Color(1, 1, 1), -1, -1, {}],
+	"steel_floor": ["diamondplate", 0.4, Color(0.8, 0.8, 0.82), -1, -1, {}],
 	"deck": ["deck", 0.4, Color(1, 1, 1), -1, 0, {}],
 	"hull_red": ["paintmetal", 0.15, Color(0.5, 0.08, 0.06), -1, 0.2, {}],
 	"hull_dark": ["paintmetal", 0.15, Color(0.1, 0.12, 0.15), -1, 0.2, {}],
@@ -322,7 +326,7 @@ func _tone(name: String, m: Material) -> void:
 			(m as StandardMaterial3D).albedo_color = Color(lerp(c.r, l, 0.3), lerp(c.g, l, 0.3), lerp(c.b, l, 0.3), c.a) * 0.94
 			return
 
-const MACRO_SETS := ["concrete", "rawconc", "dryground", "dirt", "grass", "gravel2", "asphalt", "cobble", "paver", "plaster", "stonewall", "brick", "ashlar", "rooftiles"]
+const MACRO_SETS := ["rockface", "sand", "snow", "concrete", "rawconc", "dryground", "dirt", "grass", "gravel2", "asphalt", "cobble", "paver", "plaster", "stonewall", "brick", "ashlar", "rooftiles"]
 
 func build(d: Array) -> StandardMaterial3D:
 	var s := StandardMaterial3D.new()
@@ -342,12 +346,12 @@ func build(d: Array) -> StandardMaterial3D:
 				s.normal_texture = n
 				s.normal_scale = 1.0
 			# parallax occlusion on rough masonry/cobbles (high+ quality)
-			if tset in ["cobble", "stonewall", "paver"] and int(GS.settings.get("shadows", 2)) >= 2:
+			if tset in ["cobble", "stonewall", "paver", "ashlar"] and int(GS.settings.get("shadows", 2)) >= 2:
 				var hm := tex(tset + "_height.png")
 				if hm:
 					s.heightmap_enabled = true
 					s.heightmap_texture = hm
-					s.heightmap_scale = {"cobble": 1.6, "stonewall": 1.0, "paver": 0.8}[tset]
+					s.heightmap_scale = {"cobble": 1.6, "stonewall": 1.0, "paver": 0.8, "ashlar": 0.9}[tset]
 					s.heightmap_deep_parallax = true
 					s.heightmap_min_layers = 6
 					s.heightmap_max_layers = 16
@@ -358,6 +362,11 @@ func build(d: Array) -> StandardMaterial3D:
 				s.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_GREEN
 				s.metallic_texture = orm
 				s.metallic_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_BLUE
+				# v4.9: baked ambient occlusion from the ORM red channel (cracks, mortar, cobble gaps)
+				s.ao_enabled = true
+				s.ao_texture = orm
+				s.ao_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
+				s.ao_light_affect = 0.25
 		s.uv1_scale = Vector3(uv, uv, uv)
 		# large-scale colour variation (world space) so big surfaces don't look tiled and flat
 		if tset in MACRO_SETS and str(GS.settings.get("quality", "high")) != "low":

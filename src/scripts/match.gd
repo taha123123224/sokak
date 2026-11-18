@@ -875,10 +875,15 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	e.adjustment_saturation = float(c["sat"]) * 1.06
 	e.adjustment_color_correction = _grade_lut()
 	if pack == "canli":
-		# "Canlı" (Valorant-like): clean, vivid colour with punchy but not neon contrast
+		# "Canlı": clean, vivid colour with punchy but not neon contrast (v4.9: toned down, it read as candy)
 		e.adjustment_contrast = 1.08
-		e.adjustment_saturation = float(c["sat"]) * 1.24
+		e.adjustment_saturation = float(c["sat"]) * 1.1
 		e.adjustment_color_correction = grade_lut3d("canli")
+	elif pack == "dogal":
+		# v4.9 "Doğal" (CS2-like): natural colour, neutral white balance, crisp mid contrast, filmic highlights
+		e.adjustment_contrast = 1.07
+		e.adjustment_saturation = float(c["sat"]) * 1.0
+		e.adjustment_color_correction = grade_lut3d("dogal")
 	elif pack == "sinematik":
 		e.adjustment_contrast = 1.14
 		e.adjustment_saturation = float(c["sat"]) * 1.1
@@ -922,7 +927,7 @@ static func _grade(c: Vector3, pack: String) -> Color:
 	var lum := c.dot(Vector3(0.2126, 0.7152, 0.0722))
 	var mx := maxf(c.x, maxf(c.y, c.z)); var mn := minf(c.x, minf(c.y, c.z))
 	var sat := mx - mn
-	var vib := 0.38 if pack == "canli" else 0.15
+	var vib := 0.3 if pack == "canli" else (0.06 if pack == "dogal" else 0.15)
 	c = Vector3(lum, lum, lum) + (c - Vector3(lum, lum, lum)) * (1.0 + vib * (1.0 - sat))
 	if pack == "canli":
 		# cool clean shadows, warm sunny highlights, gentle S-curve, no crushed blacks
@@ -931,6 +936,13 @@ static func _grade(c: Vector3, pack: String) -> Color:
 		var sc := Vector3(smoothstep(0.0, 1.0, c.x), smoothstep(0.0, 1.0, c.y), smoothstep(0.0, 1.0, c.z))
 		c = c.lerp(sc, 0.22)
 		c = c * 0.985 + Vector3(0.012, 0.014, 0.018)
+	elif pack == "dogal":
+		# neutral grade: tiny cool lift in the deep shadows, slight warmth in highlights, soft toe & shoulder
+		c += Vector3(-0.004, 0.0, 0.012) * pow(1.0 - lum, 3.0)
+		c += Vector3(0.012, 0.006, -0.006) * lum * lum
+		var sd := Vector3(smoothstep(0.0, 1.0, c.x), smoothstep(0.0, 1.0, c.y), smoothstep(0.0, 1.0, c.z))
+		c = c.lerp(sd, 0.16)
+		c = c * 0.99 + Vector3(0.008, 0.008, 0.01)
 	else:
 		# cinematic teal / orange
 		c += Vector3(-0.03, 0.01, 0.045) * pow(1.0 - lum, 2.2)
@@ -2604,6 +2616,24 @@ func place_ping(pos: Vector3, who: String, tm: String, mine: bool) -> void:
 		_pings.erase(root)
 		root.queue_free()
 
+## v4.9: low-res atlas surfaces get world-space micro detail (concrete pores as albedo + a fine normal),
+## so walls and floors stay crisp up close instead of turning into a blur. Not on LOW, not on cut-outs.
+func _micro_detail(sm: StandardMaterial3D) -> void:
+	if str(GS.settings.get("quality", "high")) == "low" or sm.albedo_texture == null:
+		return
+	if sm.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or sm.detail_enabled or sm.ao_on_uv2 or sm.uv2_triplanar:
+		return
+	sm.detail_enabled = true
+	sm.detail_albedo = MatLib.tex("micro_detail.png")
+	sm.detail_normal = MatLib.tex("rawconc_normal.png")
+	sm.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MUL
+	sm.detail_uv_layer = BaseMaterial3D.DETAIL_UV_2
+	sm.uv2_triplanar = true
+	sm.uv2_world_triplanar = true
+	sm.uv2_triplanar_sharpness = 4.0
+	sm.uv2_scale = Vector3(0.45, 0.45, 0.45)
+	sm.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+
 ## v3.4 imported (Sketchfab) maps: their exporter marks everything fully metallic and some packs keep the
 ## colour in the emissive slot (baked / unlit atlases) -> plain lit dielectric surfaces, cut-out alpha
 func _fix_imported_mats(vis: Node) -> void:
@@ -2631,3 +2661,4 @@ func _fix_imported_mats(vis: Node) -> void:
 				sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 				sm.alpha_scissor_threshold = 0.45
 				sm.cull_mode = BaseMaterial3D.CULL_DISABLED
+			_micro_detail(sm)
