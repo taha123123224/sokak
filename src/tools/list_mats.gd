@@ -3,7 +3,7 @@ extends SceneTree
 ## prints every material of a map model with how much surface (triangle area, m2) uses it and its texture
 func _init() -> void:
 	var id: String = OS.get_cmdline_user_args()[0]
-	var ps: PackedScene = load("res://assets/maps/%s.glb" % id)
+	var ps: PackedScene = load(id if id.begins_with("res://") else "res://assets/maps/%s.glb" % id)
 	var root := ps.instantiate()
 	var area := {}
 	var texn := {}
@@ -30,8 +30,9 @@ func _init() -> void:
 				if cr.normalized().y > 0.8: ua += cr.length() * 0.5
 			area[key] = area.get(key, 0.0) + a
 			up[key] = up.get(key, 0.0) + ua
-			if mt is StandardMaterial3D and (mt as StandardMaterial3D).albedo_texture:
-				texn[key] = (mt as StandardMaterial3D).albedo_texture.resource_path.get_file()
+			if mt is StandardMaterial3D:
+				var sm := mt as StandardMaterial3D
+				texn[key] = "%s col=%s met=%.2f rough=%.2f mtex=%s nrm=%s" % [sm.albedo_texture.resource_path.get_file() if sm.albedo_texture else "-", sm.albedo_color.to_html(false), sm.metallic, sm.roughness, sm.metallic_texture != null, sm.normal_texture != null]
 	var ks := area.keys()
 	ks.sort_custom(func(a, b): return area[a] > area[b])
 	for k in ks.slice(0, 40):

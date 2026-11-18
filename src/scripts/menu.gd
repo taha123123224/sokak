@@ -346,7 +346,7 @@ void vertex() { wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 void fragment() {
 	ALBEDO = vec3(0.0);
 	float d = length((wp.xz - c.xz) * vec2(1.0, 1.6));
-	ALPHA = 0.42 * exp(-d * d * 7.0);
+	ALPHA = 0.62 * exp(-d * d * 5.0);
 }"""
 	var gm := ShaderMaterial.new(); gm.shader = sh
 	g.material_override = gm
@@ -354,6 +354,52 @@ void fragment() {
 	g.position = Vector3(0, 0.002, 0)
 	world.add_child(g)
 	return true
+
+## v4.9 sunlit dust drifting through the lobby shot (depth cue between camera, soldier and street)
+func _lobby_dust() -> void:
+	var p := GPUParticles3D.new()
+	p.amount = 90
+	p.lifetime = 14.0
+	p.preprocess = 14.0
+	p.position = Vector3(0.5, 1.3, 1.2)
+	p.visibility_aabb = AABB(Vector3(-4, -2, -4), Vector3(8, 4, 8))
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	pm.emission_box_extents = Vector3(2.4, 1.3, 1.8)
+	pm.gravity = Vector3(0, -0.004, 0)
+	pm.direction = Vector3(1, 0.2, 0)
+	pm.spread = 180.0
+	pm.initial_velocity_min = 0.01
+	pm.initial_velocity_max = 0.05
+	pm.turbulence_enabled = true
+	pm.turbulence_noise_strength = 0.6
+	pm.turbulence_noise_scale = 2.5
+	pm.turbulence_influence_min = 0.02
+	pm.turbulence_influence_max = 0.06
+	pm.scale_min = 0.5
+	pm.scale_max = 1.4
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.2, 0.8, 1.0])
+	g.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 1), Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
+	var gt := GradientTexture1D.new(); gt.gradient = g
+	pm.color_ramp = gt
+	p.process_material = pm
+	var qm := QuadMesh.new(); qm.size = Vector2(0.012, 0.012)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat.vertex_color_use_as_albedo = true
+	mat.albedo_color = Color(1.0, 0.92, 0.75, 0.35)
+	var rg := Gradient.new()
+	rg.offsets = PackedFloat32Array([0.0, 1.0]); rg.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
+	var rt := GradientTexture2D.new(); rt.gradient = rg; rt.fill = GradientTexture2D.FILL_RADIAL
+	rt.fill_from = Vector2(0.5, 0.5); rt.fill_to = Vector2(0.5, 0.0); rt.width = 32; rt.height = 32
+	mat.albedo_texture = rt
+	qm.material = mat
+	p.draw_pass_1 = qm
+	world.add_child(p)
 
 func _build_world() -> void:
 	world = Node3D.new()
@@ -431,6 +477,8 @@ func _build_world() -> void:
 	cam_look = LOBBY_LOOK
 	# soldier, holding the active set's main weapon at low ready
 	soldier = _make_soldier(GS.cur_char())
+	if qi >= 1:
+		_lobby_dust()
 	# weapon pedestal
 	var ped := MeshInstance3D.new()
 	var cm := CylinderMesh.new(); cm.top_radius = 0.42; cm.bottom_radius = 0.46; cm.height = 0.85
@@ -619,8 +667,13 @@ func _process(delta: float) -> void:
 	var mp := get_viewport().get_mouse_position() / get_viewport().get_visible_rect().size - Vector2(0.5, 0.5)
 	var lobby_view := cam_target == LOBBY_CAM
 	var amt := 0.05 if lobby_view and bg_rect else 0.25
-	cam.position = cam.position.lerp(cam_target + Vector3(mp.x * amt, -mp.y * amt * 0.6, 0), min(delta * 3.0, 1.0))
-	cam.look_at(cam_look)
+	# v4.9 "breathing" camera on the lobby shot: slow handheld drift + a gentle push-in, never distracting
+	var tt := Time.get_ticks_msec() / 1000.0
+	var br := Vector3.ZERO
+	if lobby_view:
+		br = Vector3(sin(tt * 0.31) * 0.035, sin(tt * 0.47 + 1.3) * 0.018, sin(tt * 0.17) * 0.06)
+	cam.position = cam.position.lerp(cam_target + br + Vector3(mp.x * amt, -mp.y * amt * 0.6, 0), min(delta * 3.0, 1.0))
+	cam.look_at(cam_look + (Vector3(sin(tt * 0.23) * 0.012, sin(tt * 0.37) * 0.008, 0) if lobby_view else Vector3.ZERO))
 	if bg_rect:
 		# the street drifts a little against the soldier: cheap depth
 		bg_rect.position = bg_rect.position.lerp(Vector2(-24, -14) - mp * Vector2(30, 16), min(delta * 3.0, 1.0))
@@ -1105,7 +1158,7 @@ func _streak_next() -> int:
 
 var _daily_popped := false
 func _lobby_popups() -> void:
-	if not is_inside_tree() or page != "lobby":
+	if not is_inside_tree() or page != "lobby" or OS.has_environment("NOPOPUP"):
 		return
 	var lv := int(GS.profile.get("level", 1))
 	var seen := int(GS.settings.get("seen_level", 0))

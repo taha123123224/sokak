@@ -488,7 +488,7 @@ var MODES := {
 }
 ## CC-BY 4.0 assets: [work, author, licence/link] — shown in Ayarlar > Lisanslar
 const CREDITS := [
-	["PBR dokular: asfalt, kaldırım, beton, sıva, çim, toprak, kaya, ahşap, sac, pas, kiremit (22 set)", "Poly Haven", "CC0 · polyhaven.com"],
+	["PBR dokular: asfalt, kaldırım, beton, sıva, çim, toprak, kaya, ahşap, sac, pas, kiremit (24 set)", "Poly Haven", "CC0 · polyhaven.com"],
 	["Ağaç ve apartman cephesi görselleri", "Higgsfield (GPT Image) ile üretildi", "SOKAK için üretildi"],
 	["M4 - FPS Weapon Animations Pack v.1 (M4A1 birinci şahıs)", "BarcodeGames", "CC-BY 4.0 · sketchfab.com"],
 	["Sniper animated (AWM birinci şahıs)", "DJMaesen", "CC-BY 4.0 · sketchfab.com/bumstrum"],

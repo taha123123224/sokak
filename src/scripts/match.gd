@@ -2143,6 +2143,21 @@ func test_hook(i: int) -> void:
 	if i == 23:
 		hud.force_board = true
 		return
+	if i == 102:
+		# v4.9 viewmodel review: equip the next gun from env GUNS ("ak47,m4a1,..."), no skin, still pose
+		var lst: PackedStringArray = OS.get_environment("GUNS").split(",")
+		var k: int = int(get_meta("gun_i", 0))
+		set_meta("gun_i", k + 1)
+		if k < lst.size():
+			var id: String = lst[k]
+			var cat: String = str(GS.WEAPONS[id]["cat"])
+			player.slots[cat] = id
+			var st := GS.stats_for(id)
+			player.ammo[id] = [st["mag"], 90]
+			player.switch_to(id, true)
+			player.velocity = Vector3.ZERO
+			print("GUN ", id)
+		return
 	if i == 101:
 		# v4.8 mantle test: a 1.4 m crate right in front of the player, then "press jump"
 		var f: Vector3 = -player.global_transform.basis.z

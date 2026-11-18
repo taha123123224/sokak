@@ -34,6 +34,8 @@ Oyun içi parlaklık eski renk ayarlarıyla uyumlu olsun diye albedo ortalaması
 | snow | [snow_02](https://polyhaven.com/a/snow_02) | kar |
 | sand | [coast_sand_01](https://polyhaven.com/a/coast_sand_01) | kum |
 | diamondplate | [metal_plate](https://polyhaven.com/a/metal_plate) | tırtıklı sac, çelik zemin |
+| stonewall | [rustic_stone_wall_02](https://polyhaven.com/a/rustic_stone_wall_02) | taş duvarlar (Safranbolu, Çanakkale) |
+| brick2 | [red_brick_03](https://polyhaven.com/a/red_brick_03) | tuğla duvarlar |
 
 ## Higgsfield ile üretilen görseller (kullanıcının Higgsfield hesabı, GPT Image 2.6)
 
