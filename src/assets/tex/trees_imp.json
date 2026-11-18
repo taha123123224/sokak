@@ -1,0 +1,41 @@
+{
+ "views": 8,
+ "cell": 512,
+ "rows": [
+  {
+   "label": "olive1",
+   "h_frac": 0.9805,
+   "w_frac": 0.9961
+  },
+  {
+   "label": "olive2",
+   "h_frac": 0.7793,
+   "w_frac": 1.0
+  },
+  {
+   "label": "broad",
+   "h_frac": 0.7676,
+   "w_frac": 1.0
+  },
+  {
+   "label": "small",
+   "h_frac": 0.9824,
+   "w_frac": 0.9766
+  },
+  {
+   "label": "firsa",
+   "h_frac": 0.9805,
+   "w_frac": 0.625
+  },
+  {
+   "label": "firsb",
+   "h_frac": 0.9805,
+   "w_frac": 0.5938
+  },
+  {
+   "label": "firsc",
+   "h_frac": 0.9805,
+   "w_frac": 0.7773
+  }
+ ]
+}

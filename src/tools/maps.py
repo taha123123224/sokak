@@ -2093,7 +2093,7 @@ def site_slab(name, x0, y0, x1, y1, z, mm, holes=()):
 
 
 # ======================================================================== MAP 5: İNŞAAT (small construction site)
-def map_insaat():
+def map_insaat_v42():   # v4.2 layout, kept for reference (not in ALL)
     mm = begin()
     X0, X1, Y0, Y1 = -34, 34, -30, 30
     dirt = M('site_dirt', (0.45, 0.37, 0.28), 0.95)
@@ -2224,6 +2224,510 @@ def map_insaat():
 
 
 # ======================================================================== MAP 6: ÇANAKKALE (coastal fortress + trenches)
+# ======================================================================== MAP 5 (v4.11): İNŞAAT — "Kartal Konutları" şantiyesi
+# Spliced into maps.py (exec'd in its namespace). Design notes: docs/MAP_DESIGN.md#insaat
+#
+#   N (A spawn, site office row y≈23)
+#   W lane: BLOK-A, 3-storey RC frame with brick infill (x -36..-18, y -12..12), walk-through ground floor,
+#           stair core to floors 1-2, east windows over mid
+#   MID   : foundation pit 20x16, 2.6 m deep (x -10..10, y -10..6), sunken ramps NW + SE, steel stair NE,
+#           tower crane + cement silo as landmarks
+#   E lane: container alley (x≈21.5) + BLOK-B 2-storey shell (x 26..38, y -2..12) + precast yard
+#   S (B spawn behind gatehouse + parked truck y≈-25)
+
+INS_FH = 3.2
+
+
+def ins_mats(mm):
+    return dict(
+        conc=mm['concrete'], slab=M('site_floor', (0.62, 0.62, 0.6), 0.6), brick=mm['brick'],
+        steel=mm['steel'], dark=mm['metal'], planks=mm['planks'], wood=M('formwork', (0.62, 0.48, 0.3), 0.85),
+        dirt=M('site_dirt', (0.45, 0.37, 0.28), 0.95), gravel=M('gravel', (0.5, 0.48, 0.45), 0.95),
+        sand=M('sand', (0.82, 0.7, 0.5), 0.95), rebar=M('rebar_rust', (0.35, 0.18, 0.1), 0.8, 0.6),
+        yellow=M('crane_yellow', (0.95, 0.68, 0.05), 0.5, 0.3), orange=mm['ship_orange'],
+        red=M('stripe_red', (0.8, 0.1, 0.08), 0.5), white=M('mixer_white', (0.9, 0.9, 0.88), 0.35, 0.3),
+        bag=M('sandbag', (0.62, 0.6, 0.56)), tarp=M('tarp_blue', (0.1, 0.25, 0.5), 0.7),
+        plastic=M('cone_white', (0.95, 0.95, 0.95), 0.4), net=M('scaffold_net', (0.15, 0.4, 0.2), 0.9),
+        lean=M('lean_concrete', (0.5, 0.5, 0.48), 0.8), membrane=M('membrane_black', (0.05, 0.05, 0.05), 0.5),
+        mud=M('mud_ground', (0.38, 0.32, 0.26), 0.9), soil=M('soil_wall', (0.42, 0.34, 0.26), 0.95),
+        pbrick=M('plaster_brick', (0.7, 0.62, 0.55), 0.85),
+    )
+
+
+def ins_mound(name, x, y, r, h, m, sq=1.0, rot=0):
+    """natural angle-of-repose heap (aggregate / sand), not a ball"""
+    pts = [(r, 0.0), (r * 0.82, h * 0.28), (r * 0.6, h * 0.62), (r * 0.36, h * 0.88), (r * 0.12, h * 0.99), (0.0, h)]
+    o = lathe(name, pts, (x, y, 0), (0, 0, (rot)), m=m, seg=28)
+    o.scale = (1.0, sq, 1.0)
+    col((x, y, h * 0.3), (r * 1.2, r * 1.2 * sq, h * 0.6), rotz=rot)
+    return o
+
+
+def ins_bin(x, y, w, d, h, rot, k):
+    """3-sided aggregate bay made of interlocking concrete blocks (open side faces -Y local)"""
+    root = empty('agg_bin', (x, y, 0)); root.rotation_euler = (0, 0, math.radians(rot))
+    for (sx, sy, lx, ly) in [(-w / 2, 0, 0.6, d), (w / 2, 0, 0.6, d), (0, d / 2, w + 0.6, 0.6)]:
+        for row in range(int(h / 0.6)):
+            box('agg_blk', (lx, ly, 0.58), (sx, sy, 0.3 + row * 0.6), m=k['conc'], parent=root, bevel=0.03)
+    c, s_ = math.cos(math.radians(rot)), math.sin(math.radians(rot))
+    for (sx, sy, lx, ly) in [(-w / 2, 0, 0.6, d), (w / 2, 0, 0.6, d), (0, d / 2, w + 0.6, 0.6)]:
+        col((x + sx * c - sy * s_, y + sx * s_ + sy * c, h / 2), (lx, ly, h), rotz=rot)
+    return root
+
+
+def ins_rail(x0, y0, x1, y1, k, h=1.05, z=0.0):
+    """temporary edge-protection guard rail: steel posts on clamps + 2 tubes + toe board"""
+    L = math.hypot(x1 - x0, y1 - y0); rot = math.degrees(math.atan2(y1 - y0, x1 - x0))
+    n = max(1, int(L / 2.0))
+    for i in range(n + 1):
+        t = i / n
+        cyl('gr_post', 0.025, h, (x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, z + h / 2), m=k['yellow'], axis='Z', verts=6)
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    for hz in (h * 0.5, h):
+        cyl('gr_tube', 0.022, L, (cx, cy, z + hz), (0, 0, (rot - 90)), m=k['yellow'], axis='Y', verts=6)
+    box('gr_toe', (L, 0.03, 0.15), (cx, cy, z + 0.075), (0, 0, (rot)), m=k['wood'])
+    col((cx, cy, z + h / 2), (L, 0.12, h), rotz=rot)
+
+
+def ins_infill(name, ax, ay, bx, by, z, kind, k):
+    """brick infill for one structural bay between two columns, floor z..z+FH (under the next slab)
+    kind: full | win | wide | door | low | none"""
+    if kind == 'none':
+        return
+    H = INS_FH - 0.25
+    L = math.hypot(bx - ax, by - ay) - 0.4
+    rot = math.degrees(math.atan2(by - ay, bx - ax))
+    cx, cy = (ax + bx) / 2, (ay + by) / 2
+    c, s_ = math.cos(math.radians(rot)), math.sin(math.radians(rot))
+    T = 0.2
+    bm_ = k['pbrick'] if z < 1.0 else k['brick']
+    def seg(off, w, z0, h):
+        if w <= 0.05 or h <= 0.05:
+            return
+        wall(name, cx + c * off, cy + s_ * off, z + z0, w, T, h, bm_, rot=rot)
+    if kind == 'full':
+        seg(0, L, 0, H)
+    elif kind == 'low':                      # unfinished: three courses only (waist cover)
+        seg(0, L, 0, 1.0)
+    elif kind in ('win', 'wide'):
+        ow = 1.4 if kind == 'win' else min(L - 1.2, 3.2)
+        side = (L - ow) / 2
+        seg(-(ow + side) / 2, side, 0, H)
+        seg((ow + side) / 2, side, 0, H)
+        seg(0, ow, 0, 0.95)                  # sill (crouch cover)
+        seg(0, ow, 2.15, H - 2.15)           # lintel
+        box('sill', (ow, 0.32, 0.06), (cx, cy, z + 0.98), (0, 0, (rot)), m=k['conc'])
+    elif kind == 'door':
+        ow = 1.6
+        side = (L - ow) / 2
+        seg(-(ow + side) / 2, side, 0, H)
+        seg((ow + side) / 2, side, 0, H)
+        seg(0, ow, 2.25, H - 2.25)
+
+
+def ins_rc_block(name, X0, Y0, nx, ny, bay, floors, k, faces, stair=None, roof_open=False, scaffold_south=False):
+    """reinforced-concrete frame building: columns, edge beams, slabs (with stair hole), brick infill per
+    bay/face/floor from `faces`[floor][face] = list of kinds, stairs between floors."""
+    X1, Y1 = X0 + nx * bay, Y0 + ny * bay
+    xs = [X0 + i * bay for i in range(nx + 1)]
+    ys = [Y0 + j * bay for j in range(ny + 1)]
+    # ground slab + apron
+    box(name + '_gslab', (X1 - X0 + 1.2, Y1 - Y0 + 1.2, 0.16), ((X0 + X1) / 2, (Y0 + Y1) / 2, 0.08), m=k['slab'])
+    col(((X0 + X1) / 2, (Y0 + Y1) / 2, 0.08), (X1 - X0 + 1.2, Y1 - Y0 + 1.2, 0.16))
+    for f in range(floors):
+        z = 0.16 if f == 0 else f * INS_FH
+        top = (f + 1) * INS_FH
+        for x in xs:
+            for y in ys:
+                wall(name + '_col', x, y, z, 0.4, 0.4, top - z - 0.25, k['conc'])
+        # slab above this floor (with stair hole)
+        holes = [stair['hole']] if (stair and f + 1 <= stair['to_floor']) else []
+        if f + 1 == floors and roof_open:
+            # roof: only half poured, the other half is formwork decking with rebar mats (cover, not walkable edge)
+            midx = (X0 + X1) / 2
+            site_slab(name + f'_slab{f}', X0 - 0.2, Y0 - 0.2, midx, Y1 + 0.2, top, {'concrete': k['conc']}, holes=[])
+            box(name + '_deck', (X1 - midx, Y1 - Y0 + 0.4, 0.06), ((midx + X1) / 2, (Y0 + Y1) / 2, top - 0.27), m=k['wood'])
+            col(((midx + X1) / 2, (Y0 + Y1) / 2, top - 0.27), (X1 - midx, Y1 - Y0 + 0.4, 0.06))
+            for i in range(int((X1 - midx) / 0.6)):
+                cyl('roof_mesh', 0.008, Y1 - Y0, (midx + 0.3 + i * 0.6, (Y0 + Y1) / 2, top - 0.15), m=k['rebar'], axis='Y', verts=4)
+        else:
+            site_slab(name + f'_slab{f}', X0 - 0.2, Y0 - 0.2, X1 + 0.2, Y1 + 0.2, top, {'concrete': k['conc']}, holes=holes)
+        # perimeter edge beams (downstand) on each storey: reads as real structure, not a stack of plates
+        zb = top - 0.3 - 0.225
+        box(name + '_beam', (X1 - X0 + 0.4, 0.3, 0.45), ((X0 + X1) / 2, Y0, zb), m=k['conc'])
+        box(name + '_beam', (X1 - X0 + 0.4, 0.3, 0.45), ((X0 + X1) / 2, Y1, zb), m=k['conc'])
+        box(name + '_beam', (0.3, Y1 - Y0 + 0.4, 0.45), (X0, (Y0 + Y1) / 2, zb), m=k['conc'])
+        box(name + '_beam', (0.3, Y1 - Y0 + 0.4, 0.45), (X1, (Y0 + Y1) / 2, zb), m=k['conc'])
+        # brick infill
+        fl = faces.get(f, {})
+        for face, kinds in fl.items():
+            if face == 'S':
+                segs = [(xs[i], Y0, xs[i + 1], Y0) for i in range(nx)]
+            elif face == 'N':
+                segs = [(xs[i], Y1, xs[i + 1], Y1) for i in range(nx)]
+            elif face == 'W':
+                segs = [(X0, ys[j], X0, ys[j + 1]) for j in range(ny)]
+            else:
+                segs = [(X1, ys[j], X1, ys[j + 1]) for j in range(ny)]
+            for (sg, kind) in zip(segs, kinds):
+                ins_infill(name + '_inf', sg[0], sg[1], sg[2], sg[3], z if f else 0.16, kind, k)
+        # open slab edges on upper floors get guard rails where there is no infill (edge protection)
+        if f >= 1:
+            for face, kinds in fl.items():
+                for i, kind in enumerate(kinds):
+                    if kind != 'none':
+                        continue
+                    if face == 'S':
+                        ins_rail(xs[i] + 0.25, Y0 - 0.05, xs[i + 1] - 0.25, Y0 - 0.05, k, z=z)
+                    elif face == 'N':
+                        ins_rail(xs[i] + 0.25, Y1 + 0.05, xs[i + 1] - 0.25, Y1 + 0.05, k, z=z)
+                    elif face == 'W':
+                        ins_rail(X0 - 0.05, ys[i] + 0.25, X0 - 0.05, ys[i + 1] - 0.25, k, z=z)
+                    else:
+                        ins_rail(X1 + 0.05, ys[i] + 0.25, X1 + 0.05, ys[i + 1] - 0.25, k, z=z)
+    # stairs: straight concrete flights alternating in the stair hole
+    if stair:
+        hx0, hy0, hx1, hy1 = stair['hole']
+        wdt = (hx1 - hx0 - 0.2) if stair['to_floor'] == 1 else (hx1 - hx0) / 2 - 0.1
+        for f in range(stair['to_floor']):
+            z0 = 0.16 if f == 0 else f * INS_FH
+            z1 = (f + 1) * INS_FH
+            if f % 2 == 0:
+                stairs(name + f'_st{f}', hx0 + wdt / 2 + 0.1, (hy0 + hy1) / 2, z0, z1, hy1 - hy0, wdt, k['conc'], axis='Y', direction=1)
+            else:
+                stairs(name + f'_st{f}', hx1 - wdt / 2 - 0.05, (hy0 + hy1) / 2, z0, z1, hy1 - hy0, wdt, k['conc'], axis='Y', direction=-1)
+        # landings rail around the hole on the top served floor
+        zt = stair['to_floor'] * INS_FH
+        ins_rail(hx0, hy0, hx1, hy0, k, z=zt) if stair['to_floor'] % 2 == 1 else ins_rail(hx0, hy1, hx1, hy1, k, z=zt)
+    # rebar starter bars on top of the columns (building will grow)
+    if roof_open:
+        for x in xs:
+            for y in ys:
+                for dx in (-0.12, 0.12):
+                    for dy in (-0.12, 0.12):
+                        cyl('starter', 0.012, 1.1, (x + dx, y + dy, floors * INS_FH + 0.55), m=k['rebar'], axis='Z', verts=5)
+    return X1, Y1
+
+
+def ins_scaffold(x0, x1, y, h, k, facing=-1):
+    """facade scaffold (tube & fitting) with toe boards and green shade net; blocked volume (not climbable)"""
+    root = empty('scaff', (0, 0, 0))
+    n = max(1, int((x1 - x0) / 2.0))
+    for i in range(n + 1):
+        x = x0 + (x1 - x0) * i / n
+        for d in (0.25, 1.35):
+            cyl('sc_std', 0.024, h, (x, y + facing * d, h / 2), m=k['steel'], parent=root, axis='Z', verts=6)
+    for lv in range(1, int(h / 2.0) + 1):
+        z = lv * 2.0
+        box('sc_board', (x1 - x0, 0.95, 0.05), ((x0 + x1) / 2, y + facing * 0.8, z), m=k['planks'], parent=root)
+        for d in (0.25, 1.35):
+            cyl('sc_ledger', 0.022, x1 - x0, ((x0 + x1) / 2, y + facing * d, z + 1.0), (0, 0, (90)), m=k['steel'], parent=root, axis='Y', verts=6)
+    for i in range(n):
+        xa, xb = x0 + (x1 - x0) * i / n, x0 + (x1 - x0) * (i + 1) / n
+        ang = math.degrees(math.atan2(2.0, xb - xa))
+        cyl('sc_brace', 0.02, math.hypot(xb - xa, 2.0), ((xa + xb) / 2, y + facing * 1.4, 1.0 + (i % 4) * 2.0), (0, (90 - ang), 0), m=k['steel'], parent=root, axis='Z', verts=6)
+    box('sc_net', (x1 - x0, 0.02, h - 0.6), ((x0 + x1) / 2, y + facing * 1.45, h / 2 + 0.3), m=k['net'], parent=root)
+    col(((x0 + x1) / 2, y + facing * 0.85, h / 2), (x1 - x0, 1.5, h))
+
+
+def ins_silo(x, y, k):
+    """cement silo on four legs (walk underneath), the second tall landmark after the crane"""
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            box('silo_leg', (0.22, 0.22, 4.4), (x + sx * 1.05, y + sy * 1.05, 2.2), m=k['white'])
+            col((x + sx * 1.05, y + sy * 1.05, 2.2), (0.24, 0.24, 4.4))
+        box('silo_brace', (2.1, 0.08, 0.08), (x, y + sx * 1.05, 1.5), (0, (32), 0), m=k['white'])
+    lathe('silo_hopper', [(0.25, 3.2), (1.45, 4.9)], (x, y, 0), m=k['white'], seg=20)
+    cyl('silo_body', 1.45, 7.5, (x, y, 8.65), m=k['white'], axis='Z', verts=24)
+    cyl('silo_band', 1.47, 0.6, (x, y, 10.8), m=k['red'], axis='Z', verts=24)
+    lathe('silo_roof', [(1.45, 12.4), (0.3, 13.1)], (x, y, 0), m=k['white'], seg=20)
+    cyl('silo_pipe', 0.09, 12.0, (x + 1.55, y, 6.6), m=k['steel'], axis='Z', verts=8)
+    for i in range(16):
+        box('silo_ladder', (0.4, 0.04, 0.03), (x - 1.55, y, 4.9 + i * 0.45), m=k['steel'])
+    col((x, y, 8.65), (2.9, 2.9, 7.5))
+
+
+def ins_rebar_rack(x, y, rot, k, n_bundles=4):
+    root = empty('rebar_rack', (x, y, 0)); root.rotation_euler = (0, 0, math.radians(rot))
+    for sy in (-2.6, 0, 2.6):
+        for sx in (-0.75, 0.75):
+            box('rr_post', (0.12, 0.12, 1.5), (sx, sy, 0.75), m=k['dark'], parent=root)
+        for z in (0.45, 1.05):
+            box('rr_arm', (1.7, 0.1, 0.08), (0, sy, z), m=k['dark'], parent=root)
+    for b in range(n_bundles):
+        z = 0.53 if b < 2 else 1.13
+        xo = -0.4 if b % 2 == 0 else 0.4
+        for i in range(10):
+            cyl('rr_bar', 0.014, 6.2, (xo + (i % 5) * 0.04 - 0.08, 0, z + (i // 5) * 0.035), m=k['rebar'], parent=root, axis='Y', verts=5)
+    c, s_ = math.cos(math.radians(rot)), math.sin(math.radians(rot))
+    col((x, y, 0.75), (1.7, 6.2, 1.5), rotz=rot)
+
+
+def ins_cement_pallet(x, y, rot, k, layers=4):
+    root = empty('cem', (x, y, 0)); root.rotation_euler = (0, 0, math.radians(rot))
+    box('cem_pal', (1.2, 1.0, 0.14), (0, 0, 0.07), m=k['planks'], parent=root)
+    for L in range(layers):
+        for i in range(2):
+            for j in range(3 if L % 2 == 0 else 2):
+                if L % 2 == 0:
+                    box('cem_bag', (0.58, 0.32, 0.13), (-0.3 + i * 0.6, -0.33 + j * 0.33, 0.21 + L * 0.14), m=k['bag'], parent=root, bevel=0.04)
+                else:
+                    box('cem_bag', (0.38, 0.48, 0.13), (-0.4 + j * 0.4 + 0.2, -0.25 + i * 0.5, 0.21 + L * 0.14), m=k['bag'], parent=root, bevel=0.04)
+    box('cem_wrap', (1.18, 0.98, 0.02), (0, 0, 0.16 + layers * 0.14), m=k['tarp'], parent=root) if layers >= 4 else None
+    col((x, y, (0.14 + layers * 0.14) / 2), (1.2, 1.0, 0.14 + layers * 0.14), rotz=rot)
+
+
+def ins_precast_stack(x, y, rot, n, k):
+    """precast hollow-core floor planks on timber bearers"""
+    root = empty('precast', (x, y, 0)); root.rotation_euler = (0, 0, math.radians(rot))
+    z = 0
+    for i in range(n):
+        for by in (-1.5, 1.5):
+            box('pc_bearer', (1.3, 0.1, 0.1), (0, by, z + 0.05), m=k['wood'], parent=root)
+        box('pc_plank', (1.2, 4.6, 0.26), (RND.uniform(-0.04, 0.04), RND.uniform(-0.06, 0.06), z + 0.23), m=k['conc'], parent=root, bevel=0.02)
+        for c_ in range(4):
+            cyl('pc_core', 0.07, 4.62, (-0.42 + c_ * 0.28, 0, z + 0.23), m=k['dark'], parent=root, axis='Y', verts=8)
+        z += 0.36
+    col((x, y, z / 2), (1.3, 4.7, z), rotz=rot)
+
+
+def ins_wheelbarrow(x, y, rot, k):
+    root = empty('wb', (x, y, 0)); root.rotation_euler = (0, 0, math.radians(rot))
+    lathe('wb_tray', [(0.15, 0.32), (0.42, 0.62)], (0, 0, 0), m=k['orange'], parent=root, seg=10).scale = (0.85, 1.25, 1.0)
+    cyl('wb_wheel', 0.18, 0.08, (0, 0.62, 0.18), m=M('tire', (0.03, 0.03, 0.03), 0.9), parent=root, axis='X', verts=14)
+    for sx in (-0.25, 0.25):
+        cyl('wb_handle', 0.018, 1.4, (sx, -0.25, 0.45), ((-12), 0, 0), m=k['dark'], parent=root, axis='Y', verts=6)
+        box('wb_leg', (0.03, 0.03, 0.32), (sx, -0.3, 0.16), m=k['dark'], parent=root)
+
+
+def ins_toilet(x, y, rot, k, col_=None):
+    root = empty('wc', (x, y, 0)); root.rotation_euler = (0, 0, math.radians(rot))
+    shell = M('wc_blue', (0.1, 0.32, 0.6), 0.45) if col_ is None else col_
+    box('wc_body', (1.1, 1.1, 2.2), (0, 0, 1.12), m=shell, parent=root, bevel=0.04)
+    box('wc_roof', (1.2, 1.2, 0.1), (0, 0, 2.28), m=k['plastic'], parent=root, bevel=0.03)
+    box('wc_door', (0.8, 0.04, 1.85), (0, -0.57, 1.05), m=k['plastic'], parent=root, bevel=0.02)
+    col((x, y, 1.15), (1.15, 1.15, 2.3), rotz=rot)
+
+
+def ins_generator(x, y, rot, k):
+    root = empty('gen', (x, y, 0)); root.rotation_euler = (0, 0, math.radians(rot))
+    box('gen_skid', (1.3, 3.2, 0.16), (0, 0, 0.08), m=k['dark'], parent=root)
+    box('gen_body', (1.2, 3.0, 1.7), (0, 0, 1.0), m=M('gen_yellow', (0.85, 0.62, 0.08), 0.45, 0.3), parent=root, bevel=0.05)
+    for i in range(6):
+        box('gen_louvre', (1.22, 0.06, 0.6), (0, -1.0 + i * 0.12, 1.05), m=k['dark'], parent=root)
+    cyl('gen_exh', 0.06, 0.6, (0.3, 1.1, 2.1), m=k['steel'], parent=root, axis='Z', verts=8)
+    col((x, y, 0.92), (1.3, 3.2, 1.85), rotz=rot)
+
+
+def ins_mortar_mixer(x, y, rot, k):
+    root = empty('mm', (x, y, 0)); root.rotation_euler = (0, 0, math.radians(rot))
+    box('mm_frame', (0.9, 1.2, 0.08), (0, 0, 0.42), m=k['dark'], parent=root)
+    for sx in (-0.4, 0.4):
+        cyl('mm_wheel', 0.22, 0.08, (sx, -0.45, 0.22), m=M('tire', (0.03, 0.03, 0.03), 0.9), parent=root, axis='X', verts=12)
+        box('mm_leg', (0.05, 0.05, 0.42), (sx, 0.5, 0.21), m=k['dark'], parent=root)
+    lathe('mm_drum', [(0.18, 0.0), (0.42, 0.3), (0.42, 0.55), (0.2, 0.85)], (0, 0.1, 0.55), ((35), 0, 0), m=k['orange'], parent=root, seg=16)
+    col((x, y, 0.6), (1.0, 1.3, 1.2), rotz=rot)
+
+
+def map_insaat():
+    mm = begin()
+    k = ins_mats(mm)
+    X0, X1, Y0, Y1 = -40, 40, -34, 34
+    PX0, PX1, PY0, PY1, PD = -10, 10, -10, 6, 2.6        # foundation pit
+
+    # ---------------------------------------------------------------- ground (with the pit cut out)
+    E = 260
+    G0, G1, H0, H1 = X0 - 2, X1 + 2, Y0 - 2, Y1 + 2
+    for (a, b, c_, d) in [(G0, PY1, G1, H1), (G0, H0, G1, PY0), (G0, PY0, PX0, PY1), (PX1, PY0, G1, PY1)]:
+        ground('site', a, b, c_, d, 0, k['dirt'])
+    for (a, b, c_, d) in [(X0 - E, H1, X1 + E, Y1 + E), (X0 - E, Y0 - E, X1 + E, H0), (X0 - E, H0, G0, H1), (G1, H0, X1 + E, H1)]:
+        ground('site_far', a, b, c_, d, 0, k['dirt'])
+    # haul road (gravel) from the south gate to the pit, and a compacted gravel strip along the east
+    box('road_s', (7, 22, 0.04), (1, -23, 0.02), m=k['mud'])
+    box('road_e', (4, 38, 0.04), (18.2, -5, 0.02), m=k['mud'])
+    for (px, py, sx, sy, r) in [(2, -16, 2.4, 1.6, 20), (-3, 10.5, 3.0, 1.8, -10), (16, -8, 2.0, 1.4, 0), (-28, -22, 2.6, 1.6, 35), (30, 22, 2.2, 1.5, 0)]:
+        decal_plane(px, py, 0.04, sx, sy, 'puddle', (r))
+    for (px, py, r) in [(14, -20, 0), (-4, -28, 90)]:
+        decal_plane(px, py, 0.04, 1.6, 1.2, 'oilstain', (r))
+
+    # ---------------------------------------------------------------- MID: foundation pit
+    ground('pit_floor', PX0, PY0, PX1, PY1, -PD, k['lean'])
+    # waterproofing membrane strip + footings and starter columns inside (cover, readable shapes)
+    box('pit_membrane', (PX1 - PX0 - 0.6, 0.8, 0.02), (0, PY1 - 0.7, -PD + 0.01), m=k['membrane'])
+    T = 0.3
+    # retaining walls (shotcrete) — openings where the ramps arrive
+    wall('pit_w', PX0 - T / 2, (PY0 + PY1) / 2, -PD, T, PY1 - PY0 + T * 2, PD, k['soil'])
+    wall('pit_e', PX1 + T / 2, (PY0 + PY1) / 2, -PD, T, PY1 - PY0 + T * 2, PD, k['soil'])
+    wall('pit_n', (PX0 + 4 + PX1) / 2, PY1 + T / 2, -PD, PX1 - PX0 - 4, T, PD, k['soil'])          # gap x -10..-6 (NW ramp)
+    wall('pit_s', (PX0 + PX1 - 4) / 2, PY0 - T / 2, -PD, PX1 - PX0 - 4, T, PD, k['soil'])          # gap x 6..10 (SE ramp)
+    # NW ramp: earth ramp hugging the west wall, descends south from the north edge (y 6 -> -2)
+    ramp('ramp_nw', -8, 2, -PD, 0, 8, 4, k['mud'], 'Y', 1)
+    prof('ramp_nw_fill', [(-2, -PD), (6, -PD), (6, -0.25)], 4, (-8, 0, 0), m=k['soil'], plane='YZ', bevel=0.0)
+    wall('ramp_nw_side', -5.85, 2, -PD, 0.3, 8, PD, k['conc'])
+    # SE ramp: hugs the east wall, descends north from the south edge (y -10 -> -2)
+    ramp('ramp_se', 8, -6, -PD, 0, 8, 4, k['mud'], 'Y', -1)
+    prof('ramp_se_fill', [(-10, -0.25), (-10, -PD), (-2, -PD)], 4, (8, 0, 0), m=k['soil'], plane='YZ', bevel=0.0)
+    wall('ramp_se_side', 5.85, -6, -PD, 0.3, 8, PD, k['conc'])
+    # NE steel stair (third way in/out of the pit)
+    stairs('pit_stair', 7.6, 4.4, -PD, 0, 4.6, 1.3, k['steel'], axis='X', direction=1)
+    for sy in (3.7, 5.1):
+        cyl('ps_rail', 0.025, 5.3, (7.6, sy, -PD / 2 + 0.95), (0, (90 - math.degrees(math.atan2(PD, 4.6))), 0), m=k['yellow'], axis='Z', verts=6)
+    # pit interior cover: footings with starter bars, formwork columns, rebar mats, a pump
+    for (fx, fy) in [(-3.5, -6.5), (2.5, -5.0), (-1.0, 1.5), (3.5, 2.0), (-4.5, -1.5)]:
+        wall('footing', fx, fy, -PD, 2.2, 2.2, 0.7, k['conc'])
+        wall('pit_col', fx, fy, -PD + 0.7, 0.45, 0.45, 2.6 if (fx, fy) in [(2.5, -5.0), (-1.0, 1.5)] else 1.2, k['conc'])
+        for dx in (-0.14, 0.14):
+            for dy in (-0.14, 0.14):
+                cyl('ft_bar', 0.012, 1.1, (fx + dx, fy + dy, -PD + (3.3 if (fx, fy) in [(2.5, -5.0), (-1.0, 1.5)] else 1.9) + 0.5), m=k['rebar'], axis='Z', verts=5)
+    for (mx, my, r) in [(0.5, -8.2, 0), (-6.5, -7.8, 90)]:
+        box('rebar_mat', (2.4, 4.8, 0.32), (mx, my, -PD + 0.16), (0, 0, (r)), m=k['rebar'])
+        col((mx, my, -PD + 0.16), (2.4, 4.8, 0.32), rotz=r)
+    # rebar cages waiting on the short starter columns (vertical bars + stirrups every 25 cm)
+    for (fx, fy) in [(-3.5, -6.5), (3.5, 2.0), (-4.5, -1.5)]:
+        z0 = -PD + 1.9
+        for i in range(8):
+            ang = i / 8 * math.tau
+            cyl('cage_bar', 0.012, 2.4, (fx + math.cos(ang) * 0.2, fy + math.sin(ang) * 0.2, z0 + 1.2), m=k['rebar'], axis='Z', verts=4)
+        for j in range(9):
+            torus('cage_ring', 0.2, 0.008, (fx, fy, z0 + 0.15 + j * 0.27), m=k['rebar'], seg=12, mseg=3)
+    # plywood formwork panels leaning on the retaining walls, water drums
+    ply = M('formwork', (0.62, 0.48, 0.3), 0.85)
+    for (px, py, r, n) in [(-9.55, -4.0, 90, 4), (-9.55, -7.5, 90, 3), (9.55, 0.0, 270, 4), (2.0, 5.55, 180, 3)]:
+        c_, s2 = math.cos(math.radians(r)), math.sin(math.radians(r))
+        for i in range(n):
+            box('ply', (1.22, 0.02, 2.44), (px + c_ * (i * 0.05) + (-s2) * (i * 0.3 - 0.4), py + s2 * (i * 0.05) + c_ * (i * 0.3 - 0.4), -PD + 1.15), (-12, 0, r), m=ply)
+        col((px, py, -PD + 1.1), (1.4 if r in (0, 180) else 0.5, 0.5 if r in (0, 180) else 1.4, 2.2), rotz=0)
+    for (bx2, by2) in [(-8.6, 4.6), (-7.9, 4.9), (6.8, -9.0)]:
+        cyl('drum', 0.29, 0.88, (bx2, by2, -PD + 0.44), m=M('barrel_blue', (0.1, 0.25, 0.6), 0.4, 0.3), axis='Z', verts=16)
+        col((bx2, by2, -PD + 0.44), (0.58, 0.58, 0.88))
+    box('pump', (0.8, 1.1, 0.7), (4.2, -1.8, -PD + 0.35), m=M('gen_yellow', (0.85, 0.62, 0.08), 0.45, 0.3), bevel=0.05)
+    col((4.2, -1.8, -PD + 0.35), (0.8, 1.1, 0.7))
+    cyl('pump_hose', 0.06, 9.0, (4.2, 2.8, -PD + 0.07), m=mm['cable'], axis='Y', verts=6)
+    # pit edge protection: jersey barriers + guard rails, gaps at the three ways in
+    for (jx, jy, r) in [(-2.2, 7.1, 90), (1.0, 7.1, 90), (4.2, 7.1, 90), (-6.2, -10.8, 90), (-3.0, -10.8, 90), (0.2, -10.8, 90)]:
+        jersey(jx, jy, r, mm)
+    ins_rail(-10.6, -9.8, -10.6, 5.6, k)
+    ins_rail(10.6, -9.8, 10.6, 3.2, k)
+    ins_rail(5.8, 6.6, 9.8, 6.6, k)
+    ins_rail(3.4, -10.6, 5.6, -10.6, k)
+
+    # ---------------------------------------------------------------- landmarks
+    tower_crane(14, 10, mm)
+    ins_silo(-14.5, 21.5, k)
+
+    # ---------------------------------------------------------------- WEST: BLOK-A (3 storeys, 3x4 bays of 6 m)
+    W, D = 'win', 'door'
+    faces_a = {
+        0: {'E': ['full', 'wide', 'full', 'wide'], 'W': ['win', 'full', 'win', 'full'],
+            'S': ['full', 'full', 'door'], 'N': ['full', 'full', 'door']},
+        1: {'E': [W, W, 'none', W], 'W': [W, W, W, 'full'], 'S': ['full', W, 'low'], 'N': [W, 'full', W]},
+        2: {'E': ['low', 'none', 'low', 'none'], 'W': ['low', 'none', 'none', 'low'], 'S': ['none', 'low', 'none'], 'N': ['low', 'none', 'none']},
+    }
+    ins_rc_block('blokA', -36, -12, 3, 4, 6.0, 3, k, faces_a, stair=dict(hole=(-29.6, -5.8, -25.4, -0.2), to_floor=2), roof_open=True)
+    # ground floor partitions: rooms on the west two bays, open corridor along the east bay (walk-through lane)
+    for (ax, ay, bx, by, kind) in [(-30, -12, -30, -6, 'full'), (-30, -6, -30, 0, D), (-30, 0, -30, 6, 'full'), (-30, 6, -30, 12, D),
+                                   (-24, -12, -24, -6, D), (-24, 0, -24, 6, D), (-36, 0, -30, 0, D), (-30, 6, -24, 6, 'full')]:
+        ins_infill('blokA_part', ax, ay, bx, by, 0.16, kind, k)
+    ins_scaffold(-36.2, -24.3, -12.25, 9.0, k, facing=-1)
+    # interior dressing (sparse, readable): cement pallets, block pallets, a work light, plaster buckets
+    for (px, py, r, L) in [(-21, -8, 0, 5), (-21.5, 9, 15, 3), (-33, 3, 90, 4), (-27, 9, 0, 5)]:
+        ins_cement_pallet(px, py, r, k, L)
+    block_stack(-33.5, -9.5, 1.3, 1.3, 1.4)
+    block_stack(-20.5, 2.5, 1.3, 2.6, 0.9)
+    ins_cement_pallet(-21, -4, 0, k, 3)                                            # floor 1
+    for (px, py) in [(-21.0, 4.0), (-33.0, -8.0)]:
+        ins_cement_pallet(px, py, 0, k, 4)
+    # floor-1 cover (they rest on the slab at z=3.2): stacked blocks
+    for (bx_, by_, sx, sy) in [(-21.0, -2.0, 1.3, 1.3), (-21.0, 7.5, 2.6, 1.3), (-33.0, -3.5, 1.3, 1.3)]:
+        box('blocks1', (sx, sy, 1.0), (bx_, by_, INS_FH + 0.5), m=k['conc'], bevel=0.02)
+        col((bx_, by_, INS_FH + 0.5), (sx, sy, 1.0))
+
+    # ---------------------------------------------------------------- EAST: container alley, BLOK-B, precast yard
+    container(21.5, -14, 0, 0, mm['c_blue'], mm)
+    container(21.5, -14, 2.59, 0, mm['c_white'], mm)
+    container(21.5, -5.0, 0, 0, mm['c_grey'], mm)
+    container(22.4, 24.5, 0, 0, mm['c_red'], mm)
+    faces_b = {
+        0: {'N': ['full', 'full'], 'E': ['full', 'full'], 'W': ['none', 'none'], 'S': ['none', 'none']},
+        1: {'N': ['full', W], 'E': ['full', 'full'], 'W': [W, W], 'S': ['low', 'none']},
+    }
+    ins_rc_block('blokB', 26, -2, 2, 2, 6.0, 2, k, faces_b, stair=dict(hole=(33.0, -1.6, 34.6, 4.0), to_floor=1))
+    for (px, py, r, n) in [(29, -10, 0, 3), (35, -16, 90, 4), (27, -21, 0, 2), (32, 22, 90, 3)]:
+        ins_precast_stack(px, py, r, n, k)
+    container(34.5, -26.5, 0, 90, mm['c_orange'], mm)
+    container(34.5, -26.5, 2.59, 90, mm['c_grey'], mm)
+    ins_generator(26.5, -27, 90, k)
+    for (rx, ry) in [(36, 1.5), (28.5, 16.5)]:
+        cable_reel(rx, ry, mm)
+
+    # ---------------------------------------------------------------- NORTH: A side — site office row + yard
+    for (cx, r, cm) in [(-6.1, 90, mm['c_white']), (0.0, 90, mm['c_white']), (6.1, 90, mm['c_grey'])]:
+        container(cx, 23.0, 0, r, cm, mm)
+    container(0.0, 23.0, 2.59, 90, mm['c_white'], mm)
+    container(6.1, 23.0, 2.59, 90, mm['c_blue'], mm)
+    stairs('office_st', -9.75, 21.0, 0, 2.59, 4.2, 1.2, k['steel'], axis='Y', direction=1)   # roof of the west office
+    ins_rail(-9.1, 24.3, -3.1, 24.3, k, z=2.59)
+    box('office_sign', (5.6, 0.08, 0.95), (3.0, 21.7, 4.0), m=sign_mat('santiye'))
+    ins_generator(11.2, 23.0, 90, k)
+    ins_toilet(-11.0, 24.5, 0, k); ins_toilet(-12.3, 24.5, 0, k)
+    container(-14.0, 15.5, 0, 0, mm['c_green'], mm)                    # material store (blocks the W diagonal)
+    container(16.5, 17.8, 0, 90, mm['c_grey'], mm)                    # tool store (blocks the E lane sightline)
+    ins_rebar_rack(-29, 18, 90, k)
+    ins_rebar_rack(-22, 18, 90, k, 3)
+    ins_rebar_rack(28.5, 26.5, 90, k)
+    for (fx, fy) in [(-5.5, 15.0), (5.0, 14.0)]:
+        for kk in range(5):
+            box('formwork_stack', (2.5, 1.25, 0.1), (fx, fy, 0.05 + kk * 0.11), (0, 0, (RND.uniform(-5, 5))), m=k['wood'])
+        col((fx, fy, 0.3), (2.5, 1.25, 0.6))
+    ins_mortar_mixer(-18, 14.5, 30, k)
+    ins_wheelbarrow(-16.5, 13.2, 200, k)
+    ins_wheelbarrow(24.5, 15.0, 80, k)
+    ins_cement_pallet(-8.5, 12.5, 10, k, 5)
+    ins_cement_pallet(9.0, 13.5, -8, k, 4)
+    pallet_stack(30.5, 30.0, 4, mm)
+    pallet_stack(-31, 29.5, 5, mm, rot=10)
+
+    # ---------------------------------------------------------------- SOUTH: B side — gate, gatehouse, trucks, aggregate bays
+    container(-12.0, -25.0, 0, 90, mm['c_white'], mm)                 # gatehouse
+    stairs('gate_st', -15.65, -27.0, 0, 2.59, 4.2, 1.2, k['steel'], axis='Y', direction=1)
+    ins_rail(-15.0, -23.7, -9.0, -23.7, k, z=2.59)
+    truck(2.0, -25.0, 90, mm, mm['c_red'])
+    mixer(14.0, -19.0, 0, mm)
+    ins_bin(-14.5, -15.5, 4.2, 3.2, 1.8, 180, k)
+    ins_mound('sand', -14.5, -15.8, 2.0, 1.5, k['sand'], 0.75)
+    ins_bin(-9.4, -15.5, 4.2, 3.2, 1.8, 180, k)
+    ins_mound('gravel_pile', -9.4, -15.8, 2.0, 1.4, k['gravel'], 0.75)
+    ins_mound('spoil', -30.5, -27.0, 4.2, 2.1, k['dirt'], 0.8, 25)     # excavated spoil heap (SW cover)
+    for (bx_, by_, sx, sy, sz) in [(-3.5, -16.5, 2.6, 1.3, 1.0), (5.5, -15.0, 1.3, 1.3, 1.7), (-22.5, -19.5, 1.3, 2.6, 1.3), (24.5, -4.0, 1.3, 1.3, 1.0)]:
+        block_stack(bx_, by_, sx, sy, sz)
+    for (jx, jy, r) in [(-22, -26, 0), (22, -24, 0), (-6, -21, 90)]:
+        jersey(jx, jy, r, mm)
+    for (cx, cy) in [(-1.5, -18.5), (3.5, -18.5), (-1.5, -29), (3.5, -29.5), (10.0, -13.0)]:
+        cone(cx, cy)
+    ins_toilet(-36.5, -30.5, 90, k); ins_toilet(-36.5, -29.2, 90, k)
+    ins_wheelbarrow(-25, -16.5, 120, k)
+    for (rx, ry) in [(-34.5, -20.5), (8.5, -30.5)]:
+        cable_reel(rx, ry, mm)
+    # west back alley (flank behind BLOK-A): narrowed by block pallets
+    for (bx_, by_) in [(-38.2, -6.5), (-38.2, 5.0)]:
+        block_stack(bx_, by_, 1.3, 1.3, 1.7)
+
+    # ---------------------------------------------------------------- perimeter + lights
+    hoarding(X0 - 0.6, Y0 - 0.6, X1 + 0.6, Y1 + 0.6, mm)
+    for (lx, ly) in [(-38.5, -32.5), (38.5, 32.5), (-38.5, 32.5), (38.5, -32.5)]:
+        light_tower(lx, ly, mm, h=11)
+
+    # ---------------------------------------------------------------- spawns (8 + 8)
+    spawns_a = [(-14, 29.5, 180), (-8, 30.5, 180), (-2, 29.5, 180), (4, 30.5, 180), (10, 29.5, 180), (15, 30.5, 185), (-18, 31, 170), (19, 31.5, 190)]
+    spawns_b = [(14, -30.5, 0), (8, -29.5, 0), (-2, -30.5, 0), (-8, -29.5, 0), (-14, -30.5, 5), (18, -31, 355), (-19, -31, 10), (24, -30.5, 350)]
+    for i, (x, y, yaw) in enumerate(spawns_a + spawns_b):
+        spawn(x, y, 0.1, yaw, 'a' if i < len(spawns_a) else 'b')
+    bounds_walls(X0, Y0, X1, Y1, 22)
+    # terrain under the foundation pit is cut out (Godot x/z: z = -blender y)
+    finalize('insaat', dict(preset='day', sun=[-48, 35], fog=0.004, sky='day'), [X0, Y0, X1, Y1],
+             extra=dict(terrain_holes=[[PX0 - 1.0, -PY1 - 1.0, PX1 + 1.0, -PY0 + 1.0]], hide=['bg_block', 'bg_win']))
+
+
 def berm(x, y, length, rot, mm, h=1.5):
     """earth trench wall with a sandbag crest (cover on both sides)"""
     root = empty('berm', (x, y, 0)); root.rotation_euler = (0, 0, math.radians(rot))

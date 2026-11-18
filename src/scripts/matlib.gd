@@ -67,11 +67,26 @@ var DEFS := {
 	"ruin_stone_dark": ["ashlar", 0.6, Color(0.62, 0.62, 0.66), 0.92, 0, {}],
 	"path_stone": ["cobble", 0.5, Color(0.9, 0.88, 0.85), -1, 0, {}],
 	# İnşaat / Çanakkale
-	"site_dirt": ["dryground", 0.22, Color(0.92, 0.9, 0.9), 0.97, 0, {}],
+	"site_dirt": ["dryground", 0.34, Color(0.92, 0.9, 0.9), 0.97, 0, {}],
 	"gravel": ["gravel2", 0.45, Color(0.92, 0.9, 0.87), 0.95, 0, {}],
 	"sand": ["sand", 0.3, Color(1.0, 0.97, 0.92), -1, 0, {}],
 	"rebar_rust": ["rust", 2.0, Color(1, 1, 1), -1, -1, {}],
 	"crane_yellow": ["paintmetal", 0.8, Color(0.82, 0.6, 0.12), 0.55, 0.3, {}],
+	# v4.11 İnşaat yenilemesi
+	"lean_concrete": ["rawconc", 0.25, Color(0.8, 0.82, 0.84), 0.8, 0, {}],
+	"tarp_blue": ["sandbag", 1.2, Color(0.25, 0.45, 0.85), 0.75, 0, {}],
+	"gen_yellow": ["paintmetal", 0.7, Color(0.85, 0.62, 0.1), 0.5, 0.3, {}],
+	"wc_blue": ["paintmetal", 0.5, Color(0.2, 0.42, 0.75), 0.4, 0.0, {}],
+	"membrane_black": ["sandbag", 1.5, Color(0.12, 0.12, 0.13), 0.55, 0, {}],
+	# v4.11 Poly Haven setleri (CC0)
+	"mud_ground": ["mud", 0.22, Color(1, 1, 1), -1, 0, {}],
+	"soil_wall": ["soilwall", 0.3, Color(1, 1, 1), -1, 0, {}],
+	"plaster_brick": ["plasterbrick", 0.42, Color(1, 1, 1), -1, 0, {}],
+	"fort_wall": ["fortwall", 0.25, Color(1, 1, 1), -1, 0, {}],
+	"rust_sheet": ["rustsheet", 0.45, Color(1, 1, 1), -1, -1, {}],
+	"dry_grass2": ["drygrass", 0.22, Color(1, 1, 1), -1, 0, {}],
+	"plank_siding": ["siding", 0.5, Color(1, 1, 1), -1, 0, {}],
+	"white_plaster": ["whiteplaster", 0.35, Color(1, 1, 1), -1, 0, {}],
 	"scaffold_net": ["", 1.0, Color(0.08, 0.26, 0.16, 0.8), 0.9, 0, {"cull": false}],
 	"fence_mesh": ["corrugated", 2.0, Color(0.7, 0.72, 0.74), 0.4, 0.8, {}],
 	"fence_banner": ["", 1.0, Color(0.08, 0.3, 0.55), 0.75, 0, {"cull": false}],
@@ -195,6 +210,9 @@ func tex(name: String) -> Texture2D:
 	var t: Texture2D = null
 	if ResourceLoader.exists(TEX + name):
 		t = load(TEX + name)
+	elif name.ends_with(".png") and ResourceLoader.exists(TEX + name.get_basename() + ".jpg"):
+		# v4.11: Poly Haven 4K/2K sets are stored as high-quality JPEG sources
+		t = load(TEX + name.get_basename() + ".jpg")
 	tex_cache[name] = t
 	return t
 
@@ -326,7 +344,7 @@ func _tone(name: String, m: Material) -> void:
 			(m as StandardMaterial3D).albedo_color = Color(lerp(c.r, l, 0.3), lerp(c.g, l, 0.3), lerp(c.b, l, 0.3), c.a) * 0.94
 			return
 
-const MACRO_SETS := ["rockface", "sand", "snow", "concrete", "rawconc", "dryground", "dirt", "grass", "gravel2", "asphalt", "cobble", "paver", "plaster", "stonewall", "brick", "ashlar", "rooftiles"]
+const MACRO_SETS := ["mud", "soilwall", "drygrass", "fortwall", "rockface", "sand", "snow", "concrete", "rawconc", "dryground", "dirt", "grass", "gravel2", "asphalt", "cobble", "paver", "plaster", "stonewall", "brick", "ashlar", "rooftiles"]
 
 func build(d: Array) -> StandardMaterial3D:
 	var s := StandardMaterial3D.new()

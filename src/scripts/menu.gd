@@ -2027,8 +2027,8 @@ func _page_lobby() -> void:
 	nv.alignment = BoxContainer.ALIGNMENT_END
 	nm2.add_child(nv)
 	nv.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, UI.ACCENT2, "Rajdhani-Bold"))
-	nv.add_child(UI.lbl("GRAFİK YENİLEMESİ", 26, Color.WHITE, "RussoOne-Regular"))
-	nv.add_child(_wrap("Yeni gerçekçi dokular (asfalt, beton, sıva, çim, kaya, ahşap, metal), gerçek ağaçlar, sokaklı şehirler ve yeni Doğal renk paketi. Ayarlar > Grafik > Renk Paketi.", 15))
+	nv.add_child(UI.lbl("YENİ İNŞAAT HARİTASI", 26, Color.WHITE, "RussoOne-Regular"))
+	nv.add_child(_wrap("Kartal Konutları şantiyesi sıfırdan: 3 katlı blok, temel çukuru, kule vinç. Haritaların çevresinde fotogerçekçi ağaçlar, 4K beton, tuğla, taş ve asfalt.", 15))
 	right.add_child(_rewards_strip())
 	var mp := UI.glass(12, 4)
 	right.add_child(mp)

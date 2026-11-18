@@ -17,6 +17,7 @@ var occ := {}                # coarse occupancy grid (8 m cells) so trees avoid 
 var q := 1.0                 # density factor from the graphics preset
 var sea_dir := Vector2.ZERO
 var sea_y := -2.5
+var holes: Array = []          # v4.11: [x0, z0, x1, z1] rects (Godot x/z) where the terrain is cut (pits under the map)
 
 const THEMES := {
 	# relief: mountain height far away; flat: flat ring width before hills; tex: near/far/rock textures
@@ -261,9 +262,19 @@ func _terrain() -> void:
 		for i in N:
 			var a0 := j * (N + 1) + i
 			var b0 := a0 + N + 1
+			if not holes.is_empty():
+				var cen := (verts[a0] + verts[b0 + 1]) * 0.5
+				var cut := false
+				for hr in holes:
+					if cen.x > float(hr[0]) and cen.x < float(hr[2]) and cen.z > float(hr[1]) and cen.z < float(hr[3]):
+						cut = true
+						break
+				if cut:
+					continue
 			idx[k] = a0; idx[k + 1] = a0 + 1; idx[k + 2] = b0
 			idx[k + 3] = a0 + 1; idx[k + 4] = b0 + 1; idx[k + 5] = b0
 			k += 6
+	idx.resize(k)
 	var arr := []
 	arr.resize(Mesh.ARRAY_MAX)
 	arr[Mesh.ARRAY_VERTEX] = verts
@@ -821,65 +832,90 @@ func _tree_mesh(kind: String, far: bool) -> Mesh:
 const TREE_SHADER := """
 shader_type spatial;
 render_mode cull_disabled, diffuse_lambert_wrap, specular_disabled, depth_prepass_alpha;
-// v4.9 photographic tree billboards (Higgsfield-generated, background removed) from a 3x3 atlas:
-// row 0 spruce, row 1 broadleaf / poplar, row 2 olive. Cylindrical billboard that leans back a little
-// when seen from above (helicopter), soft wind sway, a fake rounded-crown normal for nice lighting.
+// v4.11 multi-view tree impostors baked from photoscanned CC0 trees (Poly Haven): 8 azimuth views per
+// tree, albedo + view-space normal per view. The two nearest views are blended by camera azimuth relative
+// to the instance yaw, the baked normal is rebuilt in world space -> trees take real sun light.
 uniform sampler2D atlas : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
+uniform sampler2D natlas : filter_linear_mipmap_anisotropic, repeat_disable;
+uniform float rows = 7.0;
 varying vec3 tint;
 varying float hy;
+varying vec3 v_rt;
+varying vec3 v_up;
+varying vec3 v_fw;
+varying vec2 uv_a;
+varying vec2 uv_b;
+varying float wb;
 void vertex() {
 	vec3 org = MODEL_MATRIX[3].xyz;
 	float sx = length(MODEL_MATRIX[0].xyz);
 	float sy = length(MODEL_MATRIX[1].xyz);
+	float yaw = atan(MODEL_MATRIX[0].z, MODEL_MATRIX[0].x);
 	vec3 tc = CAMERA_POSITION_WORLD - org;
 	vec3 fw = normalize(vec3(tc.x, 0.0001, tc.z));
 	vec3 rt = normalize(cross(vec3(0.0, 1.0, 0.0), fw));
-	float lean = clamp(normalize(tc).y, 0.0, 1.0) * 0.3;
+	float lean = clamp(normalize(tc).y, 0.0, 1.0) * 0.18;
 	vec3 up = normalize(vec3(0.0, 1.0, 0.0) + fw * lean);
-	float k = UV.y;                   // 0 top .. 1 bottom
-	float sway = sin(TIME * 0.9 + org.x * 0.13 + org.z * 0.07) * 0.018 * (1.0 - k) * (1.0 - k) * sy;
+	float k = UV.y;
+	float sway = sin(TIME * 0.9 + org.x * 0.13 + org.z * 0.07) * 0.012 * (1.0 - k) * (1.0 - k) * sy;
 	vec3 wp = org + rt * (VERTEX.x * sx + sway) + up * (VERTEX.y * sy);
 	POSITION = PROJECTION_MATRIX * VIEW_MATRIX * vec4(wp, 1.0);
-	vec3 n = normalize(fw * 0.75 + rt * (UV.x * 2.0 - 1.0) * 0.8 + vec3(0.0, 1.0, 0.0) * (0.35 + 0.6 * (1.0 - k)));
-	NORMAL = mat3(VIEW_MATRIX) * n;
-	float cell = INSTANCE_CUSTOM.a;
-	vec2 cc = vec2(mod(cell, 3.0), floor(cell / 3.0));
-	UV = (cc * vec2(320.0, 640.0) + vec2(4.0, 2.0) + UV * vec2(312.0, 636.0)) / vec2(1024.0, 2048.0);
+	NORMAL = mat3(VIEW_MATRIX) * fw;
+	v_rt = rt; v_up = up; v_fw = fw;
+	float a = atan(fw.x, fw.z) + yaw;
+	float f = fract(a / 6.2831853) * 8.0;
+	float fa = floor(f);
+	wb = f - fa;
+	float fb = mod(fa + 1.0, 8.0);
+	float row = INSTANCE_CUSTOM.a;
+	vec2 cs = vec2(1.0 / 8.0, 1.0 / rows);
+	uv_a = (vec2(fa, row) + UV) * cs;
+	uv_b = (vec2(fb, row) + UV) * cs;
 	tint = INSTANCE_CUSTOM.rgb;
 	hy = 1.0 - k;
 }
 void fragment() {
-	vec4 c = texture(atlas, UV);
+	vec4 ca = texture(atlas, uv_a);
+	vec4 cb = texture(atlas, uv_b);
+	vec4 c = mix(ca, cb, wb);
 	ALPHA = c.a;
-	ALPHA_SCISSOR_THRESHOLD = 0.45;
+	ALPHA_SCISSOR_THRESHOLD = 0.38;
+	vec3 na = texture(natlas, uv_a).rgb;
+	vec3 nb = texture(natlas, uv_b).rgb;
+	vec3 n = normalize(mix(na, nb, wb) * 2.0 - 1.0);
+	vec3 nw = normalize(v_rt * n.x + v_up * n.y + v_fw * n.z);
+	NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
 	ALBEDO = c.rgb * tint;
-	ROUGHNESS = 1.0;
-	BACKLIGHT = c.rgb * 0.35;
-	AO = mix(0.55, 1.0, smoothstep(0.0, 0.7, hy));
-	AO_LIGHT_AFFECT = 0.3;
+	ROUGHNESS = 0.95;
+	BACKLIGHT = c.rgb * 0.3;
+	AO = mix(0.6, 1.0, smoothstep(0.0, 0.6, hy));
+	AO_LIGHT_AFFECT = 0.25;
 }
 """
 
-const TREE_ASPECT := [0.462, 0.446, 0.479, 0.561, 0.728, 0.301, 0.603, 0.704, 0.624]
+# rows of assets/tex/trees_imp_*.png (see trees_imp.json): fraction of the square cell the tree fills
+const IMP_H := [0.9805, 0.7793, 0.7676, 0.9824, 0.9805, 0.9805, 0.9805]
 
 func _tree_cell(kind: String) -> int:
 	var r := rng.randf()
 	match kind:
 		"conifer":
-			return rng.randi() % 3 if r < 0.88 else 3 + rng.randi() % 2
+			return 4 + rng.randi() % 3 if r < 0.88 else 2 + rng.randi() % 2
 		"olive":
-			return 6 + rng.randi() % 3 if r < 0.8 else (5 if r < 0.9 else 3)
+			return rng.randi() % 2 if r < 0.82 else 2
 		_:
-			if r < 0.62: return 3 + rng.randi() % 2
-			if r < 0.82: return 5         # poplar
-			return rng.randi() % 3
+			if r < 0.45: return 2
+			if r < 0.8: return 3
+			return 4 + rng.randi() % 3
 
 func _trees() -> void:
 	var kind: String = th.get("trees", "broad")
 	var n := int(float(th.get("n_tree", 1000)) * q * 1.6)
 	var xf := []; var cols := []
 	var tries := 0
-	var tree_from := 4.0 if th.get("city", "") in ["sheds", "facility"] else 6.0
+	# v4.11: keep a clear verge around the playable area (real trees, real crown sizes: they must not
+	# overhang the map edge when seen from the helicopter)
+	var tree_from := 9.0 if th.get("city", "") in ["sheds", "facility"] else 13.0
 	while xf.size() < n and tries < n * 5:
 		tries += 1
 		var p := _pick_pos(tree_from, 1100.0, 1.9)
@@ -898,10 +934,10 @@ func _trees() -> void:
 		if h < gy - 0.5 and th.has("sea"):
 			continue
 		var cell := _tree_cell(kind)
-		var hh := rng.randf_range(11.0, 22.0) if cell < 3 else (rng.randf_range(4.5, 7.5) if cell >= 6 else (rng.randf_range(12.0, 18.0) if cell == 5 else rng.randf_range(7.0, 13.0)))
-		var w := hh * float(TREE_ASPECT[cell]) / 0.98 * 1.0
-		# quad mesh is 1 x 1 with its base at y = 0; scale x = width, y = height
-		xf.append(Transform3D(Basis().scaled(Vector3(w, hh, 1.0)), Vector3(x, h - 0.25, z)))
+		var hh := rng.randf_range(4.2, 6.8) if cell < 2 else (rng.randf_range(8.5, 13.5) if cell == 2 else (rng.randf_range(6.5, 10.5) if cell == 3 else rng.randf_range(9.0, 17.0)))
+		var fr := hh / float(IMP_H[cell])      # square impostor cell; the tree fills IMP_H of its height
+		# quad mesh is 1 x 1 with its base at y = 0; scale x = width, y = height; rotation = view yaw
+		xf.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU) * Basis.from_scale(Vector3(fr, fr, 1.0)), Vector3(x, h - 0.25, z)))
 		var tint := Color(rng.randf_range(0.82, 1.08), rng.randf_range(0.86, 1.06), rng.randf_range(0.78, 1.0)) * rng.randf_range(0.8, 1.05)
 		tint.a = float(cell)
 		cols.append(tint)
@@ -914,7 +950,8 @@ func _trees() -> void:
 	var sh := Shader.new()
 	sh.code = TREE_SHADER
 	m.shader = sh
-	m.set_shader_parameter("atlas", MatLib.tex("trees_atlas.png"))
+	m.set_shader_parameter("atlas", MatLib.tex("trees_imp_albedo.png"))
+	m.set_shader_parameter("natlas", MatLib.tex("trees_imp_normal.png"))
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_custom_data = true

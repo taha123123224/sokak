@@ -37,6 +37,37 @@ Oyun içi parlaklık eski renk ayarlarıyla uyumlu olsun diye albedo ortalaması
 | stonewall | [rustic_stone_wall_02](https://polyhaven.com/a/rustic_stone_wall_02) | taş duvarlar (Safranbolu, Çanakkale) |
 | brick2 | [red_brick_03](https://polyhaven.com/a/red_brick_03) | tuğla duvarlar |
 
+## v4.11 — 4K yükseltme ve yeni setler (Poly Haven, CC0)
+
+İndirme: 4K kaynak (Diffuse, nor_gl, arm, varsa Displacement). Projede `assets/tex/<yerel_ad>_{albedo,normal,orm,height}.jpg`.
+
+| Yerel ad | Poly Haven varlığı | Çözünürlük | Kullanım |
+|---|---|---|---|
+| rawconc | [concrete_wall_004](https://polyhaven.com/a/concrete_wall_004) | 4K | beton duvar, kolon, döşeme |
+| plaster | [painted_plaster_wall](https://polyhaven.com/a/painted_plaster_wall) | 4K | sıva cepheler |
+| brick2 | [red_brick_03](https://polyhaven.com/a/red_brick_03) | 4K | tuğla |
+| stonewall | [rustic_stone_wall_02](https://polyhaven.com/a/rustic_stone_wall_02) | 4K | taş duvar |
+| asphalt | [asphalt_02](https://polyhaven.com/a/asphalt_02) | 4K | yol |
+| cobble | [cobblestone_floor_08](https://polyhaven.com/a/cobblestone_floor_08) | 4K | Arnavut kaldırımı |
+| dryground | [dry_ground_01](https://polyhaven.com/a/dry_ground_01) | 2K | kuru toprak (şantiye, kıyı) |
+| mud | [muddy_tracks](https://polyhaven.com/a/muddy_tracks) | 2K | lastik izli çamur |
+| soilwall | [excavated_soil_wall](https://polyhaven.com/a/excavated_soil_wall) | 2K | kazı çukuru duvarı |
+| plasterbrick | [rough_plaster_brick_02](https://polyhaven.com/a/rough_plaster_brick_02) | 2K | yarı sıvalı tuğla |
+| fortwall | [defense_wall](https://polyhaven.com/a/defense_wall) | 2K | sur / tabya duvarı |
+| contside | [container_side](https://polyhaven.com/a/container_side) | 2K | konteyner yan yüzü |
+| rustsheet | [rusty_corrugated_iron](https://polyhaven.com/a/rusty_corrugated_iron) | 2K | paslı oluklu sac |
+| drygrass | [withered_grass](https://polyhaven.com/a/withered_grass) | 2K | kuru ot |
+| siding | [weathered_plank_siding](https://polyhaven.com/a/weathered_plank_siding) | 2K | ahşap kaplama |
+| whiteplaster | [white_plaster_rough_01](https://polyhaven.com/a/white_plaster_rough_01) | 2K | beyaz badana |
+
+## v4.11 — Ağaç impostor'ları (Poly Haven, CC0)
+
+`assets/tex/trees_imp_{albedo,normal}.png` (4096×3584, 7 ağaç × 8 açı), `tools/bake_impostors.py` ile Blender Cycles'ta
+renk + görüş uzayı normali olarak pişirildi:
+[island_tree_01](https://polyhaven.com/a/island_tree_01), [island_tree_02](https://polyhaven.com/a/island_tree_02) (zeytin benzeri),
+[jacaranda_tree](https://polyhaven.com/a/jacaranda_tree) (geniş yapraklı), [tree_small_02](https://polyhaven.com/a/tree_small_02),
+[fir_sapling_medium](https://polyhaven.com/a/fir_sapling_medium) (3 iğne yapraklı). Eski Higgsfield ağaç atlası (`trees_atlas.png`) artık kullanılmıyor.
+
 ## Higgsfield ile üretilen görseller (kullanıcının Higgsfield hesabı, GPT Image 2.6)
 
 | Dosya | İçerik |

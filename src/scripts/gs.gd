@@ -469,7 +469,7 @@ var MAPS := {
 	"safranbolu": {"name": "Safranbolu", "desc": "Osmanlı konakları, Arasta çarşısı ve teraslar. Çok katmanlı çatışma.", "size": "Büyük"},
 	"gemi": {"name": "Gemi", "desc": "Gün batımında Marmara'da yük gemisi. Konteyner koridorları.", "size": "Orta"},
 	"liman": {"name": "Liman Deposu", "desc": "Sisli sabah, konteyner sahası ve depo. Nişancı dostu.", "size": "Büyük"},
-	"insaat": {"name": "İnşaat", "desc": "Yarım kalmış 3 katlı beton bina, vinç ve şantiye. Küçük ve hızlı, yakın çatışma.", "size": "Küçük"},
+	"insaat": {"name": "İnşaat", "desc": "Kartal Konutları şantiyesi: 3 katlı betonarme blok, temel çukuru, kule vinç ve konteyner sokağı. Üç şeritli, dikey oynanış.", "size": "Orta"},
 	"canakkale": {"name": "Çanakkale", "desc": "Boğaz kıyısında taş tabya, top mevzileri ve siper hattı. Gün batımında destansı çatışma.", "size": "Büyük"},
 	"hurda": {"name": "Hurda Sahası", "desc": "Çukurdaki konteyner sahası: hesco bariyerleri, lastikler, sürekli çatışma.", "size": "Küçük", "amb": "amb_site"},
 	"fabrika": {"name": "Paslı Fabrika", "desc": "Terk edilmiş tuğla fabrika kompleksi, avlular, depolar ve bacalar.", "size": "Büyük", "amb": "amb_city"},
@@ -488,7 +488,8 @@ var MODES := {
 }
 ## CC-BY 4.0 assets: [work, author, licence/link] — shown in Ayarlar > Lisanslar
 const CREDITS := [
-	["PBR dokular: asfalt, kaldırım, beton, sıva, çim, toprak, kaya, ahşap, sac, pas, kiremit (24 set)", "Poly Haven", "CC0 · polyhaven.com"],
+	["PBR dokular: asfalt, kaldırım, beton, sıva, çim, toprak, kaya, ahşap, sac, pas, kiremit, kazı toprağı, çamur, sur duvarı (34 set, 6'sı 4K)", "Poly Haven", "CC0 · polyhaven.com"],
+	["Ağaçlar: Island Tree 01/02, Jacaranda Tree, Tree Small 02, Fir Sapling Medium (fotogrametri; oyunda çok açılı impostor olarak)", "Poly Haven", "CC0 · polyhaven.com"],
 	["Ağaç ve apartman cephesi görselleri", "Higgsfield (GPT Image) ile üretildi", "SOKAK için üretildi"],
 	["M4 - FPS Weapon Animations Pack v.1 (M4A1 birinci şahıs)", "BarcodeGames", "CC-BY 4.0 · sketchfab.com"],
 	["Sniper animated (AWM birinci şahıs)", "DJMaesen", "CC-BY 4.0 · sketchfab.com/bumstrum"],

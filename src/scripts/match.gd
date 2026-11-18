@@ -369,6 +369,7 @@ func _build() -> void:
 	if use_osk:
 		var osk = _osk.new()
 		osk.name = "Outskirts"
+		osk.holes = map_data.get("terrain_holes", [])
 		vis.add_child(osk)
 		var t_osk := Time.get_ticks_msec()
 		osk.build(map_id, bounds, float(map_data.get("ground", {}).get("y", 0.0)), "low" if bool(GS.settings.get("competitive", false)) else str(GS.settings.get("quality", "high")))
@@ -494,7 +495,7 @@ func _build() -> void:
 		_process_loading_pct()
 		await get_tree().process_frame
 	SFX.play_music("music_match", -13, false)
-	SFX.play_amb(GS.MAPS.get(map_id, {}).get("amb", {"mahalle": "amb_city", "safranbolu": "amb_town", "gemi": "amb_ship", "liman": "amb_port", "insaat": "amb_wind", "canakkale": "amb_sea"}.get(map_id, "amb_town")))
+	SFX.play_amb(GS.MAPS.get(map_id, {}).get("amb", {"mahalle": "amb_city", "safranbolu": "amb_town", "gemi": "amb_ship", "liman": "amb_port", "insaat": "amb_site", "canakkale": "amb_sea"}.get(map_id, "amb_town")))
 	# dip to black, then reveal the match (no messy cross-fade of the loading art over the HUD)
 	var blk := ColorRect.new()
 	blk.color = Color(0, 0, 0, 0)
@@ -1594,15 +1595,17 @@ func _ptex(n: String) -> Texture2D:
 	return load(path) if ResourceLoader.exists(path) else load("res://assets/tex/posters/poster_a.jpg")
 
 func _place_posters() -> void:
-	if map_id == "ayvadisi" or spawn_points.is_empty():
+	# v4.11: street advertising only where it exists in real life (city streets) — not on a ship deck,
+	# a building site or a fortress
+	if map_id != "mahalle" or spawn_points.is_empty():
 		return
 	await get_tree().physics_frame
 	var space := get_world_3d().direct_space_state
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(map_id)
 	var placed: Array[Vector3] = []
-	var want_p := 12
-	var want_b := 4
+	var want_p := 5
+	var want_b := 2
 	var bx0 := float(bounds[0]) + 2.0; var bx1 := float(bounds[2]) - 2.0
 	var bz0 := -float(bounds[3]) + 2.0; var bz1 := -float(bounds[1]) - 2.0
 	for tries in 600:
