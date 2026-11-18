@@ -2,21 +2,23 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cplojv2e0qtf6"
-path.s3tc="res://.godot/imported/gemi_ao.png-b955a63fd06d958659887fcf8f27c81d.s3tc.ctex"
+uid="uid://bb7jlvngl4g2d"
+path="res://.godot/imported/gemi_Image_8.png-c3b768d9fb038c3af770ea84368caff3.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
+}
+generator_parameters={
+"md5": "116e4764c447d3b2b357bba2be1a2be1"
 }
 
 [deps]
 
-source_file="res://assets/maps/gemi_ao.png"
-dest_files=["res://.godot/imported/gemi_ao.png-b955a63fd06d958659887fcf8f27c81d.s3tc.ctex"]
+source_file="res://assets/maps/gemi_Image_8.png"
+dest_files=["res://.godot/imported/gemi_Image_8.png-c3b768d9fb038c3af770ea84368caff3.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -93,3 +93,8 @@ renk + görüş uzayı normali olarak pişirildi:
 
 Değiştirilen eski dokuların kopyaları: `/home/claude/old_assets/v48_tex/` (geliştirme makinesi),
 tüm proje yedeği: `/home/claude/backups/sokak_pre_gfx_v48.tgz`. Git'te `v4.8.0` sürümüne dönmek de yeterli.
+
+## v4.14 — gerçek modeller (Sketchfab, CC-BY 4.0)
+| model | yaratıcı | kullanım | kaynak |
+|---|---|---|---|
+| Container Ship | RM02 | Gemi haritası: gövde, köprüüstü, kıç konteyner yükü (×2.67 gerçek ölçek; oynanış alanındaki model konteynerleri ve lashing köprüleri silindi) | https://sketchfab.com/3d-models/container-ship-aaa41cca946b4a08bc08cf692b7757be |

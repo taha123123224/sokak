@@ -1,6 +1,6 @@
 {
- "version": "4.13.0",
- "build": 69,
+ "version": "4.14.0",
+ "build": 70,
  "parts": [
   {
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part00",
@@ -49,7 +49,7 @@
  ],
  "pck_size": 981533772,
  "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
- "notes": "Gemi, Liman ve Çekirdek'te doğuş noktaları arası açık görüş hatları kapatıldı; gemi vinç bomları düzeltildi",
+ "notes": "Gemi haritası gerçek konteyner gemisi modeliyle yeniden kuruldu (RM02, CC-BY)",
  "launcher": {
   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/baslatici.pck",
   "size": 1692560
@@ -57,9 +57,9 @@
  "packs": [
   {
    "f": "SOKAK.pck",
-   "size": 17106352,
-   "md5": "05ce654bab13bae57797f5b3666e7581",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/SOKAK_05ce654bab.pck"
+   "size": 17165072,
+   "md5": "7a91e5bd76ac6e1df30583978166ab0b",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/SOKAK_7a91e5bd76.pck"
   },
   {
    "f": "veri/p00_79645374ea.pck",
@@ -68,10 +68,10 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p00_79645374ea.pck"
   },
   {
-   "f": "veri/p01_32c99e47c0.pck",
-   "size": 5287756,
-   "md5": "32c99e47c098831cadde7a66c0d7a980",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p01_32c99e47c0.pck"
+   "f": "veri/p01_0a1d41dd4e.pck",
+   "size": 24218940,
+   "md5": "0a1d41dd4ea32c966f17fb739cc6aaec",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p01_0a1d41dd4e.pck"
   },
   {
    "f": "veri/p02_8fea00d481.pck",
@@ -440,5 +440,5 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p63_129c4bdda0.pck"
   }
  ],
- "packs_total": 1383431520
+ "packs_total": 1402421424
 }

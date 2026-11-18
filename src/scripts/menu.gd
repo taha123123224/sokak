@@ -2027,8 +2027,8 @@ func _page_lobby() -> void:
 	nv.alignment = BoxContainer.ALIGNMENT_END
 	nm2.add_child(nv)
 	nv.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, UI.ACCENT2, "Rajdhani-Bold"))
-	nv.add_child(UI.lbl("YENİ ÇANAKKALE TABYASI", 26, Color.WHITE, "RussoOne-Regular"))
-	nv.add_child(_wrap("Mecidiye Tabyası: Krupp topları, cephanelik tünelleri, taş kale ve siperler. Fabrika ve Hurda'ya yeni sahalar, haritalarda gerçek ağaçlar.", 15))
+	nv.add_child(UI.lbl("YENİ GEMİ: GERÇEK KONTEYNER GEMİSİ", 26, Color.WHITE, "RussoOne-Regular"))
+	nv.add_child(_wrap("244 metrelik gerçek konteyner gemisi: köprüüstü, yan geçitler, dalgakıran arkası doğuş. Tüm haritalarda doğuşlar arası açık görüş hattı kapatıldı.", 15))
 	right.add_child(_rewards_strip())
 	var mp := UI.glass(12, 4)
 	right.add_child(mp)

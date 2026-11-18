@@ -26,7 +26,7 @@ const THEMES := {
 	"safranbolu": {"relief": 120.0, "flat": 110.0, "near": "cobble", "far": "grass", "tn": [0.85, 0.82, 0.78], "tf": [0.72, 0.82, 0.55],
 				   "city": "oldtown", "n_bld": 900, "b0": 4.0, "b1": 420.0, "trees": "broad", "n_tree": 3200},
 	"gemi":       {"relief": 90.0, "flat": 0.0, "near": "grass", "far": "grass", "tn": [0.7, 0.8, 0.55], "tf": [0.6, 0.72, 0.5],
-				   "sea": "all", "sea_y": -6.05, "coast": 1500.0, "city": "apt", "n_bld": 900, "b0": 1500.0, "b1": 2300.0, "trees": "broad", "n_tree": 600, "ships": 9},
+				   "sea": "all", "sea_y": -10.55, "coast": 1500.0, "city": "apt", "n_bld": 900, "b0": 1500.0, "b1": 2300.0, "trees": "broad", "n_tree": 600, "ships": 9},
 	"liman":      {"relief": 60.0, "flat": 220.0, "near": "asphalt", "far": "grass", "tn": [0.62, 0.62, 0.62], "tf": [0.72, 0.78, 0.6],
 				   "sea": "east", "sea_y": -2.55, "city": "port", "n_bld": 900, "b0": 4.0, "b1": 520.0, "trees": "broad", "n_tree": 900, "ships": 6},
 	"insaat":     {"relief": 80.0, "flat": 170.0, "near": "dirt", "far": "grass", "tn": [0.8, 0.75, 0.68], "tf": [0.75, 0.8, 0.6],

@@ -837,6 +837,10 @@ def finalize(mapid, env, bounds, extra=None):
         if is_sign:
             _uv_world(tmp, sign=True)
             tmp.transform(mw)
+        elif o.get('keepuv'):
+            # v4.14 imported, UV-mapped models (Sketchfab etc.): keep their own UVs
+            tmp.transform(mw)
+            tmp.normal_update()
         elif o.get('roofuv'):
             tmp.transform(mw)
             tmp.normal_update()
@@ -1638,7 +1642,7 @@ def map_safranbolu():
 
 
 # ======================================================================== MAP 3: GEMİ (cargo ship)
-def map_gemi():
+def map_gemi_v413():
     mm = begin()
     L, W = 164, 32
     HX = L / 2
@@ -1757,6 +1761,114 @@ def map_gemi():
                                          (56, -12, 0, 90), (56, 12, 0, 90), (fc0 + 10, 0, F, 90), (54, 4, 0, 90), (52, -4.5, 0, 90), (fc0 + 12, 6, F, 90)]):
         spawn(x, y, z + 0.2, yaw + 90, 'a' if i < 6 else 'b')
     finalize('gemi', dict(preset='sunset', sun=[-6, 280], fog=0.004, sky='sunset', water=True), [-L / 2, -W / 2, L / 2, W / 2])
+
+
+
+# ======================================================================== MAP 3 (v4.14): GEMİ — real container ship model
+SHIP_GLB = os.path.join(ROOT, 'assets_src', 'sketchfab', 'sk_containership.glb')   # "Container Ship" by RM02, CC-BY 4.0 (Sketchfab aaa41cc)
+SHIP_S, SHIP_OX = 2.67, -88.7          # model containers are 4.63 x 0.91 x 0.97 -> x2.67 = real 40 ft boxes
+SHIP_OZ = -7.4 * SHIP_S                # hatch-cover tops -> z 0.12
+
+
+def ship_model(mm, keep_x0):
+    """import the ship, scale/place it, drop the model's own containers and lashing frames inside the playable
+    deck (x > keep_x0; the aft bays stay loaded as backdrop) and keep the model's UVs + PBR materials"""
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=SHIP_GLB)
+    new = [o for o in bpy.data.objects if o not in before]
+    T = Matrix.Translation((SHIP_OX, 0, SHIP_OZ)) @ Matrix.Scale(SHIP_S, 4)
+    out = []
+    for o in new:
+        if o.type != 'MESH':
+            continue
+        me = o.data.copy()
+        me.transform(T @ o.matrix_world)
+        bm = bmesh.new(); bm.from_mesh(me)
+        kill = []
+        for f in bm.faces:
+            c = f.calc_center_median()
+            if 'Container' in o.name and c.x > keep_x0:
+                kill.append(f)
+            elif 'Container' not in o.name and keep_x0 + 2 < c.x < 41.5 and 0.35 < c.z < 3.0 and abs(c.y) < 14.4:
+                kill.append(f)                     # lashing bridges across the hatches (would wall off every lane)
+        bmesh.ops.delete(bm, geom=kill, context='FACES')
+        bm.to_mesh(me); bm.free()
+        for m in me.materials:
+            if m and not m.name.startswith('ext_'):
+                m.name = 'ext_ship_' + m.name.lower().split('.')[0]
+        ob = bpy.data.objects.new('ship_' + o.name.split('_')[1].lower(), me)
+        ob['keepuv'] = True
+        bpy.context.scene.collection.objects.link(ob)
+        out.append(ob)
+    for o in new:
+        bpy.data.objects.remove(o, do_unlink=True)
+    # 4K hull (hero), 2K bridge and containers (seen from 60 m+): VRAM
+    for img in bpy.data.images:
+        if img.size[0] >= 4096 and ('Bridge' in img.name or 'Container' in img.name):
+            img.scale(2048, 2048)
+    return out
+
+
+def map_gemi():
+    mm = begin()
+    D = 0.12                     # hatch-cover tops
+    W2 = 14.3                    # hatch half width; side walkways 14.5..17 at z -1.73
+    WK = -1.73
+    X0, X1 = -62.0, 41.5         # bridge front .. breakwater
+    ship_model(mm, X0 - 1.0)
+    # --- collision that follows the model
+    col(((X0 + 54) / 2, 0, D - 0.3), (54 - X0, 2 * W2, 0.6))                   # hatch deck (to the bow deck)
+    for s in (-1, 1):
+        col(((X0 + 50) / 2, s * 15.75, WK - 0.3), (50 - X0, 2.6, 0.6))          # side walkways
+        col(((X0 + 50) / 2, s * 17.3, WK + 3), (50 - X0 + 6, 0.5, 8))          # hull side / rail (tall)
+        col(((X0 + 50) / 2, s * (W2 + 0.1), D - 0.9), (50 - X0, 0.2, 1.9))      # coaming step (walkway -> hatch: step 1.85 m)
+    col((X0 - 5, 0, 8), (10, 34, 16))                                           # bridge (accommodation block)
+    col((42.75, 0, 2.2), (0.8, 2 * W2, 4.4))                                   # breakwater
+    for (x, hw) in [(46, 16.0), (50, 15.3), (54, 14.0), (58, 12.0), (62, 8.3)]:
+        for s in (-1, 1):
+            col((x, s * (hw + 0.3), 3), (4.2, 0.6, 8))                          # bow flare
+    col((63.5, 0, 3), (1, 18, 8))
+    # walkway <-> hatch steps (steel stairs) every other bay
+    for x in (-56, -31, -4, 22, 38):
+        for s in (-1, 1):
+            stairs(f'wk_st{x}{s}', x, s * 14.95, WK, D, 3.0, 1.6, mm['steel'], axis='X', direction=1)
+    # --- cargo: real-size 40 ft containers on the hatches (cover), lanes along X between rows
+    cmats = [mm['c_red'], mm['c_blue'], mm['c_orange'], mm['c_green'], mm['c_grey'], mm['c_yellow'], mm['c_white']]
+    bays = [-50, -42, -27, -19, -6, 2, 15, 23, 35]
+    rows = [-11.4, -8.8, -2.6, 2.6, 8.8, 11.4]
+    rr = random.Random(7)
+    for bi, bx in enumerate(bays):
+        for ri, ry in enumerate(rows):
+            if rr.random() < 0.2:
+                continue
+            h = rr.choice([1, 2, 2, 3]) if abs(ry) > 5 else rr.choice([1, 1, 2])
+            for k in range(h):
+                container(bx, ry, D + k * 2.59, 90, cmats[rr.randrange(len(cmats))], mm, collide=(k == 0), length=6.06)
+            col((bx, ry, D + h * 2.59 / 2), (6.06, 2.44, h * 2.59))
+    # centre-lane breakers (long sight lines): transverse 20 ft boxes
+    for (x, y) in [(-34.5, 0.0), (-12.5, 5.5), (-12.5, -5.5), (8.5, 0.0), (29, 0.0)]:
+        container(x, y, D, 0, cmats[rr.randrange(len(cmats))], mm, collide=True, length=6.06)
+        col((x, y, D + 1.3), (2.44, 6.06, 2.59))
+    # side walkways: staggered steel deck lockers (body-wide gap each, no straight sight line)
+    for s_ in (-1, 1):
+        for (x, y0, y1) in [(-24, 14.55, 16.15), (6, 15.45, 17.0), (26, 14.55, 16.15)]:
+            y0_, y1_ = s_ * y0, s_ * y1
+            box('deck_locker', (2.2, abs(y1_ - y0_), 2.0), (x, (y0_ + y1_) / 2, WK + 1.0), m=mm['steel'], bevel=0.05)
+            col((x, (y0_ + y1_) / 2, WK + 1.0), (2.2, abs(y1_ - y0_), 2.0))
+    for (cx, cy) in [(-46, 5.6), (-23, -5.6), (-1, 5.6), (19, -5.6), (31, 5.6)]:
+        crate(cx, cy, D, 1.2, mm)
+        crate(cx + 1.3, cy + 0.2, D, 1.0, mm, rot=15)
+    # sea level: the model's red boot-topping ends ~9 m below the hatches
+    box('sea', (3000, 3000, 0.1), (0, 0, -10.5), m=mm['water'])
+    # spawns: A in front of the bridge (deck + walkways), B behind the breakwater
+    A = [(-58, -10, D), (-58, -5, D), (-58, 0, D), (-58, 5, D), (-58, 10, D), (-57, 15.8, WK), (-57, -15.8, WK), (-60, 7.5, D)]
+    B = [(39, -10, D), (39, -5, D), (39, 0, D), (39, 5, D), (39, 10, D), (38, 15.8, WK), (38, -15.8, WK), (40, -7.5, D)]
+    for (x, y, z) in A:
+        spawn(x, y, z + 0.2, 0, 'a')       # same yaw convention as v4.13 (A faces the bow)
+    for (x, y, z) in B:
+        spawn(x, y, z + 0.2, 180, 'b')
+    finalize('gemi', dict(preset='sunset', sun=[-6, 280], fog=0.004, sky='sunset', water=True), [X0 - 1, -17.5, 54, 17.5],
+             extra=dict(terrain_holes=[[-200.0, -30.0, 90.0, 30.0]]))
 
 
 # ======================================================================== MAP 4: LİMAN DEPOSU

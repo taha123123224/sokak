@@ -467,7 +467,7 @@ const MAX_LVL := 7
 var MAPS := {
 	"mahalle": {"name": "Eski Mahalle", "desc": "İstanbul ara sokakları, dükkanlar ve çay bahçesi. Yakın-orta mesafe.", "size": "Orta"},
 	"safranbolu": {"name": "Safranbolu", "desc": "Osmanlı konakları, Arasta çarşısı ve teraslar. Çok katmanlı çatışma.", "size": "Büyük"},
-	"gemi": {"name": "Gemi", "desc": "Gün batımında Marmara'da yük gemisi. Konteyner koridorları.", "size": "Orta"},
+	"gemi": {"name": "Gemi", "desc": "Gün batımında Marmara'da 244 m konteyner gemisi. Ambar kapakları üstünde konteyner koridorları, alçak yan geçitler.", "size": "Orta"},
 	"liman": {"name": "Liman Deposu", "desc": "Sisli sabah, konteyner sahası ve depo. Nişancı dostu.", "size": "Büyük"},
 	"insaat": {"name": "İnşaat", "desc": "Kartal Konutları şantiyesi: 3 katlı betonarme blok, temel çukuru, kule vinç ve konteyner sokağı. Üç şeritli, dikey oynanış.", "size": "Orta"},
 	"canakkale": {"name": "Çanakkale", "desc": "Mecidiye Tabyası: Boğaz kıyısında Krupp top mevzileri, traverslerin içinden geçen cephanelikler, taş kale ve siper hattı.", "size": "Büyük"},
@@ -488,6 +488,7 @@ var MODES := {
 }
 ## CC-BY 4.0 assets: [work, author, licence/link] — shown in Ayarlar > Lisanslar
 const CREDITS := [
+	["Container Ship (Gemi haritası gövde, köprüüstü, kıç konteynerleri)", "RM02", "CC-BY 4.0 · sketchfab.com/3d-models/container-ship-aaa41cca946b4a08bc08cf692b7757be"],
 	["PBR dokular: asfalt, kaldırım, beton, sıva, çim, toprak, kaya, ahşap, sac, pas, kiremit, kazı toprağı, çamur, sur duvarı (34 set, 6'sı 4K)", "Poly Haven", "CC0 · polyhaven.com"],
 	["Ağaçlar: Island Tree 01/02, Jacaranda Tree, Tree Small 02, Fir Sapling Medium (fotogrametri; oyunda çok açılı impostor olarak)", "Poly Haven", "CC0 · polyhaven.com"],
 	["Ağaç ve apartman cephesi görselleri", "Higgsfield (GPT Image) ile üretildi", "SOKAK için üretildi"],
