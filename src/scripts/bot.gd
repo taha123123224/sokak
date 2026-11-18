@@ -93,6 +93,15 @@ func _ready() -> void:
 	name_tag.position.y = 2.15
 	add_child(name_tag)
 
+## v4.16 Mixamo "Pro Rifle Pack" clips retargeted onto every character (tools/rocketbox.py): directional rifle
+## locomotion, crouch, jump and directional deaths that hand over to the ragdoll
+const PACK_LOOPS := ["R_Idle", "R_IdleAim", "R_WalkF", "R_WalkB", "R_WalkL", "R_WalkR", "R_RunF", "R_RunB", "R_RunL", "R_RunR",
+	"R_Sprint", "R_CrouchIdle", "R_CrouchAim", "R_CrouchF", "R_CrouchB", "R_CrouchL", "R_CrouchR", "R_JumpLoop"]
+var pack := false
+var death_clip := ""
+var rd_pending := false
+var rd_args := []
+
 func setup(soldier: PackedScene, n: String, tm: String, diff: int, weapon: String) -> void:
 	display_name = n
 	team = tm
@@ -104,9 +113,10 @@ func setup(soldier: PackedScene, n: String, tm: String, diff: int, weapon: Strin
 	anim = model.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	if anim:
 		anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_IDLE
-		for a in ["Idle", "Run", "Walk"]:
+		for a in ["Idle", "Run", "Walk"] + PACK_LOOPS:
 			if anim.has_animation(a):
 				anim.get_animation(a).loop_mode = Animation.LOOP_LINEAR
+		pack = anim.has_animation("R_Idle")
 	_tint_team()
 	name_tag.text = n
 	name_tag.modulate = GS.TEAM_COLORS.get(tm, Color(1, 0.4, 0.35)) if tm != "" else Color(1, 0.4, 0.35)
@@ -588,7 +598,9 @@ func _anim_tail(delta: float, hv: Vector2) -> void:
 		if pose and alive and not wdata.get("melee", false):
 			pose.weight = move_toward(pose.weight, 0.55 if reload_t > 0 else 1.0, delta * 5.0)
 		twist.head_kick = hr * (0.6 if hit_head else 0.12)
-	if hs > 3.5:
+	if pack:
+		_pack_locomotion(hv, hs)
+	elif hs > 3.5:
 		_play("Run", (hs / 5.5) * (-1.0 if backwards else 1.0))
 	elif hs > 0.4:
 		_play("Walk", (hs / 1.8) * (-1.0 if backwards else 1.0))
@@ -603,7 +615,38 @@ func _anim_tail(delta: float, hv: Vector2) -> void:
 			if OS.has_environment("SURFDBG"): print("STEP ", stp)
 			SFX.play3d("%s%d" % [stp, randi() % 4], global_position, -9 if hs > 3.5 else -14, randf_range(0.9, 1.1), 35.0, 3.0)
 	if model:
-		model.position.y = -0.35 if crouching else 0.0
+		model.position.y = (-0.35 if crouching else 0.0) if not pack else 0.0
+
+## directional clips: the body faces the aim, the clip follows the move direction relative to it (no leg twist needed)
+func _pack_locomotion(hv: Vector2, hs: float) -> void:
+	leg_yaw = 0.0
+	if model and alive:
+		model.rotation.y = PI
+	if not is_on_floor() and velocity.y > -30.0:
+		_play("R_JumpLoop")
+		return
+	if hs <= 0.4:
+		if crouching:
+			_play("R_CrouchAim" if target_visible else "R_CrouchIdle")
+		else:
+			_play("R_IdleAim" if target_visible else "R_Idle")
+		return
+	var rel := wrapf(atan2(-hv.x, -hv.y) - aim_yaw, -PI, PI)
+	var d := "F"
+	if abs(rel) > deg_to_rad(135):
+		d = "B"
+	elif rel > deg_to_rad(45):
+		d = "L"
+	elif rel < -deg_to_rad(45):
+		d = "R"
+	if crouching:
+		_play("R_Crouch" + d, clampf(hs / 1.3, 0.6, 1.6))
+	elif hs > 4.6 and d == "F":
+		_play("R_Sprint", clampf(hs / 6.0, 0.7, 1.4))
+	elif hs > 2.6:
+		_play("R_Run" + d, clampf(hs / 4.2, 0.7, 1.4))
+	else:
+		_play("R_Walk" + d, clampf(hs / 1.5, 0.6, 1.6))
 
 func _try_step(delta: float) -> void:
 	var hmove := Vector3(velocity.x, 0, velocity.z) * delta
@@ -981,8 +1024,27 @@ func _sp_take_damage(amount: float, attacker, pos: Vector3, headshot: bool, w: S
 		if ik_r: ik_r.stop()
 		if ik_l: ik_l.stop()
 		if pose: pose.weight = 0.0
-		if anim: anim.pause()
-		_ragdoll_on((global_position - pos).normalized() * (5.5 if headshot else 4.0) + Vector3.UP * 1.2, pos, headshot)
+		var imp := (global_position - pos).normalized() * (5.5 if headshot else 4.0) + Vector3.UP * 1.2
+		death_clip = ""
+		if pack and anim:
+			# fd: away from the shooter, in body space (+z = the body's back)
+			if crouching: death_clip = "R_DeathCrouch"
+			elif headshot and fd.z > 0.0: death_clip = "R_DeathHead"
+			elif abs(fd.x) > abs(fd.z): death_clip = "R_DeathRight"
+			elif fd.z > 0.0: death_clip = "R_DeathFront"
+			else: death_clip = "R_DeathBack"
+			if death_clip == "R_DeathRight" and fd.x > 0.0 and model:
+				death_spin = PI      # only a right-side clip: turn the body so it falls the other way
+			anim.speed_scale = 1.0
+			anim.play(death_clip, 0.08)
+			cur_anim = death_clip
+			if model: model.rotation.y = PI + death_spin * (1.0 if death_spin == PI else 0.0)
+			# the clip sells the hit (knees go, body turns), then physics takes the fall
+			rd_pending = true
+			rd_args = [imp * 0.65, pos, headshot]
+		else:
+			if anim: anim.pause()
+			_ragdoll_on(imp, pos, headshot)
 		_drop_gun()
 		match_node.on_death(self, attacker, w, headshot)
 
@@ -1060,6 +1122,20 @@ func _ragdoll_off() -> void:
 
 func _death_anim(delta: float) -> void:
 	death_t += delta
+	if rd_pending and death_t >= (0.18 if death_head else 0.32):
+		rd_pending = false
+		_ragdoll_on(rd_args[0], rd_args[1], rd_args[2])
+		if rd_on and anim: anim.pause()
+	if death_clip != "" and not rd_on:
+		# no ragdoll (low quality / too many corpses): the mocap death plays out and holds its last frame
+		if not death_fx_done and death_t > 1.1:
+			death_fx_done = true
+			SFX.play3d("bodyfall", global_position, -4, randf_range(0.9, 1.1), 30.0, 4.0)
+			match_node.fx.blood_pool(global_position)
+		if not is_on_floor():
+			velocity.y -= 16.0 * delta
+			move_and_slide()
+		return
 	if rd_on:
 		if death_t > 0.7 and not death_fx_done:
 			death_fx_done = true
@@ -1245,12 +1321,17 @@ func respawn(pos: Vector3, yaw_: float, weapon: String) -> void:
 	collision_layer = 2
 	collision_mask = 1 | 2
 	_ragdoll_off()
+	rd_pending = false
+	death_clip = ""
 	model.transform = Transform3D(Basis(Vector3.UP, PI), Vector3.ZERO)
 	target = null
 	target_visible = false
 	last_seen_t = -100
 	has_roam = false
-	if anim: anim.play("Idle")
+	if anim:
+		anim.speed_scale = 1.0
+		anim.play("R_Idle" if pack else "Idle")
+		cur_anim = "R_Idle" if pack else "Idle"
 	set_weapon(weapon)
 
 func chest_pos() -> Vector3:

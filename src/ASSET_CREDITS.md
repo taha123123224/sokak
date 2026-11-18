@@ -101,3 +101,11 @@ tüm proje yedeği: `/home/claude/backups/sokak_pre_gfx_v48.tgz`. Git'te `v4.8.0
 | Harbor crane | TGVMisterH | Liman: rıhtımda 2 mobil liman vinci (%15 poligon, 1K doku) | https://sketchfab.com/3d-models/d4d582ebd707426f93f1f5a9cdd0ce03 |
 | Forklift | alban | Liman deposu (%20 poligon, 2K doku; unlit tarama malzemesi lit PBR'a çevrildi) | https://sketchfab.com/3d-models/e79f0768aec6431d8e6f3874e5acc5f2 |
 | Container Ship | RM02 | Liman: rıhtıma yanaşmış tam yüklü gemi (2K gövde, 1K köprüüstü/konteyner) | (yukarıda) |
+
+## v4.16 — karakter animasyonları ve gerçek silah sesleri
+| varlık | kaynak | lisans |
+|---|---|---|
+| 25 tüfekli karakter klibi (8 karakter, `rb_*.glb`) | Mixamo "Pro Rifle Pack" (Adobe) | Mixamo ücretsiz lisans (oyunda ticari kullanım serbest) |
+| shot_sniper/awm, shot_smg, bolt_back/fwd, dryfire | Sonniss GDC 2020 Game Audio Bundle — Pole Position Production | royalty-free, atıf gerekmez |
+| shot_ak, shot_akm, shotfar_ak(m), shot_kar, shot_pistol(+v), shot_usp, shot_m1911, shot_sup, shell0-2, bodyfall, step_concrete0-3 | Freesound #136399 #184750 #201669 #710084 #668348 #402789 #427598 #539141 #318964 #181177 #813622 | CC0 |
+Ayrıntı ve bağlantılar: `docs/ANIMATION_AUDIO_ASSET_RESEARCH.md`.

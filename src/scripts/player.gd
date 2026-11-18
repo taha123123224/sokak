@@ -606,7 +606,11 @@ func _process(delta: float) -> void:
 	inspect_t = max(inspect_t - delta, 0.0)
 	melee_t = max(melee_t - delta, 0.0)
 	if test_freeze >= 0.0:      # screenshot tests: hold an animation at a fixed fraction
-		if test_freeze_kind == "insp":
+		if test_freeze_kind == "anim":
+			if fp_ap and _fp_has(fp_anim):
+				fp_ap.seek(_fp_len(fp_anim) * test_freeze, true)
+				fp_ap.speed_scale = 0.0
+		elif test_freeze_kind == "insp":
 			inspect_t = 3.2 * (1.0 - test_freeze)
 			if fp_ap and fp_anim == "inspect":
 				fp_ap.seek(_fp_len("inspect") * test_freeze, true)

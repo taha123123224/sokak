@@ -201,6 +201,98 @@ def retarget(arm, src):
     arm.animation_data.action = None
 
 
+# v4.16: Mixamo "Pro Rifle Pack" (X Bot) -> rifle locomotion / crouch / jump / deaths for every character
+PACK = '/home/claude/src_assets/mixamo/pro_rifle'
+PACK_CLIPS = {
+    'R_Idle': 'idle', 'R_IdleAim': 'idle aiming', 'R_WalkF': 'walk forward', 'R_WalkB': 'walk backward', 'R_WalkL': 'walk left',
+    'R_WalkR': 'walk right', 'R_RunF': 'run forward', 'R_RunB': 'run backward', 'R_RunL': 'run left', 'R_RunR': 'run right',
+    'R_Sprint': 'sprint forward', 'R_CrouchIdle': 'idle crouching', 'R_CrouchAim': 'idle crouching aiming',
+    'R_CrouchF': 'walk crouching forward', 'R_CrouchB': 'walk crouching backward', 'R_CrouchL': 'walk crouching left',
+    'R_CrouchR': 'walk crouching right', 'R_JumpUp': 'jump up', 'R_JumpLoop': 'jump loop', 'R_JumpDown': 'jump down',
+    'R_DeathFront': 'death from the front', 'R_DeathBack': 'death from the back', 'R_DeathRight': 'death from right',
+    'R_DeathHead': 'death from front headshot', 'R_DeathCrouch': 'death crouching headshot front',
+}
+LOOPS = {'R_Idle', 'R_IdleAim', 'R_WalkF', 'R_WalkB', 'R_WalkL', 'R_WalkR', 'R_RunF', 'R_RunB', 'R_RunL', 'R_RunR', 'R_Sprint',
+         'R_CrouchIdle', 'R_CrouchAim', 'R_CrouchF', 'R_CrouchB', 'R_CrouchL', 'R_CrouchR', 'R_JumpLoop'}
+
+
+def load_pack():
+    """X Bot in T-pose (rest) + one action per clip, all on the same mixamorig skeleton"""
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.fbx(filepath=os.path.join(PACK, 'X Bot.fbx'))
+    xb = [o for o in bpy.data.objects if o not in before]
+    xarm = [o for o in xb if o.type == 'ARMATURE'][0]
+    for o in xb:
+        if o.type == 'MESH':
+            bpy.data.objects.remove(o, do_unlink=True)
+    xarm.animation_data_clear()
+    clips = {}
+    for key, fn in PACK_CLIPS.items():
+        b2 = set(bpy.data.objects); a2 = set(bpy.data.actions)
+        bpy.ops.import_scene.fbx(filepath=os.path.join(PACK, fn + '.fbx'))
+        newa = [a for a in bpy.data.actions if a not in a2]
+        for o in [o for o in bpy.data.objects if o not in b2]:
+            bpy.data.objects.remove(o, do_unlink=True)
+        if newa:
+            newa[0].name = 'PK_' + key
+            newa[0].use_fake_user = True
+            clips[key] = newa[0]
+    return xarm, clips
+
+
+def retarget_pack(arm, xarm, clips):
+    """same solver as retarget(): world rotation offsets measured in both T-poses, hips height scaled, root kept in place"""
+    xarm.animation_data_clear()
+    bpy.context.scene.frame_set(1)
+    bpy.context.view_layer.update()
+    s_rest = {n: (xarm.matrix_world @ xarm.pose.bones['mixamorig:' + n].matrix) for n in M2B if ('mixamorig:' + n) in xarm.pose.bones}
+    t_rest = {n: arm.matrix_world @ arm.data.bones[B(n)].matrix_local for n in M2B if B(n) in arm.data.bones and n in s_rest}
+    off = {n: s_rest[n].to_quaternion().inverted() @ t_rest[n].to_quaternion() for n in t_rest}
+    hips0_s = s_rest['Hips'].translation.copy()
+    hips0_t = t_rest['Hips'].translation.copy()
+    ratio = hips0_t.z / max(hips0_s.z, 0.01)
+    inv = arm.matrix_world.inverted()
+    tb2m = {B(n): n for n in t_rest}
+    for key, sa in clips.items():
+        C.set_action(xarm, sa)
+        f0, f1 = int(sa.frame_range[0]), int(sa.frame_range[1])
+        act = bpy.data.actions.new(key)
+        C.set_action(arm, act)
+        for fr in range(f0, f1 + 1):
+            bpy.context.scene.frame_set(fr)
+            sm = {n: xarm.matrix_world @ xarm.pose.bones['mixamorig:' + n].matrix for n in t_rest}
+            mats = {}
+            for b in arm.data.bones:
+                pb = arm.pose.bones[b.name]
+                rest = b.matrix_local
+                base = mats[b.parent.name] @ (b.parent.matrix_local.inverted() @ rest) if b.parent else rest.copy()
+                mx = tb2m.get(b.name)
+                if mx:
+                    R = inv.to_quaternion() @ sm[mx].to_quaternion() @ off[mx]
+                    loc = base.translation
+                    if mx == 'Hips':
+                        d = (sm['Hips'].translation - hips0_s) * ratio
+                        if not key.startswith('R_Death'):
+                            d.x = 0.0; d.y = 0.0          # locomotion in place (the game moves the body)
+                        loc = inv @ (hips0_t + d)
+                    M = Matrix.LocRotScale(loc, R, Vector((1, 1, 1)))
+                else:
+                    M = base
+                mats[b.name] = M
+                pb.matrix_basis = base.inverted() @ M
+                pb.keyframe_insert('rotation_quaternion', frame=fr)
+                if mx == 'Hips':
+                    pb.keyframe_insert('location', frame=fr)
+        tr = arm.animation_data.nla_tracks.new(); tr.name = key
+        st = tr.strips.new(key, f0, act)
+        try:
+            st.action_slot = act.slots[0]
+        except Exception:
+            pass
+        print('  pack clip', key, f1 - f0 + 1, 'frames', flush=True)
+    arm.animation_data.action = None
+
+
 def build(cid):
     folder = CHARS[cid]
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -231,6 +323,13 @@ def build(cid):
         mesh.shape_key_clear()
     align_tpose(arm, mesh, src)
     retarget(arm, src)
+    if os.path.isdir(PACK) and not os.environ.get('NOPACK'):
+        xarm, clips = load_pack()
+        retarget_pack(arm, xarm, clips)
+        bpy.data.objects.remove(xarm, do_unlink=True)
+        for a in list(bpy.data.actions):
+            if a.name.startswith('PK_'):
+                bpy.data.actions.remove(a)
     import rb_aim
     rb_aim.build_aim(arm, cid, os.path.join(OUT, f'rb_{cid}_aim.json'))
     for o in list(bpy.data.objects):

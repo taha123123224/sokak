@@ -2323,6 +2323,23 @@ func test_hook(i: int) -> void:
 		player.ammo[wid] = [int(GS.WEAPONS[wid].get("mag", 1)), 99]
 		player.cur = ""
 		player.switch_to(wid, true)
+	elif i == 133:
+		# v4.16 FP animation check: FPA="reload,fire,..." FR="0.3,..." -> plays clip k frozen at fraction k
+		var an: PackedStringArray = (OS.get_environment("FPA") if OS.has_environment("FPA") else "reload").split(",")
+		var frs2: PackedStringArray = (OS.get_environment("FR") if OS.has_environment("FR") else "0.4").split(",")
+		var k2: int = int(get_meta("fpa_i", 0))
+		set_meta("fpa_i", k2 + 1)
+		player.test_freeze = -1.0
+		player._fp_play(an[k2 % an.size()], 0.0)
+		player.test_freeze_kind = "anim"
+		player.test_freeze = float(frs2[k2 % frs2.size()])
+		print("FPA ", an[k2 % an.size()], " has=", player._fp_has(an[k2 % an.size()]), " len=", player._fp_len(an[k2 % an.size()]))
+		if OS.has_environment("FPDBG") and player.fp_root:
+			var cam_t: Transform3D = player.vm_cam.global_transform if "vm_cam" in player and player.vm_cam else Transform3D()
+			for mi in player.fp_root.find_children("*", "MeshInstance3D", true, false):
+				var m3 := mi as MeshInstance3D
+				print("FPDBG mesh ", m3.name, " vis=", m3.is_visible_in_tree(), " pos_cam=", cam_t.affine_inverse() * m3.global_position, " aabb=", m3.get_aabb().size)
+			print("FPDBG ap=", player.fp_ap.current_animation if player.fp_ap else "-", " meta_rig=", player.fp_meta.get("rig", 0), " root=", player.fp_root.name, " scale=", player.fp_root.global_transform.basis.get_scale())
 	elif i == 40 or i == 41 or i == 42:
 		# 40 slash / 41 stab / 42 inspect, frozen at env FR (0..1)
 		var frs: PackedStringArray = (OS.get_environment("FR") if OS.has_environment("FR") else "0.4").split(",")
@@ -2454,7 +2471,21 @@ func test_hook(i: int) -> void:
 		b.leg_yaw = 0.0
 		if b.twist:
 			b.twist.twist = 0.0; b.twist.lean = 0.0; b.twist.hit_twist = 0.0; b.twist.head_kick = 0.0
-		if b.anim: b.anim.play("Idle")
+		if b.anim:
+			# v4.16: BOTANIM="R_WalkF,R_CrouchL,..." BOTFR="0.3,..." -> shot k shows clip k frozen at that fraction
+			if OS.has_environment("BOTANIM"):
+				var al: PackedStringArray = OS.get_environment("BOTANIM").split(",")
+				var fl: PackedStringArray = (OS.get_environment("BOTFR") if OS.has_environment("BOTFR") else "0.3").split(",")
+				var bk: int = int(get_meta("botanim_i", 0))
+				set_meta("botanim_i", bk + 1)
+				var an2: String = al[bk % al.size()]
+				b.anim.play(an2, 0.0)
+				b.anim.seek(b.anim.current_animation_length * float(fl[bk % fl.size()]), true)
+				b.anim.speed_scale = 0.0
+				b.cur_anim = an2
+				print("BOTANIM ", an2, " has=", b.anim.has_animation(an2))
+			else:
+				b.anim.play("Idle")
 		var o: PackedFloat64Array = (OS.get_environment("CAMOFF") if OS.has_environment("CAMOFF") else "1.6,1.5,2.2").split_floats(",")
 		var c := Camera3D.new()
 		c.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF

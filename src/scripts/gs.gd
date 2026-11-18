@@ -488,6 +488,9 @@ var MODES := {
 }
 ## CC-BY 4.0 assets: [work, author, licence/link] — shown in Ayarlar > Lisanslar
 const CREDITS := [
+	["Karakter animasyonları: Pro Rifle Pack (tüfekli yürüme/koşma/çömelme/zıplama/ölüm)", "Mixamo (Adobe)", "Mixamo lisansı · mixamo.com"],
+	["Silah sesleri: Springfield M1903A3, Thompson 1928A1 kayıtları", "Pole Position Production — Sonniss GDC 2020 Game Audio Bundle", "royalty-free · sonniss.com/gameaudiogdc"],
+	["Silah / kovan / adım / düşme sesleri", "Freesound: felix.blume, qubodup, Franki-01234, DeltaCode, acidsnowflake, michorvath, SubwaySandwitch420, GryffDavid, jmdh, SecureSubset", "CC0 · freesound.org"],
 	["Harbor crane (Liman rıhtım vinçleri)", "TGVMisterH", "CC-BY 4.0 · sketchfab.com/3d-models/d4d582ebd707426f93f1f5a9cdd0ce03"],
 	["Forklift (Liman deposu)", "alban", "CC-BY 4.0 · sketchfab.com/3d-models/e79f0768aec6431d8e6f3874e5acc5f2"],
 	["Container Ship (Gemi haritası gövde, köprüüstü, kıç konteynerleri)", "RM02", "CC-BY 4.0 · sketchfab.com/3d-models/container-ship-aaa41cca946b4a08bc08cf692b7757be"],

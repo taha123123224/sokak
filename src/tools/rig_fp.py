@@ -25,6 +25,16 @@ SPECS = {
                  rear=None, top=None, ref=239, sight_dy=0.011, credit="M4 - FPS Weapon Animations Pack v.1 — BarcodeGames (CC-BY 4.0)",
                  sections={'draw': {'anim': 'Draw'}, 'fire': {'anim': 'Fire'}, 'reload': {'anim': 'Reload'},
                            'reload_empty': {'anim': 'Reload_Empty'}, 'idle': {'anim': 'Draw', 's': -0.05}}),
+    # v4.16: DuqueCD7 "FPS Character Animation Pack Ak-47" (CC-BY 4.0): equip / idle / aim / fire / reload / walk / run
+    'ak47': dict(glb='/home/claude/sokak/assets_src/sketchfab/sk_fp_ak_duque.glb', gun=['Object_14', 'Object_15', 'Object_17', 'Object_18'],
+                 fit=['Object_15'], drop=['Icosphere'], rear=None, top=None, ref=0,
+                 attach=('SKEL_AK_47_Rifle', 'Object_22', 'DEF-Weapon_013'),
+                 credit="FPS Character Animation Pack Ak-47 — DuqueCD7 (CC-BY 4.0)",
+                 sections={'draw': {'anim': 'RIG_UE5_Comando_AK_Equip'}, 'idle': {'anim': 'RIG_UE5_Comando_AK_Idle'},
+                           'fire': {'anim': 'RIG_UE5_Comando_AK_Fire'}, 'reload': {'anim': 'RIG_UE5_Comando_AK_Reload'},
+                           'ads_idle': {'anim': 'RIG_UE5_Comando_AK_Idle_Aim'}, 'ads_fire': {'anim': 'RIG_UE5_Comando_AK_Aim_Fire'},
+                           'walk': {'anim': 'RIG_UE5_Comando_AK_Walk'}, 'sprint': {'anim': 'RIG_UE5_Comando_AK__Run'},
+                           'inspect': {'anim': 'RIG_UE5_Comando_AK_Hold'}}),
     # v3.4: one shared knife rig for every melee weapon (the game's own knife model is attached to its 'knife' node)
     'melee': dict(usd='/home/claude/usdz/7516b757-knife_Animated/scene.usdc', gun=['knife_knife'], wref='knife', step=2,
                   native=True, rear=None, top=None, ref=80, credit="knife Animated — DJMaesen (CC-BY 4.0)",
@@ -51,6 +61,27 @@ def run(wid):
             if any(d in o.name for d in sp.get('drop', ())):
                 bpy.data.objects.remove(o)
         frames = [0, 1]
+        # v4.16: packs whose gun has its own armature (UE5 style): hang it on the arms' weapon bone so it follows the hands
+        att = sp.get('attach')
+        if att:
+            gob, arm_name, bone = att
+            arm = bpy.data.objects[arm_name]
+            act0 = bpy.data.actions.get(sp['sections']['idle']['anim'])
+            if arm.animation_data is None:
+                arm.animation_data_create()
+            arm.animation_data.action = act0
+            try:
+                sl = arm.animation_data.action_suitable_slots
+                if sl: arm.animation_data.action_slot = sl[0]
+            except Exception:
+                pass
+            bpy.context.scene.frame_set(sp.get('ref', 0))
+            bpy.context.view_layer.update()
+            g = bpy.data.objects[gob]
+            mw = g.matrix_world.copy()
+            g.parent = arm; g.parent_type = 'BONE'; g.parent_bone = bone
+            bpy.context.view_layer.update()
+            g.matrix_world = mw
         # play the reference action on every animated object
         act = bpy.data.actions.get(sp['sections']['idle']['anim'])
         for o in bpy.data.objects:
