@@ -71,11 +71,11 @@ def blocked(x, y, w, d, rot=0.0, z0=None, hgt=3.0, step=1.0):
 SEARCH = [(0, 0)] + [(r * math.cos(a), r * math.sin(a)) for r in (1.0, 2.0, 3.0, 3.5) for a in [i * math.pi / 4 for i in range(8)]]
 
 
-def placed(fn, x, y, w, d, rot=0.0, hgt=3.0, tag='', search=True):
+def placed(fn, x, y, w, d, rot=0.0, hgt=3.0, tag='', search=True, top=1.8):
     """build a prop with footprint w x d around (x, y) where the model leaves room (spiral search up to
     3.5 m); fn(x, y) builds it at ground 0, the new objects + colliders are lifted onto the model's ground"""
     for (dx, dy) in (SEARCH if search else [(0, 0)]):
-        ok, gz = footprint_probe(x + dx, y + dy, w, d, rot, hgt)
+        ok, gz = footprint_probe(x + dx, y + dy, w, d, rot, hgt, top=top)
         if ok:
             break
     else:
@@ -367,7 +367,24 @@ def dress_hurda():
     finalize_dress('hurda', sa_, sb_)
 
 
-DRESS = dict(fabrika=dress_fabrika, hurda=dress_hurda)
+# ======================================================================== ÇEKİRDEK (one open lane on the east terrace)
+def dress_cekirdek():
+    mm = MP.begin()
+    load_model_bvh('cekirdek')
+    d = json.load(open(os.path.join(OUTD, 'cekirdek.json')))
+    sa_ = [(s['p'][0], -s['p'][2], s['p'][1] - 0.1, math.degrees(s.get('yaw', 0))) for s in d['spawns'] if s['team'] == 'a']
+    sb_ = [(s['p'][0], -s['p'][2], s['p'][1] - 0.1, math.degrees(s.get('yaw', 0))) for s in d['spawns'] if s['team'] == 'b']
+    def stack(x, y):
+        # two-crate stack on the narrow east terrace: blocks the long lane, a body-width gap stays beside it
+        z = 0.0
+        crate(x, y, z, 1.25, mm)
+        crate(x + 0.05, y - 0.05, z + 1.25, 1.1, mm, rot=12)
+        MP.col((x, y, z + 1.17), (1.25, 1.25, 2.35))
+    placed(stack, 42.6, -11.3, 1.3, 1.3, 0, 2.4, 'eastTerraceCrates', search=False, top=11.0)
+    finalize_dress('cekirdek', sa_, sb_)
+
+
+DRESS = dict(fabrika=dress_fabrika, hurda=dress_hurda, cekirdek=dress_cekirdek)
 if __name__ == '__main__':
     for n in sys.argv[1:]:
         DRESS[n]()

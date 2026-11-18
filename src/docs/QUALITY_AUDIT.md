@@ -59,3 +59,12 @@ ayrı turlarda daha hafif ayarla denetlenecek.
 ## 5. Performans (ölçülen)
 İnşaat (v4.11), yüksek kalite, 1280×720: 340–380 bin üçgen, 640–810 çizim çağrısı (oyun içi `SHOT` günlüğü).
 Sunucuda GPU yazılımsal olduğu için FPS değeri anlamlı değil; gerçek FPS kullanıcı makinesinde ölçülmeli.
+
+## v4.13 (build 69) — sight-line pass on the remaining maps
+| harita | önce (açık doğuş görüş hattı) | sonra | değişiklik |
+|---|---|---|---|
+| Gemi | 3 / 36 | 0 / 36 | -13 ve +31 ambar kapaklarına bağlı konteyner yığınları; vinç bomları kabine menteşeli (önceden havada asılıydı), kanca + halat + karşı ağırlık |
+| Liman | 1 / 36 | 0 / 36 | depo kapısı ile konteyner sahası arasındaki batı koridoruna 2 katlı konteyner yığını |
+| Çekirdek | 1 / 64 (mesh) | 0 / 64 | doğu terasına sandık yığını (dress katmanı, yanında geçiş boşluğu var) |
+| Kereste | 0 / 64 (mesh) | — | değişiklik gerekmedi |
+| Mahalle, Safranbolu, İnşaat, Çanakkale, Fabrika, Hurda | 0 | 0 | — |

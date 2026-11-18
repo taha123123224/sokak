@@ -1,6 +1,6 @@
 {
- "version": "4.12.0",
- "build": 68,
+ "version": "4.13.0",
+ "build": 69,
  "parts": [
   {
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part00",
@@ -49,7 +49,7 @@
  ],
  "pck_size": 981533772,
  "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
- "notes": "Çanakkale yeniden: Mecidiye Tabyası (Krupp topları, cephanelik tünelleri, taş kale, siperler). Fabrika ve Hurda'ya yeni sahalar ve düzgün doğuşlar. Haritalarda fotogerçekçi ağaçlar.",
+ "notes": "Gemi, Liman ve Çekirdek'te doğuş noktaları arası açık görüş hatları kapatıldı; gemi vinç bomları düzeltildi",
  "launcher": {
   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/baslatici.pck",
   "size": 1692560
@@ -57,9 +57,9 @@
  "packs": [
   {
    "f": "SOKAK.pck",
-   "size": 17060024,
-   "md5": "0bc24fb05b92c384b28685e0fa531156",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/SOKAK_0bc24fb05b.pck"
+   "size": 17106352,
+   "md5": "05ce654bab13bae57797f5b3666e7581",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/SOKAK_05ce654bab.pck"
   },
   {
    "f": "veri/p00_79645374ea.pck",
@@ -68,10 +68,10 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p00_79645374ea.pck"
   },
   {
-   "f": "veri/p01_22a2737b7f.pck",
-   "size": 5472764,
-   "md5": "22a2737b7f39af361a14f83e5601c2f2",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p01_22a2737b7f.pck"
+   "f": "veri/p01_32c99e47c0.pck",
+   "size": 5287756,
+   "md5": "32c99e47c098831cadde7a66c0d7a980",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p01_32c99e47c0.pck"
   },
   {
    "f": "veri/p02_8fea00d481.pck",
@@ -254,10 +254,10 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p31_d2e7587556.pck"
   },
   {
-   "f": "veri/p32_0fa8ede35c.pck",
-   "size": 10683564,
-   "md5": "0fa8ede35c0f0bc794a4a6c5e225d863",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p32_0fa8ede35c.pck"
+   "f": "veri/p32_0fb8803542.pck",
+   "size": 10419468,
+   "md5": "0fb8803542e9ea4f783957a8cd6645e8",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p32_0fb8803542.pck"
   },
   {
    "f": "veri/p33_3e5aa61a4b.pck",
@@ -440,5 +440,5 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p63_129c4bdda0.pck"
   }
  ],
- "packs_total": 1383834296
+ "packs_total": 1383431520
 }

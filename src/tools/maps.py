@@ -1723,13 +1723,25 @@ def map_gemi():
     for hx in (-35, -13, 9, 31):
         wall('hatch', hx, 0, D, 6, 11, 1.0, mm['ship_green'])
         box('hatch_rim', (6.2, 11.2, 0.15), (hx, 0, D + 1.0), m=mm['ship_yellow'])
+    # containers lashed on two hatch covers: break the long centre and side lanes
+    for hx, ys in ((-13, (0.0, 4.4)), (31, (-4.4, 0.0))):
+        for k, hy in enumerate(ys):
+            container(hx, hy, D + 1.0, 90, cmats[(k + hx) % len(cmats)], mm, collide=True, length=6.06)
+            col((hx, hy, D + 1.0 + 1.3), (6.06, 2.44, 2.59))
     # cranes (pedestal + jib)
     for cx in (-35, -13, 9, 31):
         cy = W / 2 - 2.2
         cyl('crane_ped', 1.2, 9, (cx, cy, D + 4.5), m=mm['ship_yellow'], axis='Z', verts=20)
         col((cx, cy, D + 4.5), (2.4, 2.4, 9))
         box('crane_cab', (3, 3, 2.5), (cx, cy, D + 10), m=mm['ship_yellow'], bevel=0.2)
-        o = box('crane_jib', (0.8, 26, 0.8), (cx, cy - 11, D + 14), (25, 0, 0), m=mm['ship_yellow'])
+        # jib hinged at the cab, rising 25 deg out over the deck (it used to float detached)
+        ang = math.radians(25)
+        box('crane_jib', (0.8, 24, 0.8), (cx, cy - 1.2 - 12 * math.cos(ang), D + 10.6 + 12 * math.sin(ang)), (-25, 0, 0), m=mm['ship_yellow'])
+        cyl('crane_hinge', 0.55, 2.2, (cx, cy - 1.2, D + 10.6), m=mm['steel'], axis='X', verts=16)
+        box('crane_cwt', (2.4, 1.6, 1.6), (cx, cy + 1.6, D + 10.8), m=mm['ship_yellow'], bevel=0.1)
+        tip = (cx, cy - 1.2 - 24 * math.cos(ang), D + 10.6 + 24 * math.sin(ang))
+        cyl('crane_wire', 0.04, tip[2] - D - 3.5, (tip[0], tip[1], (tip[2] + D + 3.5) / 2), m=mm['black'], axis='Z', verts=6)
+        box('crane_hook', (0.5, 0.5, 0.7), (tip[0], tip[1], D + 3.3), m=mm['ship_yellow'])
     # misc deck props
     for (bx, by) in [(-56, -9), (-56, 9), (54, -7), (54, 8), (14, -4), (-14, 5)]:
         cyl('bollard', 0.3, 0.6, (bx, by, D + 0.3), m=mm['black'], axis='Z', verts=12)
@@ -1888,6 +1900,10 @@ def map_liman():
                                          (40, -36, 0, 0), (12, -36, 0, 0), (-5, -38, 0, 0), (25, -38, 0, 0), (-30, -36, 0, 30), (44, -24, 0, -30)]):
         spawn(x, y, z + 0.1, yaw, 'a' if i < 6 else 'b')
     bounds_walls(X0, Y0, X1, Y1, 20)
+    # west lane: 2-high stack across the gap between the warehouse door and the container yard
+    for k, cm in enumerate(('c_blue', 'c_red')):
+        container(-30.5, 3.2, k * 2.59, 90, mm[cm], mm, collide=(k == 0), length=6.06)
+    col((-30.5, 3.2, 2.59), (6.06, 2.44, 5.18))
     finalize('liman', dict(preset='overcast', sun=[-40, 120], fog=0.012, sky='overcast', water=True), [X0, Y0, X1, Y1])
 
 
