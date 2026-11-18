@@ -599,8 +599,9 @@ func _anim_tail(delta: float, hv: Vector2) -> void:
 		step_t -= delta * (hs / 4.0)
 		if step_t <= 0:
 			step_t = 0.36 if hs > 3.5 else 0.5
-			var surf: String = "metal" if match_node.surface == "metal" else "concrete"
-			SFX.play3d("step_%s%d" % [surf, randi() % 4], global_position, -9 if hs > 3.5 else -14, randf_range(0.9, 1.1), 35.0, 3.0)
+			var stp: String = match_node.step_sound(match_node.surface_at(global_position, get_rid()))
+			if OS.has_environment("SURFDBG"): print("STEP ", stp)
+			SFX.play3d("%s%d" % [stp, randi() % 4], global_position, -9 if hs > 3.5 else -14, randf_range(0.9, 1.1), 35.0, 3.0)
 	if model:
 		model.position.y = -0.35 if crouching else 0.0
 

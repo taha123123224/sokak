@@ -138,6 +138,9 @@ func stop_music() -> void:
 	tw.tween_callback(music.stop)
 
 func play_amb(n: String) -> void:
+	if _amb_tw:
+		_amb_tw.kill()
+	_amb_prev = ""
 	var s := get_stream(n)
 	if s is AudioStreamWAV:
 		(s as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
@@ -150,3 +153,37 @@ func play_amb(n: String) -> void:
 
 func stop_amb() -> void:
 	amb.stop()
+
+## v4.10 menu preview of a map's ambience: quiet, faded in / out, swaps smoothly when the map changes
+var _amb_prev := ""
+var _amb_tw: Tween
+func preview_amb(n: String, vol: float = -20.0) -> void:
+	if n == _amb_prev and amb.playing:
+		return
+	_amb_prev = n
+	if _amb_tw:
+		_amb_tw.kill()
+	_amb_tw = create_tween()
+	if amb.playing:
+		_amb_tw.tween_property(amb, "volume_db", -50.0, 0.35)
+	_amb_tw.tween_callback(func():
+		var s := get_stream(n)
+		if s is AudioStreamOggVorbis:
+			(s as AudioStreamOggVorbis).loop = true
+		elif s is AudioStreamWAV:
+			(s as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
+			(s as AudioStreamWAV).loop_end = _frames(s as AudioStreamWAV)
+		amb.stream = s
+		amb.volume_db = -50.0
+		amb.play())
+	_amb_tw.tween_property(amb, "volume_db", vol, 0.8)
+
+func stop_preview_amb() -> void:
+	if _amb_prev == "":
+		return
+	_amb_prev = ""
+	if _amb_tw:
+		_amb_tw.kill()
+	_amb_tw = create_tween()
+	_amb_tw.tween_property(amb, "volume_db", -50.0, 0.5)
+	_amb_tw.tween_callback(amb.stop)

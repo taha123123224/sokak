@@ -327,6 +327,7 @@ func _build_backdrop() -> bool:
 	add_child(cl)
 	bg_rect = TextureRect.new()
 	bg_rect.texture = load(lobby_bg)
+	_wbg_cur = lobby_bg
 	bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	bg_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	bg_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1608,6 +1609,10 @@ func show_page(p: String) -> void:
 	room_chat = null
 	if modal:
 		modal.queue_free(); modal = null
+	_room_backdrop_off()
+	if p != "room" and p != "netroom" and lobby_bg != "":
+		_set_world_bg(lobby_bg)
+		SFX.stop_preview_amb()
 	for k in nav_btns.keys():
 		var nb = nav_btns[k]
 		if not is_instance_valid(nb):
@@ -2507,6 +2512,9 @@ func _stat(name: String, val: float, maxv: float, compact: bool = false) -> Cont
 # ================================================================ UPGRADE
 func _modal(w: int, h: int) -> VBoxContainer:
 	if modal: modal.queue_free()
+	_bd_claim = false
+	if room_bd:
+		call_deferred("_bd_check")
 	modal = ColorRect.new()
 	(modal as ColorRect).color = Color(0, 0, 0, 0.7)
 	modal.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2525,6 +2533,136 @@ func _close_modal() -> void:
 	if modal:
 		modal.queue_free()
 		modal = null
+	_room_backdrop_off()
+
+# ---------------------------------------------------------------- v4.10 map-aware room backdrop
+## While a room is being set up, the whole screen behind the dialog becomes the selected map: its key art
+## crossfades in (slow Ken-Burns drift), the colour grade and the vignette follow the map's mood and its
+## ambience plays quietly. Lives outside the dialog so the dialog can rebuild without flicker.
+const MAP_MOOD := {
+	"mahalle": Color(1.0, 0.72, 0.42), "liman": Color(0.55, 0.68, 0.85), "gemi": Color(1.0, 0.55, 0.3),
+	"insaat": Color(0.95, 0.82, 0.55), "fabrika": Color(0.75, 0.72, 0.62), "hurda": Color(0.95, 0.75, 0.48),
+	"kereste": Color(1.0, 0.7, 0.38), "safranbolu": Color(1.0, 0.6, 0.35), "canakkale": Color(1.0, 0.55, 0.32),
+	"cekirdek": Color(0.5, 0.7, 0.95),
+}
+const MAP_AMB := {"mahalle": "amb_city", "safranbolu": "amb_town", "gemi": "amb_ship", "liman": "amb_port", "insaat": "amb_site", "canakkale": "amb_sea"}
+var room_bd: Control
+var _bd_map := ""
+var _bd_claim := false
+
+func _bd_check() -> void:
+	if not _bd_claim:
+		_room_backdrop_off()
+var _bd_t := 0.0
+
+func _room_backdrop(map_id: String) -> void:
+	_bd_claim = true
+	if room_bd == null or not is_instance_valid(room_bd):
+		room_bd = Control.new()
+		room_bd.name = "RoomBackdrop"
+		room_bd.set_anchors_preset(Control.PRESET_FULL_RECT)
+		room_bd.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ui.add_child(room_bd)
+		var a := _bd_layer(); a.name = "A"; room_bd.add_child(a)
+		var b := _bd_layer(); b.name = "B"; room_bd.add_child(b)
+		# mood tint + vignette + bottom darkening so the dialog text stays readable
+		var sh := ColorRect.new()
+		sh.name = "Grade"
+		sh.set_anchors_preset(Control.PRESET_FULL_RECT)
+		sh.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var sm := ShaderMaterial.new()
+		var shd := Shader.new()
+		shd.code = """shader_type canvas_item;
+uniform vec3 mood = vec3(1.0);
+void fragment() {
+	vec2 p = UV - 0.5;
+	float vig = smoothstep(0.25, 0.85, length(p * vec2(1.0, 1.25)));
+	float bottom = smoothstep(0.35, 1.0, UV.y);
+	vec3 c = mix(vec3(0.0), mood * 0.12, 0.5);
+	COLOR = vec4(c, clamp(0.38 + vig * 0.45 + bottom * 0.25, 0.0, 0.92));
+}"""
+		sm.shader = shd
+		sh.material = sm
+		room_bd.add_child(sh)
+		var bar := ColorRect.new()
+		bar.name = "Accent"
+		bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
+		bar.custom_minimum_size = Vector2(0, 3)
+		bar.size = Vector2(0, 3)
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		room_bd.add_child(bar)
+		room_bd.modulate.a = 0.0
+		create_tween().tween_property(room_bd, "modulate:a", 1.0, 0.35)
+	# keep it right behind the dialog
+	if modal and is_instance_valid(modal):
+		ui.move_child(room_bd, modal.get_index())
+		ui.move_child(modal, ui.get_child_count() - 1)
+		(modal as ColorRect).color = Color(0, 0, 0, 0.0)
+	if map_id == _bd_map:
+		return
+	_bd_map = map_id
+	var top: TextureRect = room_bd.get_node("B")
+	var bottom: TextureRect = room_bd.get_node("A")
+	# the new map fades in on top, then becomes the base layer
+	top.texture = _map_art(map_id)
+	top.modulate.a = 0.0
+	top.scale = Vector2(1.06, 1.06)
+	var tw := room_bd.create_tween().set_parallel(true)
+	tw.tween_property(top, "modulate:a", 1.0, 0.55).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(top, "scale", Vector2(1.0, 1.0), 9.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_callback(func():
+		bottom.texture = top.texture
+		bottom.scale = top.scale
+		bottom.modulate.a = 1.0
+		top.modulate.a = 0.0)
+	var mood: Color = MAP_MOOD.get(map_id, Color(1, 0.7, 0.4))
+	var gr: ColorRect = room_bd.get_node("Grade")
+	(gr.material as ShaderMaterial).set_shader_parameter("mood", Vector3(mood.r, mood.g, mood.b))
+	var acc: ColorRect = room_bd.get_node("Accent")
+	room_bd.create_tween().tween_property(acc, "color", mood, 0.5)
+	SFX.preview_amb(str(GS.MAPS.get(map_id, {}).get("amb", MAP_AMB.get(map_id, "amb_wind"))))
+
+func _bd_layer() -> TextureRect:
+	var t := TextureRect.new()
+	t.set_anchors_preset(Control.PRESET_FULL_RECT)
+	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	t.resized.connect(func(): t.pivot_offset = t.size * 0.5)
+	return t
+
+func _map_art(m: String) -> Texture2D:
+	for p in ["res://assets/ui/load_%s.jpg" % m, "res://assets/ui/map_%s.jpg" % m]:
+		if ResourceLoader.exists(p):
+			return load(p)
+	return null
+
+## behind the 3D soldier: swap the lobby street still for another picture (room pages show their map)
+var _wbg_cur := ""
+func _set_world_bg(path: String) -> void:
+	if bg_rect == null or not is_instance_valid(bg_rect) or path == _wbg_cur or not ResourceLoader.exists(path):
+		return
+	_wbg_cur = path
+	var nr := bg_rect.duplicate() as TextureRect
+	nr.texture = load(path)
+	nr.modulate = Color(1, 1, 1, 0)
+	bg_rect.get_parent().add_child(nr)
+	var old := bg_rect
+	bg_rect = nr
+	var tw := create_tween()
+	var dim := Color(0.55, 0.56, 0.6, 1) if path != lobby_bg else Color(1, 1, 1, 1)
+	tw.tween_property(nr, "modulate", dim, 0.6).set_trans(Tween.TRANS_SINE)
+	tw.tween_callback(old.queue_free)
+
+func _room_backdrop_off() -> void:
+	if room_bd and is_instance_valid(room_bd):
+		var n := room_bd
+		room_bd = null
+		var tw := create_tween()
+		tw.tween_property(n, "modulate:a", 0.0, 0.25)
+		tw.tween_callback(n.queue_free)
+		SFX.stop_preview_amb()
+	_bd_map = ""
 
 # ================================================================ CUSTOMISE (attachments)
 func _parts_dialog(id: String) -> void:
@@ -5580,6 +5718,8 @@ func _set_label(v: VBoxContainer, t: String) -> void:
 ## online: shows player limit / ranked instead of bots. done: called with the final cfg (null = bot room default)
 func _room_dialog(cfg: Dictionary, is_online: bool = false, done: Callable = Callable()) -> void:
 	var v := _modal(1280, 790)
+	_room_backdrop(str(cfg["map"]))
+	(v.get_parent() as PanelContainer).add_theme_stylebox_override("panel", UI.sb(Color(0.035, 0.04, 0.05, 0.86), Color(1, 1, 1, 0.1), 1, 6, 24))
 	var top := UI.hbox(12)
 	v.add_child(top)
 	var tv := UI.vbox(-4)
@@ -5794,6 +5934,10 @@ func _map_image(m: String) -> Control:
 func room_layout(o: Dictionary) -> Dictionary:
 	var out := {}
 	soldier.visible = true
+	var art := _map_art(str(o.get("map", "")))
+	if art:
+		_set_world_bg(art.resource_path)
+		SFX.preview_amb(str(GS.MAPS.get(str(o["map"]), {}).get("amb", MAP_AMB.get(str(o["map"]), "amb_wind"))), -24.0)
 	cam_target = Vector3(-0.35, 1.45, 4.3)
 	cam_look = Vector3(-0.45, 1.05, 0)
 	# ---- left: loadout + room card
@@ -6384,6 +6528,19 @@ func _page_mods() -> void:
 # ---------------------------------------------------------------- screenshot test hooks
 func test_hook(i: int) -> void:
 	match i:
+		76:
+			# v4.10 room setup with the map-aware backdrop
+			var c := {"name": "Test odası", "map": OS.get_environment("MAPSEL") if OS.has_environment("MAPSEL") else "liman", "mode": "tdm", "bots": 9, "diff": 1, "time": 8, "target": 60, "team": "a", "no": 123}
+			set_meta("tc", c)
+			_room_dialog(c)
+		77:
+			var c2: Dictionary = get_meta("tc")
+			c2["map"] = "kereste"
+			_room_dialog(c2)
+		78:
+			room_cfg = {"name": "Test odası", "map": "cekirdek", "mode": "tdm", "bots": 7, "diff": 1, "time": 8, "target": 60, "team": "a", "no": 321}
+			local_room = true
+			show_page("room")
 		68:
 			market_tab = "ekipman"; show_page("market")
 		71:

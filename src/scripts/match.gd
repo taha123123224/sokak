@@ -348,6 +348,16 @@ func _build() -> void:
 				continue
 			var msb := StaticBody3D.new()
 			msb.collision_layer = 1
+			# v4.10 footstep surfaces: which triangle range belongs to which material kind
+			var ends := PackedInt32Array(); var kinds := PackedStringArray(); var tot := 0
+			for si in m3.mesh.get_surface_count():
+				var arr := m3.mesh.surface_get_arrays(si)
+				var ix = arr[Mesh.ARRAY_INDEX]
+				tot += (ix.size() if ix else (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()) / 3
+				ends.append(tot)
+				kinds.append(surface_kind(m3.get_active_material(si), m3.name))
+			msb.set_meta("surf_ends", ends)
+			msb.set_meta("surf_kinds", kinds)
 			var mcs := CollisionShape3D.new()
 			mcs.shape = shp
 			msb.add_child(mcs)
@@ -361,7 +371,7 @@ func _build() -> void:
 		osk.name = "Outskirts"
 		vis.add_child(osk)
 		var t_osk := Time.get_ticks_msec()
-		osk.build(map_id, bounds, float(map_data.get("ground", {}).get("y", 0.0)), str(GS.settings.get("quality", "high")))
+		osk.build(map_id, bounds, float(map_data.get("ground", {}).get("y", 0.0)), "low" if bool(GS.settings.get("competitive", false)) else str(GS.settings.get("quality", "high")))
 		print("OUTSKIRTS ", map_id, " ", Time.get_ticks_msec() - t_osk, "ms")
 	# v3.4 imported maps that end in the void: a wide textured ground plane out to the horizon
 	if map_data.has("ground") and not use_osk:
@@ -418,7 +428,7 @@ func _build() -> void:
 		if cps:
 			char_scenes[cid] = cps
 	soldier_scene = char_scenes.get("asker1", load("res://assets/models/soldier.glb"))
-	surface = "metal" if map_id == "gemi" else "concrete"
+	surface = {"gemi": "metal", "canakkale": "dirt", "kereste": "dirt", "hurda": "dirt"}.get(map_id, "concrete")
 	hud = preload("res://scripts/hud.gd").new()
 	hud.match_node = self
 	add_child(hud)
@@ -835,7 +845,7 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	env_exp = float(c["exp"]) * (1.0 if pack == "gercekci" else 1.04)
 	e.tonemap_exposure = env_exp * float(s.get("brightness", 1.0))
 	e.tonemap_white = 6.0
-	e.fog_enabled = not GS.has_meta("nofog")
+	e.fog_enabled = not GS.has_meta("nofog") and not bool(s.get("competitive", false))
 	e.fog_mode = Environment.FOG_MODE_DEPTH
 	e.fog_light_color = c["fog"]
 	e.fog_light_energy = 1.0
@@ -2630,6 +2640,57 @@ func place_ping(pos: Vector3, who: String, tm: String, mine: bool) -> void:
 	if is_instance_valid(root):
 		_pings.erase(root)
 		root.queue_free()
+
+## v4.10 surface-aware footsteps --------------------------------------------------------------
+const SURF_WORDS := [["metal", ["metal", "steel", "iron", "grate", "grating", "container", "cont_", "corrug", "hull", "deck_plate", "diamond", "sac", "ship"]],
+	["wood", ["wood", "plank", "deck", "timber", "log", "pallet", "board", "tahta", "kereste", "formwork", "crate", "bark"]],
+	["grass", ["grass", "leaf", "leaves", "moss", "foliage", "lawn", "cim", "hay", "plant"]],
+	["dirt", ["dirt", "mud", "soil", "earth", "ground", "sand", "gravel", "toprak", "dust", "rock", "path"]]]
+static func surface_kind(mat: Material, node_name: String = "") -> String:
+	var t := ""
+	if mat:
+		t = str(mat.resource_name)
+		if mat is BaseMaterial3D and (mat as BaseMaterial3D).albedo_texture:
+			t += " " + (mat as BaseMaterial3D).albedo_texture.resource_path.get_file()
+	t = (t + " " + node_name).to_lower()
+	for e in SURF_WORDS:
+		for w in e[1]:
+			if t.contains(w):
+				return e[0]
+	return ""
+
+var _surf_q: PhysicsRayQueryParameters3D
+## what the character at pos is standing on: concrete / metal / wood / grass / dirt
+func surface_at(pos: Vector3, ex: RID = RID()) -> String:
+	if _surf_q == null:
+		_surf_q = PhysicsRayQueryParameters3D.new()
+		_surf_q.collision_mask = 1
+	_surf_q.from = pos + Vector3.UP * 0.3
+	_surf_q.to = pos + Vector3.DOWN * 0.6
+	_surf_q.exclude = [ex] if ex.is_valid() else []
+	var r := get_world_3d().direct_space_state.intersect_ray(_surf_q)
+	if r.is_empty():
+		return surface
+	var col: Object = r["collider"]
+	if col and col.has_meta("surf_kinds"):
+		var ends: PackedInt32Array = col.get_meta("surf_ends")
+		var kinds: PackedStringArray = col.get_meta("surf_kinds")
+		var fi: int = int(r.get("face_index", -1))
+		var k := ""
+		if fi >= 0:
+			for i in ends.size():
+				if fi < ends[i]:
+					k = kinds[i]; break
+		elif kinds.size() == 1:
+			k = kinds[0]
+		if k != "":
+			return k
+	if col and col.has_meta("surf"):
+		return str(col.get_meta("surf"))
+	return surface
+
+static func step_sound(surf: String) -> String:
+	return {"grass": "step_grass", "dirt": "step_snow", "wood": "step_wood", "metal": "step_metal"}.get(surf, "step_concrete")
 
 ## v4.9: low-res atlas surfaces get world-space micro detail (concrete pores as albedo + a fine normal),
 ## so walls and floors stay crisp up close instead of turning into a blur. Not on LOW, not on cut-outs.

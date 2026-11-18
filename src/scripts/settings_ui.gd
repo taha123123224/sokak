@@ -120,8 +120,10 @@ func _build() -> void:
 			_section("GRAFİK KALİTESİ ÖN AYARI")
 			var h := UI.hbox(8)
 			for q in [["low", "DÜŞÜK"], ["medium", "ORTA"], ["high", "YÜKSEK"], ["ultra", "ULTRA"], ["uhd", "ULTRA HD (4K)"]]:
-				h.add_child(UI.btn(q[1], func(): GS.apply_preset(q[0]); _build(), 20, GS.settings["quality"] == q[0], 170, 48))
+				h.add_child(UI.btn(q[1], func(): GS.apply_preset(q[0]); GS.settings["competitive"] = false; _build(), 20, GS.settings["quality"] == q[0] and not GS.settings.get("competitive", false), 150, 48))
+			h.add_child(UI.btn("REKABETÇİ", func(): GS.apply_competitive(); _build(), 20, bool(GS.settings.get("competitive", false)), 150, 48))
 			body.add_child(h)
+			body.add_child(UI.lbl("Rekabetçi: net görüntü ve yüksek FPS. Sis, parlama, hacimsel duman ışıması ve bulanıklık kapalı, gölgeler kısa ve keskin, uzak çevre sade.", 17, UI.DIM, "Rajdhani-Medium"))
 			body.add_child(UI.lbl("Ultra HD: 4x MSAA + TAA, 8K gölge haritası, SDFGI global aydınlatma ve uzak çizim mesafesi. Güçlü ekran kartı gerektirir.", 17, UI.DIM, "Rajdhani-Medium"))
 			_section("GRAFİK SÜRÜCÜSÜ  (görüntü bozuksa / 3D görünmüyorsa değiştir)")
 			var Gfx = preload("res://scripts/gfx.gd")

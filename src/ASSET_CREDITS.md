@@ -44,6 +44,16 @@ Oyun içi parlaklık eski renk ayarlarıyla uyumlu olsun diye albedo ortalaması
 | `assets/tex/trees_atlas.png` | 9 ağaç (3 ladin, 2 yapraklı + kavak, 3 zeytin), arka planı kaldırılmış, harita çevresi billboard ağaçları |
 | `assets/tex/facade_hf.png` | tekrarlanabilir apartman cephesi (balkon, panjur, klima) — harita çevresi şehir binaları |
 
+## Sesler
+
+| Dosya | Kaynak | Lisans |
+|---|---|---|
+| `assets/sfx/step_grass0-3.ogg`, `step_snow0-3.ogg` | Kenney — Impact Sounds (footstep_grass / footstep_snow) https://kenney.nl/assets/impact-sounds | CC0 |
+
+## Yükleme / oda kurma görselleri
+
+`assets/ui/load_kereste.jpg`, `load_cekirdek.jpg` (ve `map_` küçük sürümleri): Higgsfield (GPT Image 2.6) ile SOKAK için üretildi.
+
 ## Prosedürel (projede üretilen)
 
 `assets/tex/micro_detail.png` (rawconc dokusundan yüksek geçiren filtre), `forest_canopy.png`, `facade_apt.png`.

@@ -520,6 +520,7 @@ const CREDITS := [
 	["Rust (Paslı Fabrika haritası)", "frostychaos144", "CC-BY 4.0 · sketchfab.com/frostychaos144"],
 	["Howling (Kurt Adam modeli, rig + animasyon: SOKAK)", "Daniele De Filippis", "CC-BY 4.0 · sketchfab.com/danieledefilippis"],
 	["Interface Sounds / UI Audio (menü sesleri)", "Kenney", "CC0 · kenney.nl"],
+	["Çim ve toprak ayak sesleri (Impact Sounds)", "Kenney", "CC0 · kenney.nl"],
 ]
 const TEAMS := {"a": "KARTAL", "b": "AKREP"}
 const TEAM_COLORS := {"a": Color("3d8bff"), "b": Color("ff4d3d")}
@@ -928,6 +929,18 @@ func detect_tier() -> String:
 		if re.search(n):
 			return pat[1]
 	return "medium" if t == RenderingDevice.DEVICE_TYPE_DISCRETE_GPU else "low"
+
+## v4.10 competitive preset: clarity and frame rate first (medium base, effects that hurt visibility off)
+func apply_competitive() -> void:
+	apply_preset("medium")
+	settings["competitive"] = true
+	settings["glow"] = false
+	settings["volumetric"] = false
+	settings["ssao"] = false
+	settings["motion_blur"] = false
+	settings["shadows"] = 1
+	settings["draw_distance"] = 0.9
+	settings["color_pack"] = "dogal"
 
 func apply_preset(name: String) -> void:
 	settings["quality"] = name

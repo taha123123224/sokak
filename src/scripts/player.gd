@@ -40,6 +40,7 @@ var crouching := false
 var eye := EYE_STAND
 var was_on_floor := true
 var step_dist := 0.0
+var step_lr := false
 var land_dip := 0.0
 # v4.8 mantle: climb onto ledges up to ~1.75 m (jump into a wall / crate / platform edge)
 var mantle_t := -1.0
@@ -478,7 +479,10 @@ func _physics_process(delta: float) -> void:
 		step_dist += hv.length() * delta
 		if step_dist > 2.1:
 			step_dist = 0
-			SFX.play_var("step_" + match_node.surface, 4, -10 + (linear_to_db(1.0 - g_step) if g_step > 0.0 else 0.0))
+			var stp: String = match_node.step_sound(match_node.surface_at(global_position, get_rid()))
+			# alternate feet: slightly different pitch for left / right
+			step_lr = not step_lr
+			SFX.play("%s%d" % [stp, randi() % 4], -10 + (linear_to_db(1.0 - g_step) if g_step > 0.0 else 0.0) + (-2.0 if stp == "step_snow" else 0.0), (1.03 if step_lr else 0.96) * randf_range(0.97, 1.03))
 	if global_position.y < -20:
 		take_damage(1000, null, global_position, false, "")
 

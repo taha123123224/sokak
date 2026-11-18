@@ -1,6 +1,6 @@
 {
- "version": "4.9.1",
- "build": 65,
+ "version": "4.10.0",
+ "build": 66,
  "parts": [
   {
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part00",
@@ -49,7 +49,7 @@
  ],
  "pck_size": 981533772,
  "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
- "notes": "v4.9.1: Silah materyalleri gerçekçi hale getirildi (ayna gibi parlayan krom kaldırıldı, P90 siyah polimer, AWP yeşil askeri boya). Yeni taş duvar ve tuğla dokuları (Poly Haven). Lobi: yeni Safranbolu sokağı arka planları, nefes alan kamera, güneşte uçuşan toz.",
+ "notes": "v4.10: Oda kurarken seçtiğin haritanın görseli tüm ekranı kaplıyor, harita değişince yumuşak geçiş ve haritanın ortam sesi. Oda lobisinde arka plan seçili harita oluyor. Kereste ve Çekirdek için yeni yükleme görselleri. Zemine göre ayak sesleri (çim, toprak, ahşap, metal, beton). Yeni REKABETÇİ grafik ön ayarı.",
  "launcher": {
   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/baslatici.pck",
   "size": 1692560
@@ -57,9 +57,9 @@
  "packs": [
   {
    "f": "SOKAK.pck",
-   "size": 16896140,
-   "md5": "4e14c624b8f44c3f31c4550536b077f5",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/SOKAK_4e14c624b8.pck"
+   "size": 16980092,
+   "md5": "793d975f81410f5af2347315e100b35e",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/SOKAK_793d975f81.pck"
   },
   {
    "f": "veri/p00_79645374ea.pck",
@@ -68,10 +68,10 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p00_79645374ea.pck"
   },
   {
-   "f": "veri/p01_ecbe751cf4.pck",
-   "size": 5474860,
-   "md5": "ecbe751cf407c2214130da09c2da7e8d",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p01_ecbe751cf4.pck"
+   "f": "veri/p01_22a2737b7f.pck",
+   "size": 5472764,
+   "md5": "22a2737b7f39af361a14f83e5601c2f2",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p01_22a2737b7f.pck"
   },
   {
    "f": "veri/p02_8fea00d481.pck",
@@ -332,16 +332,16 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p45_d52c070aff.pck"
   },
   {
-   "f": "veri/p46_ae6a77c6e7.pck",
-   "size": 26682096,
-   "md5": "ae6a77c6e721edf503e169763d6ce522",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p46_ae6a77c6e7.pck"
+   "f": "veri/p46_c7891ac087.pck",
+   "size": 27000048,
+   "md5": "c7891ac08735b331dedd5142e592fa79",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p46_c7891ac087.pck"
   },
   {
-   "f": "veri/p47_6ad64f4eb4.pck",
-   "size": 14204224,
-   "md5": "6ad64f4eb423a203b48bc62e4307e50a",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p47_6ad64f4eb4.pck"
+   "f": "veri/p47_c148c8e3b3.pck",
+   "size": 14289808,
+   "md5": "c148c8e3b3d689e37c13321f6c08774d",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p47_c148c8e3b3.pck"
   },
   {
    "f": "veri/p49_c9790f1861.pck",
@@ -434,5 +434,5 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p63_ea83441096.pck"
   }
  ],
- "packs_total": 987183024
+ "packs_total": 987668416
 }
