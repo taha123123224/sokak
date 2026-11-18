@@ -255,6 +255,8 @@ func _progress(p: float, t: String) -> void:
 		await get_tree().process_frame
 		if OS.has_environment("DBGLOAD"): print("  frame ok ", k)
 
+var dress_glb := ""
+
 func _build() -> void:
 	fx = preload("res://scripts/fx.gd").new()
 	add_child(fx)
@@ -262,6 +264,23 @@ func _build() -> void:
 	var f := FileAccess.open(GS.map_paths(map_id)["json"], FileAccess.READ)
 	map_data = JSON.parse_string(f.get_as_text())
 	bounds = map_data["bounds"]
+	# v4.12 dressing layer for imported maps: assets/maps/<id>_dress.{json,glb} (built by tools/maps.py)
+	# adds box colliders, trees and optionally replaces the spawns / hides model parts
+	var dress_json := "res://assets/maps/%s_dress.json" % map_id
+	dress_glb = ""
+	if ResourceLoader.exists(dress_json) or FileAccess.file_exists(dress_json):
+		var dj = JSON.parse_string(FileAccess.get_file_as_string(dress_json))
+		if dj is Dictionary:
+			map_data["colliders"] = map_data.get("colliders", []) + dj.get("colliders", [])
+			map_data["trees"] = map_data.get("trees", []) + dj.get("trees", [])
+			map_data["hide"] = map_data.get("hide", []) + dj.get("hide", [])
+			if not dj.get("spawns", []).is_empty():
+				map_data["spawns"] = dj["spawns"]
+			if dj.has("env_override") and map_data.has("env"):
+				for ek in dj["env_override"].keys():
+					map_data["env"][ek] = dj["env_override"][ek]
+			if ResourceLoader.exists("res://assets/maps/%s_dress.glb" % map_id):
+				dress_glb = "res://assets/maps/%s_dress.glb" % map_id
 	if not map_data.has("env"):
 		map_data["env"] = {"preset": "day"}
 	# v3.1 cinematic look, matching the map key art: warm low sun on the old-town maps
@@ -374,6 +393,25 @@ func _build() -> void:
 		var t_osk := Time.get_ticks_msec()
 		osk.build(map_id, bounds, float(map_data.get("ground", {}).get("y", 0.0)), "low" if bool(GS.settings.get("competitive", false)) else str(GS.settings.get("quality", "high")))
 		print("OUTSKIRTS ", map_id, " ", Time.get_ticks_msec() - t_osk, "ms")
+	# v4.12 dressing layer mesh (its collision comes as box colliders from the dress json)
+	if dress_glb != "":
+		var dps: PackedScene = load(dress_glb)
+		if dps:
+			var dv := dps.instantiate()
+			dv.name = "Dress"
+			MatLib.apply(dv)
+			_apply_baked_ao(dv)
+			var dd2 := float(GS.settings["draw_distance"])
+			for mi in dv.find_children("*", "MeshInstance3D", true, false):
+				var m4 := mi as MeshInstance3D
+				if String(m4.name).begins_with("det"):
+					m4.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+					m4.visibility_range_end = 70.0 * dd2
+				else:
+					m4.visibility_range_end = maxf(320.0 * dd2, 480.0)
+			vis.add_child(dv)
+	# v4.11 in-map trees (photoscan impostors with shadows + trunk colliders)
+	_osk.map_trees(vis, map_data.get("trees", []), statics)
 	# v3.4 imported maps that end in the void: a wide textured ground plane out to the horizon
 	if map_data.has("ground") and not use_osk:
 		var gd: Dictionary = map_data["ground"]

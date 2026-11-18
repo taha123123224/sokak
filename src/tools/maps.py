@@ -13,6 +13,7 @@ os.makedirs(OUTD, exist_ok=True)
 
 COL = []      # colliders: dict(c=[x,y,z], s=[sx,sy,sz], r=[rx,ry,rz]) godot space
 SPAWNS = []   # dict(p=[x,y,z], yaw=, team=)
+TREES = []    # v4.11 in-map impostor trees: [x, y, z, height, row, yaw] in godot space
 WRND = random.Random(77)
 RND = random.Random(1)
 
@@ -29,6 +30,15 @@ def col(center, size, rotz=0.0, rotx=0.0, roty=0.0):
 def spawn(x, y, z=0.0, yaw=0.0, team=None):
     # yaw in degrees, 0 = facing blender +Y (north) -> godot -Z
     SPAWNS.append(dict(p=g((x, y, z)), yaw=math.radians(yaw), team=team))
+
+
+# impostor atlas rows (assets/tex/trees_imp.json): 0-1 olive, 2 broadleaf, 3 slender broadleaf, 4-6 fir
+IMP_ROWS = dict(olive=(0, 1), broad=(2,), slender=(3,), fir=(4, 5, 6))
+
+
+def imp_tree(x, y, h, kind='olive', z=0.0, row=None):
+    r = row if row is not None else WRND.choice(IMP_ROWS[kind])
+    TREES.append([round(x, 2), round(z, 2), round(-y, 2), round(h, 2), r, round(WRND.uniform(0, 6.283), 3)])
 
 
 def M(name, color, rough=0.8, metal=0.0, **kw):
@@ -209,30 +219,12 @@ def sandbags(x, y, length, rows, mm, rot=0):
     col((x, y, rows * 0.16 / 2 + 0.02), (length, 0.45, rows * 0.16 + 0.04), rotz=rot)
 
 
-def tree(x, y, mm, h=6.0, r=2.4, seed=0):
+def tree(x, y, mm, h=6.0, r=2.4, seed=0, kind=None):
+    """v4.11: street / garden tree = photoscan impostor (map json "trees"; shadows + trunk collider in game).
+    The old procedural leaf-card tree is gone (it read as green balls)."""
     rr = random.Random(seed)
-    cyl('trunk', 0.2, h * 0.55, (x, y, h * 0.275), m=mm['bark'], axis='Z', verts=10, r2=0.13)
-    # branches
-    tips = []
-    for i in range(6):
-        a = i / 6 * math.tau + rr.uniform(-0.3, 0.3)
-        el = rr.uniform(35, 60)
-        L = r * rr.uniform(0.6, 0.9)
-        base = Vector((x, y, h * rr.uniform(0.45, 0.6)))
-        dvec = Vector((math.cos(a) * math.cos(math.radians(el)), math.sin(a) * math.cos(math.radians(el)), math.sin(math.radians(el))))
-        tip = base + dvec * L
-        o = cyl('branch', 0.08, L, (base + tip) / 2, m=mm['bark'], axis='Z', verts=6, r2=0.03)
-        o.rotation_euler = Vector((0, 0, 1)).rotation_difference(dvec).to_euler()
-        tips.append(tip)
-    tips.append(Vector((x, y, h * 0.85)))
-    # leaf cards (alpha-cut clusters) around branch tips
-    for tp in tips:
-        for k in range(14):
-            c = tp + Vector((rr.uniform(-1, 1), rr.uniform(-1, 1), rr.uniform(-0.6, 0.8))) * r * 0.45
-            sz = rr.uniform(1.1, 1.7)
-            o = box('leafcard', (sz, 0.002, sz), c, (rr.uniform(-40, 40), rr.uniform(-40, 40), rr.uniform(0, 180)), m=mm['leaves'])
-            o['normuv'] = True
-    col((x, y, h * 0.3), (0.45, 0.45, h * 0.6))
+    k = kind or ('broad' if r >= 3.2 else ('slender' if rr.random() < 0.6 else 'broad'))
+    imp_tree(x, y, h * (1.15 if k == 'broad' else 1.0), k)
 
 
 def flower_box(parent, x, y, z, w, mm, rr):
@@ -906,6 +898,8 @@ def finalize(mapid, env, bounds, extra=None):
     print('chunks', len(chunk_objs), flush=True)
     export_glb(os.path.join(OUTD, mapid + '.glb'), chunk_objs)
     data = dict(colliders=COL, spawns=SPAWNS, env=env, bounds=bounds)
+    if TREES:
+        data['trees'] = TREES
     if extra:
         data.update(extra)
     with open(os.path.join(OUTD, mapid + '.json'), 'w') as f:
@@ -914,7 +908,7 @@ def finalize(mapid, env, bounds, extra=None):
 
 
 def begin():
-    reset(); COL.clear(); SPAWNS.clear(); RND.seed(1)
+    reset(); COL.clear(); SPAWNS.clear(); TREES.clear(); RND.seed(1); WRND.seed(77)
     return mats()
 
 
@@ -971,8 +965,8 @@ def map_mahalle():
         k += 1
     # back rows (outer boundary)
     for i, x in enumerate(range(X0, X1, 11)):
-        apartment(f'bn{i}', x + 5.5, Y1, 0, 10.8, 8, RND.choice([5, 6, 7]), mm, mm[walls[(i + 2) % len(walls)]], seed=100 + i, roof='flat')
-        apartment(f'bs{i}', x + 5.5, Y0, 180, 10.8, 8, RND.choice([4, 5, 6]), mm, mm[walls[(i + 5) % len(walls)]], seed=200 + i, roof='flat')
+        apartment(f'bn{i}', x + 5.5, Y1, 0, 10.8, 8, RND.choice([5, 6, 7]), mm, mm[walls[(i + 2) % len(walls)]], seed=100 + i, roof='flat', side_windows=True)
+        apartment(f'bs{i}', x + 5.5, Y0, 180, 10.8, 8, RND.choice([4, 5, 6]), mm, mm[walls[(i + 5) % len(walls)]], seed=200 + i, roof='flat', side_windows=True)
     # end caps (east/west)
     for sgn in (-1, 1):
         apartment(f'cap{sgn}', sgn * (X1 + 6), 0, -90 * sgn, 2 * Y1 + 16, 6, 6, mm, mm['p_grey'], seed=300 + sgn, roof='flat', collide=True)
@@ -2755,7 +2749,7 @@ def tent(x, y, rot, mm, w=4, l=5, h=2.6):
     col((x, y, h / 3), (w * 0.8, l, h * 0.66), rotz=rot)
 
 
-def map_canakkale():
+def map_canakkale_v3():   # pre-v4.12 layout, kept for reference (not in ALL)
     mm = begin()
     X0, X1, Y0, Y1 = -62, 56, -46, 46
     grass = M('dry_grass', (0.5, 0.48, 0.28), 0.95)
@@ -2838,6 +2832,359 @@ def map_canakkale():
         spawn(x, y, 0.1, yaw, 'a' if i < 6 else 'b')
     bounds_walls(X0, Y0, X1, Y1, 22)
     finalize('canakkale', dict(preset='golden', sun=[-40, 250], fog=0.008, sky='sunset', water=True), [X0, Y0, X1, Y1])
+
+
+# ======================================================================== MAP (v4.12): ÇANAKKALE — Mecidiye Tabyası (Boğaz kıyı bataryası)
+# Spliced into maps.py. Design notes: docs/MAP_DESIGN.md#canakkale
+#   centre : stone redoubt (kale) x -8..18, y -13..13 — N/S gates, E/W posterns, wall-walk ring at 5 m,
+#            courtyard with a barrack and a depot (rotational symmetry about (5, 0))
+#   east   : coastal battery on the cliff — 4 gun pits between 5 earth traverses (y -30..30), each traverse
+#            pierced by a vaulted magazine tunnel that links the pits (N-S lane under cover)
+#   west   : zig-zag trench line (x -50..-42) + stone farmhouse with a walled yard + olive grove
+#   N / S  : opposing army camps (spawns), sandbag + crate screens
+
+CK_C = (5.0, 0.0)          # symmetry centre
+
+
+def ck_mats(mm):
+    return dict(
+        fort=M('fort_stone', (0.72, 0.66, 0.55), 0.9), stone=M('ruin_stone_dark', (0.6, 0.56, 0.5), 0.9), revet=M('fort_wall', (0.7, 0.64, 0.54), 0.9),
+        grass=M('dry_grass2', (0.55, 0.5, 0.3), 0.95), house=mm['stone'],
+        path=M('site_dirt', (0.55, 0.45, 0.32), 0.95), cobble=mm['cobble'], soil=M('soil_wall', (0.45, 0.36, 0.26), 0.95),
+        earth=M('earth', (0.42, 0.33, 0.22), 0.95), bag=mm['sandbag'], beam=mm['beam'], planks=mm['planks'],
+        iron=M('cannon_iron', (0.12, 0.12, 0.12), 0.45, 0.85), roof=mm['roof'], white=M('white_plaster', (0.88, 0.86, 0.8), 0.9),
+        canvas=M('canvas', (0.62, 0.58, 0.45), 0.9), rock=M('cliff_rock', (0.6, 0.55, 0.45), 0.9), gravel=M('gravel', (0.5, 0.48, 0.45), 0.95),
+        brass=M('gun_brass', (0.72, 0.55, 0.25), 0.35, 0.9), lamp=mm['lamp'], sand=M('sand', (0.82, 0.7, 0.5), 0.95), mm=mm,
+    )
+
+
+def ck_mound(name, x0, x1, y, h, k, base=6.0, top=2.0, m=None):
+    """earth traverse running along X (x0..x1) centred on y: trapezoid section, grass-capped"""
+    L = x1 - x0
+    if L <= 0.1:
+        return
+    prof(name, [(-base / 2, 0), (base / 2, 0), (top / 2, h), (-top / 2, h)], L, ((x0 + x1) / 2, y, 0), m=m or k['grass'], plane='YZ', bevel=0.0)
+    box(name + '_cap', (L, top + 0.3, 0.12), ((x0 + x1) / 2, y, h + 0.02), m=k['grass'])
+    for (w, z0, z1) in [(base * 0.92, 0, h * 0.4), (base * 0.6, h * 0.4, h * 0.75), (top + 0.4, h * 0.75, h)]:
+        col(((x0 + x1) / 2, y, (z0 + z1) / 2), (L, w, z1 - z0))
+
+
+def ck_traverse(y, x0, x1, tx, k, h=3.4):
+    """earth traverse with a vaulted magazine tunnel (2.6 wide, 2.5 high) running N-S through it at x = tx"""
+    hw = 1.3
+    ck_mound('trav', x0, tx - hw - 0.6, y, h, k)
+    ck_mound('trav', tx + hw + 0.6, x1, y, h, k)
+    # tunnel: masonry side walls, vault (barrel of stone segments), earth on top, portals both faces
+    for sx in (-1, 1):
+        wall('mag_wall', tx + sx * (hw + 0.3), y, 0, 0.6, 6.0, 2.5, k['revet'])
+    for i in range(7):
+        a = math.radians(180 * (i + 0.5) / 7)
+        box('mag_vault', (2 * hw * math.sin(math.pi / 14) * 1.15, 6.0, 0.35), (tx - math.cos(a) * hw, y, 2.4 + math.sin(a) * 0.55), (0, math.degrees(a) - 90, 0), m=k['fort'])
+    wall('mag_roof', tx, y, 2.5, 2 * hw + 1.2, 6.0, 0.5, k['revet'])
+    prof('mag_earth', [(-3.0, 3.0), (3.0, 3.0), (1.0, h), (-1.0, h)], 2 * hw + 1.2, (tx, y, 0), m=k['grass'], plane='YZ', bevel=0.0)
+    col((tx, y, (3.0 + h) / 2), (2 * hw + 1.2, 4.0, h - 3.0))
+    for sy in (-1, 1):
+        fy = y + sy * 3.05
+        for sx in (-1, 1):
+            box('portal_pier', (0.7, 0.4, 2.9), (tx + sx * (hw + 0.35), fy, 1.45), m=k['revet'], bevel=0.03)
+        box('portal_lintel', (2 * hw + 1.4, 0.45, 0.6), (tx, fy, 3.1), m=k['revet'], bevel=0.03)
+        box('portal_key', (0.5, 0.5, 0.7), (tx, fy, 3.15), m=k['stone'], bevel=0.04)
+    # shell racks inside the magazine
+    for sx in (-1, 1):
+        for i in range(9):
+            ssx, ssy = tx + sx * (hw - 0.25), y - 2.2 + i * 0.55
+            cyl('shell_case', 0.12, 0.42, (ssx, ssy, 0.35), m=k['brass'], axis='Z', verts=12)
+            cyl('shell_band', 0.125, 0.04, (ssx, ssy, 0.58), m=M('copper_band', (0.6, 0.3, 0.15), 0.4, 0.9), axis='Z', verts=12)
+            lathe('shell_nose', [(0.115, 0.0), (0.1, 0.12), (0.06, 0.24), (0.0, 0.3)], (ssx, ssy, 0.6), m=k['iron'], seg=12)
+        box('shell_rack', (0.35, 5.0, 0.08), (tx + sx * (hw - 0.25), y, 0.12), m=k['beam'])
+    box('mag_lamp', (0.2, 0.2, 0.25), (tx, y, 2.2), m=k['lamp'])
+
+
+def ck_krupp(x, y, rot, k):
+    """WWI-era coastal gun on a pivot mount (procedural, period-correct silhouette)"""
+    root = empty('krupp', (x, y, 0)); root.rotation_euler = (0, 0, math.radians(rot))
+    cyl('kr_pivot', 1.25, 0.35, (0, 0, 0.42), m=k['iron'], parent=root, axis='Z', verts=28, bevel=0.03)
+    cyl('kr_race', 1.6, 0.12, (0, 0, 0.3), m=k['iron'], parent=root, axis='Z', verts=32)
+    for sx in (-1, 1):
+        prof('kr_cheek', [(-1.2, 0.6), (0.9, 0.6), (0.6, 1.9), (-0.8, 1.6)], 0.16, (sx * 0.55, 0, 0), m=k['iron'], parent=root, plane='YZ', bevel=0.02)
+    cyl('kr_trunnion', 0.14, 1.4, (0, 0, 1.6), m=k['iron'], parent=root, axis='X', verts=12)
+    cyl('kr_barrel', 0.3, 5.6, (0, 2.0, 1.72), (-4, 0, 0), m=k['iron'], parent=root, axis='Y', verts=24, r2=0.19, bevel=0.02)
+    cyl('kr_jacket', 0.36, 1.8, (0, 0.2, 1.62), (-4, 0, 0), m=k['iron'], parent=root, axis='Y', verts=24)
+    torus('kr_muzzle', 0.2, 0.05, (0, 4.75, 2.06), (86, 0, 0), m=k['iron'], parent=root, seg=20, mseg=6)
+    box('kr_breech', (0.62, 0.55, 0.62), (0, -0.95, 1.56), m=k['iron'], parent=root, bevel=0.05)
+    torus('kr_handwheel', 0.32, 0.03, (0.85, -0.4, 1.2), (0, 90, 0), m=k['iron'], parent=root, seg=18, mseg=5)
+    col((x, y, 1.0), (2.6, 2.6, 2.0), rotz=rot)
+
+
+def ck_gun_pit(x, y, k):
+    """circular stone gun platform with an earth parapet (stone-revetted) towards the sea (east)"""
+    cyl('pit_floor', 3.6, 0.22, (x, y, 0.11), m=k['fort'], axis='Z', verts=32)
+    col((x, y, 0.11), (7.0, 7.0, 0.22))
+    n = 9
+    for i in range(n):
+        a = math.radians(-78 + 156 * i / (n - 1))
+        px, py = x + math.cos(a) * 4.6, y + math.sin(a) * 4.6
+        wall('pit_rev', px, py, 0, 1.0, 2.1, 1.35, k['revet'], rot=math.degrees(a))
+        prof('pit_earth', [(-1.5, 0), (1.5, 0), (0.6, 1.5), (-0.6, 1.5)], 2.1, (px + math.cos(a) * 1.4, py + math.sin(a) * 1.4, 0), (0, 0, math.degrees(a) + 90), m=k['grass'], plane='YZ', bevel=0.0)
+        col((px + math.cos(a) * 1.2, py + math.sin(a) * 1.2, 0.75), (2.4, 2.1, 1.5), rotz=math.degrees(a))
+    ck_krupp(x, y, -90, k)
+    # ready-use ammunition: shells on a cradle + a wooden fuse box (west side of the pit)
+    for i in range(6):
+        cyl('shell_r', 0.13, 0.7, (x - 3.1, y - 1.0 + i * 0.36, 0.36), m=k['brass'], axis='X', verts=10, r2=0.07)
+    box('cradle', (0.9, 2.4, 0.18), (x - 3.1, y - 0.1, 0.09), m=k['beam'])
+    col((x - 3.1, y - 0.1, 0.3), (0.9, 2.4, 0.6))
+    crate(x - 3.3, y + 2.2, 0, 0.9, k['mm'], rot=10)
+
+
+def ck_tent(x, y, rot, k, r=2.6, h=3.0):
+    """conical army bell tent with pole and guy ropes"""
+    lathe('tent_cone', [(r, 0.0), (r * 0.96, 0.35), (r * 0.55, h * 0.55), (0.06, h)], (x, y, 0), (0, 0, rot), m=k['canvas'], seg=18)
+    cyl('tent_pole', 0.04, 0.6, (x, y, h + 0.25), m=k['beam'], axis='Z', verts=6)
+    for i in range(6):
+        a = math.radians(rot + i * 60)
+        cyl('tent_rope', 0.01, 1.6, (x + math.cos(a) * (r + 0.55), y + math.sin(a) * (r + 0.55), 0.4), (0, 50, i * 60 + rot), m=M('rope', (0.5, 0.42, 0.3), 0.9), axis='Z', verts=3)
+    col((x, y, h * 0.35), (r * 1.4, r * 1.4, h * 0.7))
+
+
+def ck_trench(x, y0, y1, k, inner=2.6, east_gaps=(), west_gaps=(), bays=()):
+    """N-S fire trench: earth parapets with sandbag crests both sides, duckboard floor, alternating sandbag
+    traverses (zig-zag walking line, no straight shot down the trench), exits as gaps in the parapets"""
+    off = inner / 2 + 1.25
+    for (sx, gaps) in [(-1, west_gaps), (1, east_gaps)]:
+        pos = y0
+        for (g0, g1) in sorted(gaps) + [(y1, y1)]:
+            if g0 - pos > 1.0:
+                berm(x + sx * off, (pos + g0) / 2, g0 - pos, 0, {'sandbag': k['bag']}, h=1.45)
+            pos = g1
+    for i in range(int((y1 - y0) / 1.2)):
+        box('duckboard', (1.4, 1.0, 0.05), (x, y0 + 0.6 + i * 1.2, 0.03), m=k['planks'])
+    for j, by in enumerate(bays):
+        sx = -1 if j % 2 == 0 else 1
+        bx = x + sx * (inner / 2 - 0.7)
+        for lv in range(8):
+            box('trav_bag', (1.4, 0.4, 0.18), (bx + RND.uniform(-0.04, 0.04), by + (lv % 2) * 0.42 - 0.21, 0.09 + (lv // 2) * 0.18 * 2), (0, 0, RND.uniform(-5, 5)), m=k['bag'], bevel=0.06, segs=3)
+        col((bx, by, 0.75), (1.4, 1.0, 1.5))
+
+
+def ck_mg_nest(x, y, k, r=2.0):
+    for i in range(10):
+        a = math.radians(30 + i * 30)
+        for lv in range(4):
+            box('mg_bag', (0.6, 0.36, 0.17), (x + math.cos(a) * r, y + math.sin(a) * r, 0.09 + lv * 0.17), (0, 0, i * 30 + 120 + RND.uniform(-6, 6)), m=k['bag'], bevel=0.06, segs=3)
+        col((x + math.cos(a) * r, y + math.sin(a) * r, 0.35), (0.7, 0.45, 0.7), rotz=i * 30 + 120)
+
+
+def ck_stone_house(name, x, y, w, d, k, rot=0, door_sides=('N', 'S'), floors=1, partition=True):
+    """two-room rural stone house: 0.6 m rubble walls, timber lintels, hipped tile roof"""
+    H = 3.2
+    T = 0.6
+    x0, x1, y0, y1 = x - w / 2, x + w / 2, y - d / 2, y + d / 2
+    def side(ax, ay, bx, by, door):
+        L = math.hypot(bx - ax, by - ay); r = math.degrees(math.atan2(by - ay, bx - ax))
+        c_, s_ = math.cos(math.radians(r)), math.sin(math.radians(r))
+        cx, cy = (ax + bx) / 2, (ay + by) / 2
+        ops = [(-L / 4, 1.0, 1.0, 1.1), (L / 4, 1.0, 1.0, 1.1)]           # windows (offset, width, sill, height)
+        if door:
+            ops[0] = (-L / 6, 1.3, 0.0, 2.2)
+        cuts = sorted([(o - wdt / 2, o + wdt / 2, sl, sl + hh) for (o, wdt, sl, hh) in ops])
+        pos = -L / 2
+        for (a0, a1, z0, z1) in cuts:
+            if a0 > pos:
+                wall(name, cx + c_ * (pos + a0) / 2, cy + s_ * (pos + a0) / 2, 0, a0 - pos, T, H, k['house'], rot=r)
+            if z0 > 0.05:
+                wall(name, cx + c_ * (a0 + a1) / 2, cy + s_ * (a0 + a1) / 2, 0, a1 - a0, T, z0, k['house'], rot=r)
+            wall(name, cx + c_ * (a0 + a1) / 2, cy + s_ * (a0 + a1) / 2, z1, a1 - a0, T, H - z1, k['house'], rot=r)
+            box('lintel', (a1 - a0 + 0.4, T + 0.06, 0.18), (cx + c_ * (a0 + a1) / 2, cy + s_ * (a0 + a1) / 2, z1 + 0.09), (0, 0, r), m=k['beam'])
+            if z0 > 0.05:
+                box('shutter', (a1 - a0, 0.05, z1 - z0), (cx + c_ * (a0 + a1) / 2 - s_ * T * 0.55, cy + s_ * (a0 + a1) / 2 + c_ * T * 0.55, (z0 + z1) / 2), (0, 0, r + 12), m=M('shutter_brown', (0.45, 0.28, 0.15)))
+            pos = a1
+        if pos < L / 2:
+            wall(name, cx + c_ * (pos + L / 2) / 2, cy + s_ * (pos + L / 2) / 2, 0, L / 2 - pos, T, H, k['house'], rot=r)
+    side(x0, y1, x1, y1, 'N' in door_sides)
+    side(x1, y0, x0, y0, 'S' in door_sides)
+    side(x0, y0, x0, y1, 'W' in door_sides)
+    side(x1, y1, x1, y0, 'E' in door_sides)
+    # interior partition with a door, floor boards, ceiling beams
+    if partition:
+        wall(name + '_part', x - 0.7 - (w / 2 - T) / 2 + 0.35, y, 0, w / 2 - T - 0.7, 0.3, H, k['stone'])
+        wall(name + '_part', x + 0.7 + (w / 2 - T) / 2 - 0.35, y, 0, w / 2 - T - 0.7, 0.3, H, k['stone'])
+        wall(name + '_part', x, y, 2.2, 1.4, 0.3, H - 2.2, k['stone'])
+    box('floor', (w - 2 * T, d - 2 * T, 0.05), (x, y, 0.025), m=k['planks'])
+    for i in range(int(w / 0.9)):
+        box('ceil_beam', (0.18, d - 0.2, 0.2), (x0 + 0.5 + i * 0.9, y, H - 0.1), m=k['beam'])
+    wall(name + '_ceil', x, y, H, w + 0.2, d + 0.2, 0.12, k['beam'])
+    hip_roof(name + '_roof', x, y, w, d, H + 0.12, 1.7, k['roof'], over=0.5)
+
+
+def ck_well(x, y, k):
+    lathe('well', [(0.9, 0.0), (0.9, 0.85), (0.7, 0.85), (0.7, 0.1)], (x, y, 0), m=k['fort'], seg=20)
+    for sx in (-1, 1):
+        box('well_post', (0.14, 0.14, 2.0), (x + sx * 0.8, y, 1.0), m=k['beam'])
+    box('well_beam', (1.9, 0.14, 0.14), (x, y, 2.0), m=k['beam'])
+    col((x, y, 0.45), (1.8, 1.8, 0.9))
+
+
+def map_canakkale():
+    mm = begin()
+    k = ck_mats(mm)
+    X0, X1, Y0, Y1 = -60, 52, -46, 46
+    # ---------------------------------------------------------------- ground, paths, coast
+    ground('land', X0 - 2, Y0 - 2, X1, Y1 + 2, 0, k['grass'])
+    ground('land_far', X0 - 260, Y0 - 260, X1, Y0 - 2, 0, k['grass'])
+    ground('land_far', X0 - 260, Y1 + 2, X1, Y1 + 260, 0, k['grass'])
+    ground('land_far', X0 - 260, Y0 - 2, X0 - 2, Y1 + 2, 0, k['grass'])
+    for (cx, cy, sx, sy, r) in [(5, 24, 4, 26, 0), (5, -24, 4, 26, 0), (32, 0, 4.5, 84, 0), (-21, 0, 3.5, 70, 0),
+                                (-8, 33, 30, 3.5, 0), (18, -33, 30, 3.5, 0), (24, 0, 12, 3.5, 0), (-14, 0, 12, 3.5, 0)]:
+        box('track', (sx, sy, 0.035), (cx, cy, 0.018), (0, 0, r), m=k['path'])
+    # cliff to the strait (Boğaz): rock face down to a sand beach and the sea
+    # (sea itself: outskirts, theme sea_y -9 m; the terrain under the bluff is cut via terrain_holes)
+    prof('cliff', [(0, 0.0), (1.2, -0.6), (3.0, -3.8), (4.6, -5.2), (6.5, -8.4), (9.0, -9.6), (16, -9.8), (16, -16), (0, -16)], 600, (X1, 0, 0), m=k['rock'], plane='XZ', bevel=0.0)
+    box('beach', (9, 600, 1), (X1 + 12.5, 0, -9.45), m=k['sand'])
+    for i in range(26):
+        sphere('shore_rock', WRND.uniform(0.8, 2.2), (X1 + WRND.uniform(7, 18), WRND.uniform(-140, 140), -9.5), m=k['rock'], scale=(1.4, 1.0, 0.6))
+    # ---------------------------------------------------------------- EAST: coastal battery (x 30..50)
+    BX = 44.0
+    for y in (-26.0, -9.0, 9.0, 26.0):
+        ck_gun_pit(BX, y, k)
+    for y in (-35.0, -17.5, 0.0, 17.5, 35.0):
+        ck_traverse(y, 37.0, 50.5, 42.0, k)
+    # battery road wall (west side), with openings at the traverse ends
+    for (ya, yb) in [(-44, -37), (-33, -20), (-15, -3), (3, 15), (20, 33), (37, 44)]:
+        wall('batt_wall', 35.2, (ya + yb) / 2, 0, 0.6, yb - ya, 1.1, k['revet'])
+    # observation post on the middle traverse (gun-laying hut)
+    wall('op_wall', 46.8, 0, 3.4, 2.4, 0.3, 1.2, k['fort'])
+    for (ox, oy) in [(44.2, 12.5), (44.2, -12.5)]:
+        crate(ox, oy, 0, 1.0, mm, rot=RND.uniform(-15, 15))
+        wood_barrel(ox + 1.2, oy + 0.3, mm)
+    # ---------------------------------------------------------------- CENTRE: stone redoubt
+    FX0, FX1, FY0, FY1, FT, FH = -8.0, 18.0, -13.0, 13.0, 2.2, 5.0
+    GW = 3.4         # main gate width (N/S, x = 5)
+    PW = 1.6         # postern width
+    def fwall(ax, ay, bx, by, gaps):
+        """straight fort wall from a to b (axis aligned) with gate gaps [(centre, width, height)]"""
+        horiz = abs(by - ay) < 1e-6
+        L = abs(bx - ax) if horiz else abs(by - ay)
+        s0 = min(ax, bx) if horiz else min(ay, by)
+        pos = s0
+        cuts = sorted([(c - w / 2, c + w / 2, h) for (c, w, h) in gaps])
+        for (c0, c1, gh) in cuts + [(s0 + L, s0 + L, 0)]:
+            if c0 > pos + 0.01:
+                if horiz:
+                    wall('fwall', (pos + c0) / 2, ay, 0, c0 - pos, FT, FH, k['fort'])
+                else:
+                    wall('fwall', ax, (pos + c0) / 2, 0, FT, c0 - pos, FH, k['fort'])
+            if c1 > c0:
+                if horiz:
+                    wall('fwall_over', (c0 + c1) / 2, ay, gh, c1 - c0, FT, FH - gh, k['fort'])
+                    box('gate_arch_l', (0.3, FT + 0.1, gh), (c0 + 0.15, ay, gh / 2), m=k['stone'])
+                    box('gate_arch_r', (0.3, FT + 0.1, gh), (c1 - 0.15, ay, gh / 2), m=k['stone'])
+                else:
+                    wall('fwall_over', ax, (c0 + c1) / 2, gh, FT, c1 - c0, FH - gh, k['fort'])
+            pos = c1
+    fwall(FX0, FY1 - FT / 2, FX1, FY1 - FT / 2, [(5.0, GW, 3.6)])
+    fwall(FX0, FY0 + FT / 2, FX1, FY0 + FT / 2, [(5.0, GW, 3.6)])
+    fwall(FX0 + FT / 2, FY0 + FT, FX0 + FT / 2, FY1 - FT, [(5.0, PW, 2.3)])
+    fwall(FX1 - FT / 2, FY0 + FT, FX1 - FT / 2, FY1 - FT, [(-5.0, PW, 2.3)])
+    # parapet with merlons (crenels to shoot through) on the outer edge of the wall-walk, all four sides
+    for (ax, ay, bx, by, ox, oy) in [(FX0, FY1, FX1, FY1, 0, -0.3), (FX0, FY0, FX1, FY0, 0, 0.3), (FX0, FY0, FX0, FY1, 0.3, 0), (FX1, FY0, FX1, FY1, -0.3, 0)]:
+        L = math.hypot(bx - ax, by - ay); n = int(L / 2.0)
+        for i in range(n):
+            t = (i + 0.5) / n
+            px, py = ax + (bx - ax) * t + ox, ay + (by - ay) * t + oy
+            horiz = abs(by - ay) < 1e-6
+            wall('merlon', px, py, FH, 1.1 if horiz else 0.6, 0.6 if horiz else 1.1, 1.15, k['fort'])
+        box('parapet_low', (L if abs(by - ay) < 1e-6 else 0.6, 0.6 if abs(by - ay) < 1e-6 else L, 0.55), ((ax + bx) / 2 + ox, (ay + by) / 2 + oy, FH + 0.27), m=k['fort'])
+        col(((ax + bx) / 2 + ox, (ay + by) / 2 + oy, FH + 0.27), (L if abs(by - ay) < 1e-6 else 0.6, 0.6 if abs(by - ay) < 1e-6 else L, 0.55))
+    # string course + plinth (reads as masonry architecture, not flat boxes)
+    for (cx, cy, sx, sy) in [((FX0 + FX1) / 2, FY1 + 0.05, FX1 - FX0 + 0.2, 0.25), ((FX0 + FX1) / 2, FY0 - 0.05, FX1 - FX0 + 0.2, 0.25),
+                             (FX0 - 0.05, 0, 0.25, FY1 - FY0 + 0.2), (FX1 + 0.05, 0, 0.25, FY1 - FY0 + 0.2)]:
+        box('string_course', (sx, sy, 0.22), (cx, cy, FH - 0.35), m=k['stone'])
+        box('plinth', (sx + (0.3 if sx < 1 else 0), sy + (0.3 if sy < 1 else 0), 0.7), (cx, cy, 0.35), m=k['stone'])
+    # corner bastions (NW, SE): octagonal, same level as the wall-walk
+    for (tx, ty) in [(FX0, FY1), (FX1, FY0)]:
+        cyl('bastion', 4.0, FH, (tx, ty, FH / 2), m=k['fort'], axis='Z', verts=8)
+        col((tx, ty, FH / 2), (6.6, 6.6, FH))
+        for i in range(8):
+            a = math.radians(i * 45 + 22.5)
+            wall('b_merlon', tx + math.cos(a) * 3.6, ty + math.sin(a) * 3.6, FH, 1.2, 0.6, 1.15, k['fort'], rot=i * 45 + 22.5 + 90)
+    # stone stairs up to the wall-walk (W wall inner face going N, E wall inner face going S — symmetric)
+    stairs('fort_st_w', FX0 + FT + 0.8, -4.5, 0, FH, 9.0, 1.6, k['stone'], axis='Y', direction=1)
+    stairs('fort_st_e', FX1 - FT - 0.8, 4.5, 0, FH, 9.0, 1.6, k['stone'], axis='Y', direction=-1)
+    # courtyard: cobbles, well, barrack (SW) and depot (NE) — mirror images through the centre
+    box('court', (FX1 - FX0 - 2 * FT, FY1 - FY0 - 2 * FT, 0.04), ((FX0 + FX1) / 2, 0, 0.02), m=k['cobble'])
+    ck_well(5.0, 0.0, k)
+    # each gate opens onto a building (no straight shot through the fort from gate to gate)
+    ck_stone_house('barrack', 5.0, -6.8, 6.4, 4.2, k, door_sides=('N',), partition=False)
+    ck_stone_house('depot', 5.0, 6.8, 6.4, 4.2, k, door_sides=('S',), partition=False)
+    for (px, py) in [(9.5, -8.5), (0.5, 8.5)]:
+        for i in range(10):
+            sphere('ball', 0.17, (px + (i % 4) * 0.35 - 0.5, py + (i // 4) * 0.33, 0.17 + (i // 4) * 0.19), m=k['iron'])
+        col((px, py, 0.4), (1.6, 1.2, 0.8))
+    for (cx, cy, r) in [(12.0, -3.0, 15), (-2.0, 3.0, -20)]:
+        crate(cx, cy, 0, 1.2, mm, rot=r)
+        crate(cx + 1.3, cy + 0.2, 0, 1.2, mm, rot=r + 8)
+    # flag on the NW bastion
+    cyl('flagpole', 0.07, 9, (FX0, FY1, FH + 4.5), m=mm['steel'], axis='Z', verts=8)
+    box('flag', (0.05, 3.6, 2.4), (FX0, FY1 + 1.85, FH + 7.6), m=mm['flag_tr'])
+    # ---------------------------------------------------------------- WEST: trench line + farmhouse + olive grove
+    TX = -46.0
+    ck_trench(TX, -36, 36, k, east_gaps=[(-13, -9), (-2, 2), (9, 13)], west_gaps=[(-24, -20), (20, 24)],
+              bays=[-30, -22, -6, 6, 22, 30])
+    for (mx, my) in [(TX, -38.5), (TX, 38.5)]:
+        ck_mg_nest(mx, my, k)
+    ck_stone_house('farm', -28.0, 0.0, 9.0, 7.0, k, door_sides=('N', 'S', 'E'))
+    garden_wall((-36, -9), (-20, -9), mm, h=1.4)
+    garden_wall((-36, 9), (-20, 9), mm, h=1.4)
+    garden_wall((-36, -9), (-36, -3), mm, h=1.4)
+    garden_wall((-36, 3), (-36, 9), mm, h=1.4)
+    for (bx2, by2) in [(-22.5, -6.5), (-33.5, 6.5)]:
+        wood_barrel(bx2, by2, mm)
+    sandbags(-20.5, 0.0, 3.0, 3, mm, rot=90)
+    # olive grove (rows) west of the trench, around the farm and between the camps
+    for row in range(3):
+        for i in range(9):
+            x = -57.8 + row * 3.0 + WRND.uniform(-0.3, 0.3)
+            y = -36 + i * 9 + WRND.uniform(-1.2, 1.2) + (row % 2) * 4.5
+            if abs(y) > 42:
+                continue
+            imp_tree(x, y, WRND.uniform(4.2, 6.0), 'olive')
+    for (x, y, h) in [(-24, 13, 9.5), (-32, -13, 10.0), (-14, 22, 5.5), (24, -22, 5.5), (-14, -24, 5.2), (24, 24, 5.0)]:
+        imp_tree(x, y, h, 'broad' if h > 7 else 'olive')
+    # ---------------------------------------------------------------- flank sight-line breakers (mirror pairs)
+    for sy in (1, -1):
+        # stone guardhouse on the battery road, hay barn between farm and fort
+        ck_stone_house('guard', 31.5, sy * 21.0, 4.4, 4.0, k, door_sides=('W',), partition=False)
+        for lv in range(3):
+            for i in range(4 - lv):
+                box('hay', (1.2, 2.4, 0.95), (-17.0 - 1.5 + i * 1.25 + lv * 0.62, sy * 20.0, 0.47 + lv * 0.95), m=M('dry_grass', (0.75, 0.65, 0.35), 0.95), bevel=0.12, segs=2)
+        col((-17.0, sy * 20.0, 1.43), (5.0, 2.4, 2.85))
+    # ---------------------------------------------------------------- NORTH / SOUTH camps (spawns, mirror y)
+    for sy in (1, -1):
+        for (tx, ty) in [(-36, 43.0), (-10, 43.6), (18, 43.6), (40, 42.0)]:
+            ck_tent(tx, sy * ty, 0, k, r=2.2, h=2.8)
+        # sandbag screen (1.9 m) in front of the camp, gaps for the west track, centre path and battery road
+        for (xa, xb) in [(-40, -24), (-18, 1), (9, 28)]:
+            n_ = max(1, int((xb - xa) / 4.6))
+            for q in range(n_):
+                qa, qb = xa + (xb - xa) * q / n_, xa + (xb - xa) * (q + 1) / n_
+                sandbags((qa + qb) / 2, sy * (29.5 + (0.12 if q % 2 else -0.12)), qb - qa - 0.35, 11 if q % 3 != 1 else 10, mm, rot=RND.uniform(-1.5, 1.5))
+                cyl('screen_post', 0.09, 2.3, (qb - 0.17, sy * 29.15, 1.15), m=k['beam'], axis='Z', verts=8)
+                cyl('screen_post', 0.09, 2.3, (qb - 0.17, sy * 29.85, 1.15), m=k['beam'], axis='Z', verts=8)
+        for (cx, r) in [(-6.0, 0), (17.0, 30)]:
+            crate(cx, sy * 32.0, 0, 1.3, mm, rot=r)
+            crate(cx + 1.4, sy * 32.2, 0, 1.3, mm, rot=r + 12)
+            crate(cx + 0.6, sy * 32.1, 1.3, 1.2, mm, rot=r - 9)
+        for (bx2, dy) in [(-28, 44.0), (32, 44.0)]:
+            wood_barrel(bx2, sy * dy, mm)
+    # ---------------------------------------------------------------- spawns (8 + 8, mirror across y = 0)
+    sp = [(-26, 39, 180), (-16, 38.5, 180), (-4, 39, 180), (6, 38.5, 180), (16, 39, 180), (26, 38.5, 180), (-32, 35.5, 165), (34, 36, 195)]
+    for (x, y, yaw) in sp:
+        spawn(x, y, 0.1, yaw, 'a')
+    for (x, y, yaw) in sp:
+        spawn(x, -y, 0.1, (180 - yaw) % 360, 'b')
+    bounds_walls(X0, Y0, X1 + 1, Y1, 22)
+    finalize('canakkale', dict(preset='golden', sun=[-38, 250], fog=0.006, sky='sunset', water=True), [X0, Y0, X1, Y1],
+             extra=dict(hide=['far_ship', 'far_shore'], terrain_holes=[[X1 + 0.2, -400, X1 + 140, 400]]))
 
 
 def map_ayvadisi():

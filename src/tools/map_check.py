@@ -59,6 +59,14 @@ def inside(p, b):
 def main():
     mid = sys.argv[1]
     d = json.load(open(os.path.join(ROOT, 'assets', 'maps', mid + '.json')))
+    dp = os.path.join(ROOT, 'assets', 'maps', mid + '_dress.json')
+    if os.path.exists(dp):
+        dj = json.load(open(dp))
+        d['colliders'] = d['colliders'] + dj.get('colliders', [])
+        if dj.get('spawns'):
+            d['spawns'] = dj['spawns']
+    if d.get('mesh_collision'):
+        print('   NOTE: imported map, its own meshes are collision -> sight-lines here only see box colliders')
     B = [b for b in boxes(d) if max(b[1]) * 2 < 200]          # skip giant ground plates for LOS
     G = boxes(d)
     sp = d['spawns']

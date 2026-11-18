@@ -32,7 +32,7 @@ const THEMES := {
 	"insaat":     {"relief": 80.0, "flat": 170.0, "near": "dirt", "far": "grass", "tn": [0.8, 0.75, 0.68], "tf": [0.75, 0.8, 0.6],
 				   "city": "apt", "n_bld": 1300, "b0": 6.0, "b1": 600.0, "trees": "broad", "n_tree": 1400, "cranes": 7},
 	"canakkale":  {"relief": 110.0, "flat": 90.0, "near": "grass", "far": "grass", "tn": [0.78, 0.74, 0.5], "tf": [0.7, 0.72, 0.48],
-				   "sea": "east", "sea_y": -2.25, "city": "village", "n_bld": 260, "b0": 140.0, "b1": 900.0, "trees": "olive", "n_tree": 4200, "ships": 7},
+				   "sea": "east", "sea_y": -9.0, "city": "village", "n_bld": 260, "b0": 140.0, "b1": 900.0, "trees": "olive", "n_tree": 4200, "ships": 7},
 	"hurda":      {"relief": 90.0, "flat": 140.0, "near": "dryground", "far": "dryground", "tn": [0.85, 0.78, 0.68], "tf": [0.8, 0.75, 0.6],
 				   "city": "industrial", "n_bld": 600, "b0": 10.0, "b1": 520.0, "trees": "broad", "n_tree": 900, "cranes": 3,
 				   "outer": [-80, -148, 73, 89]},
@@ -907,6 +907,54 @@ func _tree_cell(kind: String) -> int:
 			if r < 0.45: return 2
 			if r < 0.8: return 3
 			return 4 + rng.randi() % 3
+
+## v4.11: trees placed inside a map by the map builder (map json "trees": [[x, y, z, height, row, yaw]]),
+## drawn with the same photoscan impostors as the surroundings but casting shadows (in the shadow pass the
+## billboard turns to the sun, so the shadow has the tree's silhouette). Trunks get a thin collider.
+static func map_trees(parent: Node3D, list: Array, statics: Node3D) -> void:
+	if list.is_empty():
+		return
+	var qm := QuadMesh.new()
+	qm.size = Vector2(1, 1)
+	qm.center_offset = Vector3(0, 0.5, 0)
+	var m := ShaderMaterial.new()
+	var sh := Shader.new()
+	sh.code = TREE_SHADER
+	m.shader = sh
+	m.set_shader_parameter("atlas", MatLib.tex("trees_imp_albedo.png"))
+	m.set_shader_parameter("natlas", MatLib.tex("trees_imp_normal.png"))
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_custom_data = true
+	mm.mesh = qm
+	mm.instance_count = list.size()
+	var rng2 := RandomNumberGenerator.new()
+	rng2.seed = 4242
+	for i in list.size():
+		var t: Array = list[i]
+		var row := clampi(int(t[4]), 0, IMP_H.size() - 1)
+		var fr := float(t[3]) / float(IMP_H[row])
+		mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, float(t[5])) * Basis.from_scale(Vector3(fr, fr, 1.0)), Vector3(float(t[0]), float(t[1]) - 0.1, float(t[2]))))
+		var tint := Color(rng2.randf_range(0.9, 1.05), rng2.randf_range(0.92, 1.04), rng2.randf_range(0.88, 1.0))
+		tint.a = float(row)
+		mm.set_instance_custom_data(i, tint)
+		if statics:
+			var sb := StaticBody3D.new()
+			var cs := CollisionShape3D.new()
+			var cyl := CylinderShape3D.new()
+			cyl.radius = 0.22 if row < 2 else 0.3
+			cyl.height = 2.6
+			cs.shape = cyl
+			sb.add_child(cs)
+			statics.add_child(sb)
+			sb.global_position = Vector3(float(t[0]), float(t[1]) + 1.3, float(t[2]))
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "map_trees"
+	mmi.multimesh = mm
+	mmi.material_override = m
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	mmi.extra_cull_margin = 12.0
+	parent.add_child(mmi)
 
 func _trees() -> void:
 	var kind: String = th.get("trees", "broad")

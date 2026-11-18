@@ -470,9 +470,9 @@ var MAPS := {
 	"gemi": {"name": "Gemi", "desc": "Gün batımında Marmara'da yük gemisi. Konteyner koridorları.", "size": "Orta"},
 	"liman": {"name": "Liman Deposu", "desc": "Sisli sabah, konteyner sahası ve depo. Nişancı dostu.", "size": "Büyük"},
 	"insaat": {"name": "İnşaat", "desc": "Kartal Konutları şantiyesi: 3 katlı betonarme blok, temel çukuru, kule vinç ve konteyner sokağı. Üç şeritli, dikey oynanış.", "size": "Orta"},
-	"canakkale": {"name": "Çanakkale", "desc": "Boğaz kıyısında taş tabya, top mevzileri ve siper hattı. Gün batımında destansı çatışma.", "size": "Büyük"},
-	"hurda": {"name": "Hurda Sahası", "desc": "Çukurdaki konteyner sahası: hesco bariyerleri, lastikler, sürekli çatışma.", "size": "Küçük", "amb": "amb_site"},
-	"fabrika": {"name": "Paslı Fabrika", "desc": "Terk edilmiş tuğla fabrika kompleksi, avlular, depolar ve bacalar.", "size": "Büyük", "amb": "amb_city"},
+	"canakkale": {"name": "Çanakkale", "desc": "Mecidiye Tabyası: Boğaz kıyısında Krupp top mevzileri, traverslerin içinden geçen cephanelikler, taş kale ve siper hattı.", "size": "Büyük"},
+	"hurda": {"name": "Hurda Sahası", "desc": "Çukurdaki hurda sahası: ezilmiş araba yığınları, lastik kuleleri, balya presleri ve konteynerler. Sürekli çatışma.", "size": "Küçük", "amb": "amb_site"},
+	"fabrika": {"name": "Paslı Fabrika", "desc": "Tuğla fabrika kompleksi: iki uçta tanklı ham madde ve cüruf sahaları, avlular, depolar ve bacalar.", "size": "Büyük", "amb": "amb_site"},
 	"cekirdek": {"name": "Çekirdek Tesisi", "desc": "Yeraltı araştırma tesisi: dar koridorlar, metal ızgaralı köprüler, kontrol odaları ve çok katlı salonlar.", "size": "Büyük", "amb": "amb_wind"},
 	"kereste": {"name": "Kereste Fabrikası", "desc": "Dağların arasında terk edilmiş kereste fabrikası: tomruk yığınları, depolar, kamyonlar ve dar avlular.", "size": "Küçük", "amb": "amb_wind"},
 }
