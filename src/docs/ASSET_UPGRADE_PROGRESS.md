@@ -41,3 +41,8 @@ Mahalle, Safranbolu, Liman, Kereste, Çekirdek **bu tur için yeniden çekilmedi
   −1.73 m, köprüüstü bloğu, dalgakıran, baş omuzları). Model konteynerleri oynanış alanında silindi, kıçta arka plan olarak kaldı.
   Deniz seviyesi −10.5 m (gerçek fribord). Doğuş-doğuş açık görüş 0/64, en yakın düşman doğuşu 95 m.
   Oyun içi kareler: oyuncu gözü ×3, helikopter, sudan gövde (medium kalite) ✔.
+- 21:40 **Liman v4.15 — INTEGRATED + TESTED (NOOSK, low):** primitif uzak gemi kutusu → gerçek Container Ship rıhtımda; primitif
+  portal vinç → 2 × Harbor crane (TGVMisterH); depodaki kutu forklift → Forklift (alban). Doğuş-doğuş açık görüş 0/36.
+  Düzeltilen iki boru hattı hatası: (1) model UV katmanı "UVMap" ≠ prosedürel "Float2" → doku TEXCOORD_1/3'e düşüyordu, `_one_uv`;
+  (2) KHR_materials_unlit tarama malzemeleri → `_lit_material`. Bollard taraması (orphanrtg) render'ı çökertti → REJECTED.
+  Not: llvmpipe test ortamında Liman 6 GB RAM sınırına dayanıyor (çevre şehir dahil); görsel QA çevre kapalı yapıldı.

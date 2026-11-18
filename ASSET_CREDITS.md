@@ -98,3 +98,6 @@ tüm proje yedeği: `/home/claude/backups/sokak_pre_gfx_v48.tgz`. Git'te `v4.8.0
 | model | yaratıcı | kullanım | kaynak |
 |---|---|---|---|
 | Container Ship | RM02 | Gemi haritası: gövde, köprüüstü, kıç konteyner yükü (×2.67 gerçek ölçek; oynanış alanındaki model konteynerleri ve lashing köprüleri silindi) | https://sketchfab.com/3d-models/container-ship-aaa41cca946b4a08bc08cf692b7757be |
+| Harbor crane | TGVMisterH | Liman: rıhtımda 2 mobil liman vinci (%15 poligon, 1K doku) | https://sketchfab.com/3d-models/d4d582ebd707426f93f1f5a9cdd0ce03 |
+| Forklift | alban | Liman deposu (%20 poligon, 2K doku; unlit tarama malzemesi lit PBR'a çevrildi) | https://sketchfab.com/3d-models/e79f0768aec6431d8e6f3874e5acc5f2 |
+| Container Ship | RM02 | Liman: rıhtıma yanaşmış tam yüklü gemi (2K gövde, 1K köprüüstü/konteyner) | (yukarıda) |

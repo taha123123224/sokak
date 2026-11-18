@@ -912,6 +912,7 @@ def finalize(mapid, env, bounds, extra=None):
 
 
 def begin():
+    _EXT_CACHE.clear()
     reset(); COL.clear(); SPAWNS.clear(); TREES.clear(); RND.seed(1); WRND.seed(77)
     return mats()
 
@@ -1764,13 +1765,106 @@ def map_gemi_v413():
 
 
 
+SKF = os.path.join(ROOT, 'assets_src', 'sketchfab')
+
+
+def _one_uv(me):
+    """keep only the model's TEXCOORD_0 and give it the procedural meshes' layer name, so the merged chunks carry ONE uv
+    layer and the exported textures point at TEXCOORD_0 (Godot reads UV / UV2 only)"""
+    while len(me.uv_layers) > 1:
+        me.uv_layers.remove(me.uv_layers[-1])
+    if me.uv_layers:
+        me.uv_layers[0].name = 'Float2'
+    for m in me.materials:
+        if m and m.use_nodes:
+            for n in m.node_tree.nodes:
+                if n.type == 'UVMAP':
+                    n.uv_map = 'Float2'
+                elif n.type == 'NORMAL_MAP':
+                    n.uv_map = 'Float2'
+
+
+def _lit_material(m):
+    """scanned models often ship KHR_materials_unlit (baked light, emission-only shader): rebuild them as a plain lit
+    Principled BSDF with the same base-colour texture (the unlit path crashed the renderer and ignores the sun)"""
+    if not m.use_nodes:
+        return
+    nt = m.node_tree
+    if any(n.type == 'BSDF_PRINCIPLED' for n in nt.nodes):
+        return
+    texs = [n for n in nt.nodes if n.type == 'TEX_IMAGE']
+    out = [n for n in nt.nodes if n.type == 'OUTPUT_MATERIAL']
+    for n in list(nt.nodes):
+        if n not in texs and n not in out:
+            nt.nodes.remove(n)
+    bs = nt.nodes.new('ShaderNodeBsdfPrincipled')
+    bs.inputs['Roughness'].default_value = 0.85
+    bs.inputs['Metallic'].default_value = 0.0
+    if texs:
+        nt.links.new(texs[0].outputs['Color'], bs.inputs['Base Color'])
+    if not out:
+        out = [nt.nodes.new('ShaderNodeOutputMaterial')]
+    nt.links.new(bs.outputs['BSDF'], out[0].inputs['Surface'])
+
+
+_EXT_CACHE = {}
+
+
+def ext_prop(fname, x, y, z=0.0, rotz=0.0, scale=1.0, maxres=2048, tag='prop', center=True, ground=True, extra_rot=None,
+             decimate=1.0):
+    """v4.14: place a downloaded, UV-mapped model (Sketchfab, CC-BY) — scaled, bbox-centred on (x, y), its lowest point on z,
+    rotated rotz degrees; materials renamed ext_<tag>_* so the game keeps their own PBR textures. The file is imported once per
+    build (repeats share materials + images); decimate < 1 thins far-away hero props. Returns (objects, size)."""
+    key = (fname, scale, tuple(extra_rot or ()))
+    if key not in _EXT_CACHE:
+        before = set(bpy.data.objects); imgs_before = set(bpy.data.images)
+        bpy.ops.import_scene.gltf(filepath=os.path.join(SKF, fname))
+        new = [o for o in bpy.data.objects if o not in before]
+        meshes = []; pts = []
+        for o in new:
+            if o.type != 'MESH':
+                continue
+            me = o.data.copy()
+            M0 = Matrix.Scale(scale, 4) @ o.matrix_world
+            if extra_rot is not None:
+                M0 = Euler([math.radians(a) for a in extra_rot]).to_matrix().to_4x4() @ M0
+            me.transform(M0)
+            for m in me.materials:
+                if m and not m.name.startswith('ext_'):
+                    m.name = 'ext_' + tag + '_' + m.name.lower().split('.')[0][:20]
+                    _lit_material(m)
+            _one_uv(me)
+            meshes.append(me)
+            pts += [v.co.copy() for v in me.vertices]
+        for o in new:
+            bpy.data.objects.remove(o, do_unlink=True)
+        for img in set(bpy.data.images) - imgs_before:
+            if img.size[0] > maxres:
+                img.scale(maxres, max(1, int(img.size[1] * maxres / img.size[0])))
+        mn = Vector([min(p[i] for p in pts) for i in range(3)]); mx = Vector([max(p[i] for p in pts) for i in range(3)])
+        _EXT_CACHE[key] = (meshes, mn, mx)
+    meshes, mn, mx = _EXT_CACHE[key]
+    c = (mn + mx) / 2
+    T = Matrix.Translation((x, y, z)) @ Matrix.Rotation(math.radians(rotz), 4, 'Z') @ \
+        Matrix.Translation((-c.x if center else 0, -c.y if center else 0, -mn.z if ground else 0))
+    out = []
+    for me0 in meshes:
+        me = me0.copy(); me.transform(T)
+        ob = bpy.data.objects.new(tag, me); ob['keepuv'] = True
+        bpy.context.scene.collection.objects.link(ob)
+        if decimate < 1.0:
+            md = ob.modifiers.new('dec', 'DECIMATE'); md.ratio = decimate
+        out.append(ob)
+    return out, mx - mn
+
+
 # ======================================================================== MAP 3 (v4.14): GEMİ — real container ship model
-SHIP_GLB = os.path.join(ROOT, 'assets_src', 'sketchfab', 'sk_containership.glb')   # "Container Ship" by RM02, CC-BY 4.0 (Sketchfab aaa41cc)
+SHIP_GLB = os.path.join(SKF, 'sk_containership.glb')   # "Container Ship" by RM02, CC-BY 4.0 (Sketchfab aaa41cc)
 SHIP_S, SHIP_OX = 2.67, -88.7          # model containers are 4.63 x 0.91 x 0.97 -> x2.67 = real 40 ft boxes
 SHIP_OZ = -7.4 * SHIP_S                # hatch-cover tops -> z 0.12
 
 
-def ship_model(mm, keep_x0):
+def ship_model(mm, keep_x0, post=None, hull_res=4096, decimate=1.0, sec_res=2048):
     """import the ship, scale/place it, drop the model's own containers and lashing frames inside the playable
     deck (x > keep_x0; the aft bays stay loaded as backdrop) and keep the model's UVs + PBR materials"""
     before = set(bpy.data.objects)
@@ -1793,19 +1887,26 @@ def ship_model(mm, keep_x0):
                 kill.append(f)                     # lashing bridges across the hatches (would wall off every lane)
         bmesh.ops.delete(bm, geom=kill, context='FACES')
         bm.to_mesh(me); bm.free()
+        if post is not None:
+            me.transform(post)
         for m in me.materials:
             if m and not m.name.startswith('ext_'):
                 m.name = 'ext_ship_' + m.name.lower().split('.')[0]
+        _one_uv(me)
         ob = bpy.data.objects.new('ship_' + o.name.split('_')[1].lower(), me)
         ob['keepuv'] = True
         bpy.context.scene.collection.objects.link(ob)
+        if decimate < 1.0:
+            md = ob.modifiers.new('dec', 'DECIMATE'); md.ratio = decimate
         out.append(ob)
     for o in new:
         bpy.data.objects.remove(o, do_unlink=True)
     # 4K hull (hero), 2K bridge and containers (seen from 60 m+): VRAM
     for img in bpy.data.images:
-        if img.size[0] >= 4096 and ('Bridge' in img.name or 'Container' in img.name):
-            img.scale(2048, 2048)
+        if img.size[0] > sec_res and ('Bridge' in img.name or 'Container' in img.name):
+            img.scale(sec_res, sec_res)
+        elif img.size[0] > hull_res:
+            img.scale(hull_res, hull_res)
     return out
 
 
@@ -1918,13 +2019,8 @@ def map_liman():
                 if (b + i) % 2 == 0:
                     crate(rx - 2.2 + b * 1.45, ry, 1.65, 1.0, mm, collide=False)
             col((rx, ry, 2.25), (6, 1.3, 4.5))
-    # forklift inside
-    fk = empty('forklift', (wx + 10, wy - 6, 0)); fk.rotation_euler = (0, 0, math.radians(30))
-    box('fk_body', (1.2, 2.2, 1.2), (0, 0, 0.9), m=mm['ship_yellow'], parent=fk, bevel=0.1)
-    box('fk_cage', (1.1, 1.0, 1.2), (0, -0.3, 2.1), m=mm['black'], parent=fk)
-    box('fk_mast', (1.0, 0.15, 2.8), (0, 1.15, 1.4), m=mm['black'], parent=fk)
-    for s in (-0.3, 0.3):
-        box('fk_fork', (0.12, 1.2, 0.06), (s, 1.8, 0.15), m=mm['steel'], parent=fk)
+    # forklift inside: real model (alban, CC-BY), worn yellow counterbalance truck
+    if not os.environ.get('NOFK'): ext_prop('sk_forklift4k.glb', wx + 10, wy - 6, 0, 30, scale=0.136, maxres=2048, tag='forklift', decimate=0.2)
     col((wx + 10, wy - 6, 1.1), (1.4, 2.6, 2.2), rotz=30)
     # catwalk inside warehouse (east side) +3.5 with stairs
     wall('catwalk', wx + 14.5, wy, 3.3, 4, wd - 1, 0.2, mm['steel'])
@@ -1946,14 +2042,9 @@ def map_liman():
         container(cx, cy, 0, r, cmats[rr.randrange(len(cmats))], mm)
     container(8, 7, 2.59, 90, mm['c_blue'], mm, collide=False)
     col((8, 7, 2.59 + 1.3), (6.06, 2.44, 2.59))
-    # gantry crane over yard (visual)
-    for sx in (-30, 30):
-        for sy in (-38, 0):
-            box('gantry_leg', (1.2, 1.2, 22), (sx, sy, 11), m=mm['ship_yellow'])
-            col((sx, sy, 11), (1.2, 1.2, 22))
-    box('gantry_beam', (62, 2, 2.5), (0, -38, 22), m=mm['ship_yellow'])
-    box('gantry_beam2', (62, 2, 2.5), (0, 0, 22), m=mm['ship_yellow'])
-    box('trolley', (4, 40, 1.5), (10, -19, 20.5), m=mm['ship_yellow'])
+    # quay cranes: two real mobile harbour cranes (TGVMisterH, CC-BY) on the quay, booms over the ship
+    for cy in ((-24.0, 22.0) if not os.environ.get('NOCRANE') else ()):
+        ext_prop('sk_harborcrane.glb', X1 + 9.0, cy, 0.0, 90, scale=1.0, maxres=1024, tag='harbor_crane', center=False, decimate=0.15)
     # trucks
     truck(20, -2, 0, mm, mm['c_green'])
     truck(-8, 2, 90, mm, mm['c_red'])
@@ -1979,6 +2070,7 @@ def map_liman():
     for (sx, sy, r) in [(-18, -2, 0), (2, 16, 90), (24, 4, 0)]:
         sandbags(sx, sy, 4, 3, mm, r)
     for (bx, by) in [(X1 - 1, -30), (X1 - 1, -10), (X1 - 1, 10), (X1 - 1, 30)]:
+        # sk_bollard.glb (scan) crashed the renderer (OOM on load) -> keep the simple steel bollard for now
         cyl('bollard', 0.35, 0.8, (bx + 4, by, 0.4), m=mm['black'], axis='Z', verts=12)
     # office block (west) visual + perimeter fence
     apartment('office', -46, -18, -90, 16, 6, 3, mm, mm['p_grey'], seed=7, roof='flat')
@@ -2002,11 +2094,9 @@ def map_liman():
     for i in range(6):
         street_lamp(-40 + i * 16, Y0 + 2, 0, mm)
     box('liman_sign', (14, 0.3, 2), (0, Y1 + 1.2, 4), m=sign_mat('liman'))
-    # distant ship at quay
-    box('bg_ship', (12, 110, 14), (X1 + 16, 0, 3), m=mm['hull_dark'])
-    box('bg_ship_super', (10, 12, 10), (X1 + 16, -45, 15), m=mm['ship_white'])
-    for i in range(5):
-        container(X1 + 16, -30 + i * 14, 10, 0, cmats[i], mm, collide=False)
+    # ship at the quay: the real container ship (RM02, CC-BY), fully loaded, bow north; keel 9.1 m under the water
+    post = Matrix.Translation((X1 + 8 + 17.5, 55.7, -2.5 - 9.1 + 19.64)) @ Matrix.Rotation(math.radians(90), 4, 'Z')
+    if not os.environ.get('NOSHIP'): ship_model(mm, 1e9, post=post, hull_res=2048, sec_res=1024)
     # spawns
     for i, (x, y, z, yaw) in enumerate([(-30, 26, 0, 180), (-20, 18, 0, 180), (-36, 16, 0, 90), (-31.5, 30, 0, 180), (-14, 28, 0, 180), (-22.5, 23, 0, 90),
                                          (40, -36, 0, 0), (12, -36, 0, 0), (-5, -38, 0, 0), (25, -38, 0, 0), (-30, -36, 0, 30), (44, -24, 0, -30)]):

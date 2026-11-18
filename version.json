@@ -1,6 +1,6 @@
 {
- "version": "4.14.0",
- "build": 70,
+ "version": "4.15.0",
+ "build": 71,
  "parts": [
   {
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/SOKAK_v58.pck.part00",
@@ -49,7 +49,7 @@
  ],
  "pck_size": 981533772,
  "installer": "https://raw.githubusercontent.com/taha123123224/sokak/main/indir/SOKAK_Kurulum.exe",
- "notes": "Gemi haritası gerçek konteyner gemisi modeliyle yeniden kuruldu (RM02, CC-BY)",
+ "notes": "Liman: rıhtımda gerçek konteyner gemisi, liman vinçleri ve forklift; Gemi doku düzeltmesi",
  "launcher": {
   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/baslatici.pck",
   "size": 1692560
@@ -57,9 +57,9 @@
  "packs": [
   {
    "f": "SOKAK.pck",
-   "size": 17165072,
-   "md5": "7a91e5bd76ac6e1df30583978166ab0b",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/SOKAK_7a91e5bd76.pck"
+   "size": 17214572,
+   "md5": "7eb24c565b74df994637a8228b6758e7",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/SOKAK_7eb24c565b.pck"
   },
   {
    "f": "veri/p00_79645374ea.pck",
@@ -68,10 +68,10 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p00_79645374ea.pck"
   },
   {
-   "f": "veri/p01_0a1d41dd4e.pck",
-   "size": 24218940,
-   "md5": "0a1d41dd4ea32c966f17fb739cc6aaec",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p01_0a1d41dd4e.pck"
+   "f": "veri/p01_9bdeebd291.pck",
+   "size": 23286204,
+   "md5": "9bdeebd291883318d7bfcf06d7541965",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p01_9bdeebd291.pck"
   },
   {
    "f": "veri/p02_8fea00d481.pck",
@@ -254,10 +254,10 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p31_d2e7587556.pck"
   },
   {
-   "f": "veri/p32_0fb8803542.pck",
-   "size": 10419468,
-   "md5": "0fb8803542e9ea4f783957a8cd6645e8",
-   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p32_0fb8803542.pck"
+   "f": "veri/p32_61c40803a6.pck",
+   "size": 50611184,
+   "md5": "61c40803a6124d4ff9949a203cf4fb29",
+   "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p32_61c40803a6.pck"
   },
   {
    "f": "veri/p33_3e5aa61a4b.pck",
@@ -440,5 +440,5 @@
    "url": "https://raw.githubusercontent.com/taha123123224/sokak/dist/packs/p63_129c4bdda0.pck"
   }
  ],
- "packs_total": 1402421424
+ "packs_total": 1441729904
 }

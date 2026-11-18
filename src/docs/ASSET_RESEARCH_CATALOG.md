@@ -31,7 +31,7 @@ Durum anahtarı: RESEARCHED · VERIFIED (sayfa açıldı, önizleme kontrol) · 
 | Nordenfelt Gun (artfletch) | top tarama | Çanakkale | Sketchfab | https://sketchfab.com/3d-models/88d728f976b14eb7a15f11b7dd7dd8b6 | CC-BY | glb 36 MB / 8K | 538 948 | RESEARCHED |
 | Abandoned street lights pack (sergeilihandristov) | sokak | Mahalle, Liman | Sketchfab | https://sketchfab.com/3d-models/c853eca300e8435d8fe9206bcb524eda | CC-BY | glb 14 MB / 2K | 22 315 | DOWNLOADED |
 | dumpster (YJ_) | sokak | Mahalle | Sketchfab | https://sketchfab.com/3d-models/989ea7f01b924859b3484ee27103e8d9 | CC-BY | glb 20 MB / 2K | 11 193 | DOWNLOADED |
-| Rusty ship bollard (orphanrtg) | liman | Liman, Gemi | Sketchfab | https://sketchfab.com/3d-models/4bb0c24f0454468d9731600223801e3b | CC-BY | glb 28 MB / 8K | 28 988 | DOWNLOADED |
+| Rusty ship bollard (orphanrtg) | liman | Liman, Gemi | Sketchfab | https://sketchfab.com/3d-models/4bb0c24f0454468d9731600223801e3b | CC-BY | glb 28 MB / 8K | 28 988 | REJECTED (render çökmesi) |
 | Rowing Boat (jw202471) | tekne | Liman, Çanakkale | Sketchfab | https://sketchfab.com/3d-models/748e9f5262a24a489d10af0d87e0e9f7 | CC-BY | glb 62 MB / 4K | 4 744 | RESEARCHED |
 
 Elenenler (örnek): "Cargo Ship with Interiors" (6.7 M yüz, doku yok), "Shipwreck" (NC lisans),
