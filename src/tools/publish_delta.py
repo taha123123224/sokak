@@ -10,7 +10,7 @@ for p in packs:
     name = ('SOKAK_%s.pck' % p['md5'][:10]) if p['f'] == 'SOKAK.pck' else p['f'].split('/')[-1]
     want.add(name)
     if not os.path.exists(os.path.join(D, name)):
-        shutil.copy(os.path.join(split, p['f']), os.path.join(D, name))
+        shutil.move(os.path.join(split, p['f']), os.path.join(D, name))   # v4.17: move, the disk is tight
         new_mb += p['size'] / 1e6
         print("NEW", name, round(p['size'] / 1e6, 1), "MB")
 for fn in os.listdir(D):

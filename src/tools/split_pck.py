@@ -8,7 +8,7 @@ Godot 4.5 PCK (format 3); entries are sorted, so an unchanged shard is byte-iden
 file name (pNN_<md5>.pck) does not change -> players only download the packs that really changed.
 Writes <outdir>/SOKAK.pck, <outdir>/veri/pNN_<md5>.pck and <outdir>/packs.json.
 """
-import hashlib, json, os, struct, sys, zlib
+import hashlib, json, os, re, struct, sys, zlib
 
 ALIGN = 16
 MIN_SHARD = 64 * 1024
@@ -103,6 +103,10 @@ def main():
         if not sp_:
             return path
         d, base = os.path.split(sp_)
+        m4k = re.match(r'fp_(ak47|deagle|glock|uzi|r870)_', base)
+        if m4k and not base.endswith('.glb'):
+            # v4.17: a 4K FP pack's textures in one shard would pass GitHub's 100 MB file limit: 3 groups per pack
+            return 'fp4ka/%s_%d' % (m4k.group(1), zlib.crc32(base.encode('utf-8')) % 3)
         toks = base.split('.')[0].split('_')
         stem = '_'.join(toks[:2]) if len(toks[0]) <= 3 and len(toks) > 1 else toks[0]
         return d + '/' + stem
@@ -125,6 +129,10 @@ def main():
         name = 'veri/p%02d_%s.pck' % (k, m[:10])
         os.replace(tmp, os.path.join(outdir, name))
         packs.append({"f": name, "size": os.path.getsize(os.path.join(outdir, name)), "md5": m})
+        # v4.17 low-disk mode: a shard already published (same content hash) is not kept twice
+        skip = os.environ.get('SKIP_IN')
+        if skip and os.path.exists(os.path.join(skip, name.split('/')[-1])):
+            os.remove(os.path.join(outdir, name))
     json.dump(packs, open(os.path.join(outdir, 'packs.json'), 'w'), indent=1)
     tot = sum(p['size'] for p in packs)
     print("main %.1f MB, %d shards, total %.1f MB (largest shard %.1f MB)" % (

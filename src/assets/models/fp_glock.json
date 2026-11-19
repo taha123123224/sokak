@@ -1,17 +1,34 @@
 {
- "kind": "pistol",
- "reload": {
-  "len": 2.0,
-  "attach": [
-   0.22,
-   0.79
-  ],
-  "mag_out": 0.24,
-  "mag_in": 0.79,
-  "bolt": 0.92
+ "rig": 1,
+ "credit": "9mm Pistol | First Person Animations \u2014 Matzh, pistol model by Urpo (CC-BY 4.0)",
+ "sections": {
+  "draw": {
+   "anim": "Equip"
+  },
+  "idle": {
+   "anim": "Idle"
+  },
+  "fire": {
+   "anim": "Fire"
+  },
+  "reload": {
+   "anim": "Reload"
+  },
+  "reload_empty": {
+   "anim": "Reload_Empty"
+  },
+  "inspect": {
+   "anim": "Inspect"
+  },
+  "walk": {
+   "anim": "Walk"
+  },
+  "sprint": {
+   "anim": "Run"
+  },
+  "holster": {
+   "anim": "Unequip"
+  }
  },
- "acts": {
-  "idle": 1.0,
-  "reload": 2.0
- }
+ "sight_dy": 0.0
 }

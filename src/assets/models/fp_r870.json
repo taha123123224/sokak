@@ -1,17 +1,47 @@
 {
- "kind": "rifle",
- "reload": {
-  "len": 2.0,
-  "attach": [
-   0.22,
-   0.79
-  ],
-  "mag_out": 0.24,
-  "mag_in": 0.79,
-  "bolt": 0.9
+ "rig": 1,
+ "credit": "Animated Shotgun \u2014 teenjust500 (CC-BY 4.0)",
+ "sections": {
+  "draw": {
+   "anim": "Take"
+  },
+  "idle": {
+   "anim": "Take",
+   "s": -0.04
+  },
+  "fire": {
+   "anim": "Shoot"
+  },
+  "shell": {
+   "anim": "Reload"
+  },
+  "reload_start": {
+   "anim": "ReloadStart"
+  },
+  "reload_end": {
+   "anim": "ReloadEnd"
+  },
+  "inspect": {
+   "anim": "Watch"
+  },
+  "holster": {
+   "anim": "Hide"
+  }
  },
- "acts": {
-  "idle": 1.0,
-  "reload": 2.0
- }
+ "sight_dy": 0.0,
+ "wfix": [
+  0.9838964343070984,
+  -1.8278742075494847e-08,
+  -0.17873843014240265,
+  -0.10177958011627197,
+  0.8220375180244446,
+  -0.5602632761001587,
+  0.14692974090576172,
+  0.5694330930709839,
+  0.8087998628616333,
+  -0.08489920198917389,
+  0.02982073649764061,
+  0.3331463932991028
+ ],
+ "vm_fov": 58.72
 }

@@ -48,7 +48,7 @@ Lisans: Mixamo (Adobe) — ücretsiz, oyunlarda ticari kullanım serbest; ham an
 ### Birinci şahıs — Sketchfab
 | paket | yaratıcı | lisans | durum |
 |---|---|---|---|
-| FPS Character Animation Pack Ak-47 (b95778a5…) | DuqueCD7 | CC-BY 4.0 | DOWNLOADED → INTEGRATED (AK-47: draw/idle/fire/reload/ads_idle/ads_fire/walk/sprint) |
+| FPS Character Animation Pack Ak-47 (b95778a5…) | DuqueCD7 | CC-BY 4.0 | DOWNLOADED → denendi, **ÇIKARILDI** (v4.17: paketteki silah iskeleti kollara bağlı değil; yerine ccransh AK-74M) |
 | FPS Character Animation Pack Pistol (e2815a5b…) | DuqueCD7 | CC-BY 4.0 | DOWNLOADED (entegrasyon sırada) |
 | Animated FPS hands (rifle animation pack) (5f2d0ed7…) | ccransh | CC-BY 4.0 | DOWNLOADED (entegrasyon sırada) |
 
@@ -72,3 +72,57 @@ Lisans: Mixamo (Adobe) — ücretsiz, oyunlarda ticari kullanım serbest; ham an
 mermi, #507048 AK kovanı karo, #620929 pompalı kovanları, #459964 adım beton, #504626 toprağa düşme, #627087 susturuculu tabanca,
 #402791 AK kapalı alan, #710084. Sonniss GDC 2020 Part 7 (M1911, K98k, MP40, MG42, PMSFX mermi çarpma, SculpTunes kovan) indiriliyor.
 
+
+
+---
+
+## v4.17 — Birinci şahıs eller / silah / F (inceleme) animasyonu, 4K derin tarama (2026-11-19)
+
+Hedef: oyundaki eski "kötü görünen" ellerin yerine **gerçek, profesyonel FP el + silah paketleri**, F tuşunda paketin kendi
+**Inspect** klibi, 4K doku. Aramalar sitelerin kendi arama API'leriyle yapıldı (Sketchfab `api.sketchfab.com/v3/search`,
+Fab `/i/listings/search`), sonuçlar sitenin döndürdüğü gerçek kayıtlardır.
+
+### Kaynak kaynak sonuç (FP el/silah odaklı)
+| kaynak | arama | bulunan (gerçek) | lisans / format | karar |
+|---|---|---|---|---|
+| **Sketchfab** | 10+ sorgu: "fps arms rifle animation", "fps hands ak", "fps pistol animations", "fps shotgun animated", "first person arms weapon inspect", "ak47 first person animations", "weapon inspect fps", "1Matzh" … | ~60 indirilebilir animasyonlu FP paketi (aşağıdaki tablo) | CC-BY 4.0 (bir kısmı CC-BY-NC → elendi), glb/usdz/kaynak | **ANA KAYNAK** |
+| **Fab** (ücretsiz filtre) | "fps arms animation", "first person weapon animations", "fps pistol animations", "fps rifle animation pack", "weapon inspect animation", "fps hands" | FPS Animation Pack_AKS74U (y0ung001, 18 anim) — **yalnız Unreal**, Profesyonel lisans $100; First Person Rifle Animation (xidePunk, 16+4 anim) — **yalnız Unreal**; FPS Weapon Bundle (Deadghost) — Unreal; FPS Guns 4K Pistol 2 / Rifle 1 (Heart State Games) — FBX/Unity, **yalnız silah modeli, el/animasyon yok**; Knife FPS Animations (Artem Dubinin) — UE/Unity | Fab Standart lisans; çoğu .uasset | Godot'a aktarılamayan UE içerik → elendi; FPS Guns 4K el içermediği için bu turda alınmadı |
+| **Mixamo** | (önceki tur, giriş yapılmış) | yalnız tam vücut 3. şahıs hareketler; FP kol/silah animasyonu **yok** | Mixamo lisansı | FP için uygun değil (3. şahısta kullanılıyor) |
+| **ActorCore** | "rifle", "gun", "weapon" | silah paketleri ücretli ($39.99–$129); FP kol paketi yok | ücretli | alınmadı |
+| **Rokoko** | web: "11 free gun animations" (rokoko.com/resources/rokoko-mocap-11-free-gun-animations) | 11 ücretsiz tabanca/tüfek mocap'i, **tam vücut**, Mixamo iskeleti, FBX, ticari kullanım serbest | ücretsiz | FP kol paketi değil; 3. şahıs için aday (bu turda alınmadı) |
+| **Cascadeur** | araç | içerik kütüphanesi değil; ücretsiz sürümde ticari kullanım/FBX dışa aktarma yok | ücretli (ticari) | kullanılmadı |
+| **Blender** | araç | bpy 5.2.3 — tüm paket dönüştürme / düzeltme / doku bütçesi bununla | GPL | **KULLANILDI** |
+| Sonniss / Freesound / BOOM / Pixabay | ses kaynakları (önceki tur) | bu tur FP görsel odaklı; değişiklik yok | — | — |
+
+### Sketchfab FP paket karşılaştırması (seçilenler kalın)
+| paket | yaratıcı | anim | inspect | doku | lisans | not |
+|---|---|---|---|---|---|---|
+| **Desert Eagle \| First Person Animations** ([link](https://sketchfab.com/3d-models/09a213d8510a42d1b747135e85712eff)) | 1Matzh | 9 | ✔ | 4K | CC-BY 4.0 | glb'de silah köşeleri bind uzayı dışında (×~1e4, ters) → düzeltildi |
+| **9mm Pistol \| First Person Animations** ([link](https://sketchfab.com/3d-models/c26d7f5aa72f4b01a6da4578caa8f07f)) | 1Matzh (tabanca: Urpo) | 10 | ✔ | 4K | CC-BY 4.0 | temiz |
+| **UZI \| First Person Animations (2026 Remake)** ([link](https://sketchfab.com/3d-models/73266e9f1eb949b69a3ab11d8f636048)) | 1Matzh | 13 | ✔ | 4K | CC-BY 4.0 | glb bozuk → **orijinal .blend** + 4K dokulardan yeniden kuruldu |
+| **Animated Shotgun** ([link](https://sketchfab.com/3d-models/e048ba220f9e49c29a3e808cddc22a0a)) | teenjust500 | 7 (Take/Watch/Shoot/ReloadStart/Reload/ReloadEnd/Hide) | ✔ (Watch) | 2K | CC-BY 4.0 | glb bozuk → **orijinal FBX** kaynağından |
+| **FPS AK-74m animations** ([link](https://sketchfab.com/3d-models/94be8385c402474cacd39bc096c6ca14)) | ccransh (AK-74M: creationwasteland, kollar: DJMaesen) | 8 | ✗ → aynı rig'li rifle paketinden kopyalandı | 4K | CC-BY 4.0 | temiz |
+| Animated FPS hands (rifle animation pack) ([link](https://sketchfab.com/3d-models/5f2d0ed780a94724b36ab505f7564057)) | ccransh | 8 | ✔ rifle_inspect | 4K | CC-BY 4.0 | yalnız inspect klibi AK'ya aktarıldı |
+| FPS Character Animation Pack Ak-47 / Pistol / Saps-12 | DuqueCD7 | 11/11/10 | ✗ | 4K | CC-BY 4.0 | silah iskeleti ayrı, ellere oturmuyor → elendi |
+| Scorpion (2026 Remake), Minigun M-134, Fists | 1Matzh | 9/10/16 | ✔ | 4K | CC-BY 4.0 | oyunda karşılığı yok (sırada) |
+| M4A1-S (CS2) | 1Matzh | 5 | — | — | **CC-BY-NC**, CS2 IP | elendi |
+| FPS pistol / Makarov PM / FN 502 / P9 / sniper | ccransh | 5–7 | ✗ | 4K | CC-BY 4.0 | idle/inspect yok (FN 502 indirildi, sırada) |
+| Kriss Vector / Mark 23 / M4 (BarcodeGames) | barcodegames | 4–5 | ✗ | **1K** | CC-BY 4.0 | düşük doku (M4 zaten oyunda) |
+| AKs-74u, Pistol 43 Tactical | dan741vlasov | 7/6 | ? | — | CC-BY 4.0 | sırada |
+| AK-74M Animations (BLENDER) | martinezequielgorno | 13 | ✗ | 4K | CC-BY 4.0 | inspect yok |
+| G3 / Desert Eagle / FN FAL Reload | wichowiczs | 1 | ✗ | — | CC-BY-NC(-ND) | elendi |
+
+### DOWNLOADED → INTEGRATED (Godot'ta test edildi: `tools/fpt.sh`, hook 102 + 133, idle/fire/reload/inspect kareleri)
+| silah | paket | bölümler (F = inspect) | yöntem |
+|---|---|---|---|
+| Deagle .50 | Matzh Desert Eagle | draw, idle, walk, sprint, fire, reload, reload_empty, **inspect**, holster | `tools/patch_glb_gun.py` (silah köşeleri, parça kemiklerinden — tetik/çekiç/sürgü/şarjör — çözülen benzerlik dönüşümüyle bind uzayına) + `guess_original_bind_pose=False` |
+| Glock | Matzh 9mm Pistol | draw, idle, walk, sprint, fire, reload, reload_empty, **inspect**, holster | doğrudan |
+| Micro UZI | Matzh UZI 2026 | draw, idle, walk, sprint, ads_in/out, fire, firemode, reload, reload_empty, **inspect**, holster | `tools/packs/matzh_src_to_glb.py` (.blend → glb, Rigify DEF kemikleri örneklenerek), paket kamerası ile kadraj |
+| 870 Pompalı | teenjust500 Animated Shotgun | draw, fire (pompa dahil), shell (tek fişek döngüsü), reload_start/end, **inspect (Watch)**, holster | `tools/packs/fbx_pack_to_glb.py`, paket kamerası ile kadraj |
+| AK-47 | ccransh AK-74M + rifle_inspect | draw, idle, walk, sprint, fire, reload, reload_empty, **inspect** | `tools/packs/ccransh_add_inspect.py` |
+
+Oyun tarafı (`scripts/player.gd`): paket inspect'i kendi temposunda (3.7–5.2 sn) oynar; paket kamerasıyla kadrajlanan silahlarda
+gizli statik silah (namlu ağzı / nişangah / kovan işaretleri) paketin tuttuğu yere taşınır (`wfix`) ve paketin lens açısı
+(`vm_fov`) kullanılır; deri kaplı (skinned) paket meshleri bind-pozu sınırları yüzünden kırpılmasın diye geniş AABB; tam metal
+PBR (Deagle) gökyüzü yansımasında beyaza dönmesin diye metal tavanı. Doku bütçesi (`tools/rig_fp.py`): silahın renk+normal
+haritaları 4K, diğer silah haritaları ve eller 2K, saat/gövde 1K (tam 4K Deagle paketi tek başına ~460 MB VRAM'dı).

@@ -2,3 +2,4 @@
 node_modules/
 .wrangler/
 *.tmp
+src/assets/models/fp_deagle.glb

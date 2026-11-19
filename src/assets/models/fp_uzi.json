@@ -1,17 +1,58 @@
 {
- "kind": "rifle",
- "reload": {
-  "len": 2.0,
-  "attach": [
-   0.22,
-   0.79
-  ],
-  "mag_out": 0.24,
-  "mag_in": 0.79,
-  "bolt": 0.9
+ "rig": 1,
+ "credit": "UZI | First Person Animations (2026 Remake) \u2014 Matzh (CC-BY 4.0)",
+ "sections": {
+  "draw": {
+   "anim": "Equip"
+  },
+  "idle": {
+   "anim": "Idle"
+  },
+  "fire": {
+   "anim": "Fire"
+  },
+  "reload": {
+   "anim": "Reload"
+  },
+  "reload_empty": {
+   "anim": "Reload_Empty"
+  },
+  "inspect": {
+   "anim": "Inspect"
+  },
+  "walk": {
+   "anim": "Walk"
+  },
+  "sprint": {
+   "anim": "Run"
+  },
+  "ads_in": {
+   "anim": "Aim_In"
+  },
+  "ads_out": {
+   "anim": "Aim_Out"
+  },
+  "firemode": {
+   "anim": "Firemode"
+  },
+  "holster": {
+   "anim": "Unequip"
+  }
  },
- "acts": {
-  "idle": 1.0,
-  "reload": 2.0
- }
+ "sight_dy": 0.0,
+ "wfix": [
+  -0.9992573857307434,
+  5.293548266394055e-09,
+  0.03853251039981842,
+  0.0018470726208761334,
+  0.9988505244255066,
+  0.04789970815181732,
+  -0.03848821669816971,
+  0.047935307025909424,
+  -0.9981086850166321,
+  -0.12767629325389862,
+  0.10887832194566727,
+  0.1173396185040474
+ ],
+ "vm_fov": 42.52
 }

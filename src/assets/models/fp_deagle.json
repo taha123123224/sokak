@@ -1,17 +1,34 @@
 {
- "kind": "pistol",
- "reload": {
-  "len": 2.0,
-  "attach": [
-   0.22,
-   0.79
-  ],
-  "mag_out": 0.24,
-  "mag_in": 0.79,
-  "bolt": 0.92
+ "rig": 1,
+ "credit": "Desert Eagle | First Person Animations \u2014 Matzh (CC-BY 4.0)",
+ "sections": {
+  "draw": {
+   "anim": "rig|Equip"
+  },
+  "idle": {
+   "anim": "rig|Idle"
+  },
+  "fire": {
+   "anim": "rig|Fire"
+  },
+  "reload": {
+   "anim": "rig|Reload"
+  },
+  "reload_empty": {
+   "anim": "rig|Reload_Empty"
+  },
+  "inspect": {
+   "anim": "rig|Inspect"
+  },
+  "walk": {
+   "anim": "rig|Walk"
+  },
+  "sprint": {
+   "anim": "rig|Run"
+  },
+  "holster": {
+   "anim": "rig|Unequip"
+  }
  },
- "acts": {
-  "idle": 1.0,
-  "reload": 2.0
- }
+ "sight_dy": 0.0
 }

@@ -319,7 +319,13 @@ func _unhandled_input(e: InputEvent) -> void:
 	if e.is_action_pressed("inspect") and reload_t <= 0 and equip_t <= 0 and not ads:
 		inspect_t = 3.2
 		if _fp_has("inspect"):
-			_fp_play("inspect", 0.12, _fp_len("inspect") / 3.0)
+			# v4.17: the pack inspect plays at its animator's own pace (Matzh / teenjust500 clips run 3.7-5.2 s)
+			var il := _fp_len("inspect")
+			if fp_meta.get("rig", 0) and il > 3.2:
+				inspect_t = il
+				_fp_play("inspect", 0.12, 1.0)
+			else:
+				_fp_play("inspect", 0.12, il / 3.0)
 		SFX.play("equip", -9, 1.15)
 		if match_node and match_node.hud and match_node.hud.has_method("inspect_card"):
 			match_node.hud.inspect_card(cur)
@@ -1529,11 +1535,15 @@ static var _rig_cache := {}
 func _rig_setup(id: String, path: String) -> void:
 	for mi in vm_weapon.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).visible = false
+	# skinned pack meshes keep their bind-pose bounds; packs whose bind pose sits away from the held pose got culled
+	for mi in fp_root.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).custom_aabb = AABB(Vector3(-4, -4, -4), Vector3(8, 8, 8))
 	for k in ["mag", "bolt", "slide"]:
 		vm_parts.erase(k)
 	_unify_rig_arms()
 	var skin := GS.wskin(id)
 	for mi in fp_root.find_children("gun_*", "MeshInstance3D", true, false):
+		_rig_gun_pbr(mi as MeshInstance3D)
 		MatLib.apply(mi, skin)
 		GS.level_glow(mi, id, 0.62)
 	if fp_ap == null:
@@ -1571,6 +1581,31 @@ func _rig_setup(id: String, path: String) -> void:
 	fp_ap.add_animation_library("rig", lib)
 	# play by plain name ("idle") through the "rig/" library
 	fp_meta["prefix"] = "rig/"
+	# v4.17 packs kept in their own camera framing: the hidden static weapon (muzzle / sight / shell markers) goes to
+	# where the pack's gun is held
+	if fp_meta.has("wfix"):
+		var w: Array = fp_meta["wfix"]
+		var xf := Transform3D(Basis(Vector3(w[0], w[1], w[2]), Vector3(w[3], w[4], w[5]), Vector3(w[6], w[7], w[8])), Vector3(w[9], w[10], w[11]))
+		if not vm_weapon.has_meta("wfix_base"):
+			vm_weapon.set_meta("wfix_base", vm_weapon.transform)
+		vm_weapon.transform = xf * (vm_weapon.get_meta("wfix_base") as Transform3D)
+
+## v4.17 4K packs with full-metal PBR maps (Matzh Desert Eagle: metallic 0.6-0.9) mirror the bright day sky in the
+## viewmodel's sky reflections and read as flat white: keep their texture detail but tone the mirror down
+static var _rig_pbr_cache := {}
+func _rig_gun_pbr(mi: MeshInstance3D) -> void:
+	if mi.mesh == null:
+		return
+	for si in mi.mesh.get_surface_count():
+		var sm = mi.mesh.surface_get_material(si)
+		if not (sm is StandardMaterial3D) or (sm as StandardMaterial3D).metallic_texture == null:
+			continue
+		if not _rig_pbr_cache.has(sm):
+			var d := (sm as StandardMaterial3D).duplicate() as StandardMaterial3D
+			d.metallic = minf(d.metallic, float(fp_meta.get("gun_metal", 0.55)))
+			d.metallic_specular = 0.4
+			_rig_pbr_cache[sm] = d
+		mi.mesh.surface_set_material(si, _rig_pbr_cache[sm])
 
 ## v3.4 shared knife rig: cut its clips like any rig, then put the game's own knife model (with its skin) in the
 ## rig's animated knife socket. The rig was fitted onto w_knife at frame `melee_ref`, so at that pose the
@@ -1813,7 +1848,9 @@ func _update_viewmodel(delta: float) -> void:
 		var wb: Basis = vm_sun.get_meta("world_basis")
 		vm_sun.basis = cam.global_transform.basis.inverse() * wb
 		vm_env.sky_rotation = (cam.global_transform.basis.inverse()).get_euler()
-	vm_cam.fov = lerp(56.0, 40.0, ads_k * (0.0 if wdata.get("scope", false) else 1.0) * 0.5)
+	# v4.17: packs kept in their own camera framing bring the lens they were animated with
+	var vfov: float = float(fp_meta.get("vm_fov", 56.0))
+	vm_cam.fov = lerp(vfov, vfov * 0.72, ads_k * (0.0 if wdata.get("scope", false) else 1.0) * 0.5)
 	var kind := _vm_kind(cur)
 	var hip: Vector3 = HIP[kind] + HIP_ADJ.get(cur, Vector3.ZERO)
 	if melee_rig:
@@ -1835,6 +1872,8 @@ func _update_viewmodel(delta: float) -> void:
 	if vm_parts.has("sight") and kind != "knife" and kind != "frag":
 		var sight_rest: Transform3D = (vm_parts["sight"] as Node3D).get_meta("rest")
 		var sp: Vector3 = sight_rest.origin + Vector3(0, float(fp_meta.get("sight_dy", 0.0)), 0)
+		if fp_meta.has("wfix"):
+			sp = vm_weapon.transform * sight_rest.origin
 		var ads_pos := Vector3(-sp.x, -sp.y, -sp.z - (0.14 if kind != "pistol" else 0.3) - (0.1 if GS.has_part_base(cur, "optik") else (0.09 if GS.has_part_base(cur, "durbun") else 0.0)))
 		if wdata.get("scope", false):
 			ads_pos.z = -sp.z - 0.06

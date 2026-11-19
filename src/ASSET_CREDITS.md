@@ -109,3 +109,15 @@ tüm proje yedeği: `/home/claude/backups/sokak_pre_gfx_v48.tgz`. Git'te `v4.8.0
 | shot_sniper/awm, shot_smg, bolt_back/fwd, dryfire | Sonniss GDC 2020 Game Audio Bundle — Pole Position Production | royalty-free, atıf gerekmez |
 | shot_ak, shot_akm, shotfar_ak(m), shot_kar, shot_pistol(+v), shot_usp, shot_m1911, shot_sup, shell0-2, bodyfall, step_concrete0-3 | Freesound #136399 #184750 #201669 #710084 #668348 #402789 #427598 #539141 #318964 #181177 #813622 | CC0 |
 Ayrıntı ve bağlantılar: `docs/ANIMATION_AUDIO_ASSET_RESEARCH.md`.
+
+## v4.17 — birinci şahıs eller + silah animasyonları (Sketchfab, CC-BY 4.0)
+| silah | paket | yaratıcı | kaynak |
+|---|---|---|---|
+| Deagle .50 | Desert Eagle \| First Person Animations | 1Matzh | https://sketchfab.com/3d-models/09a213d8510a42d1b747135e85712eff |
+| Glock | 9mm Pistol \| First Person Animations (tabanca modeli: Urpo) | 1Matzh | https://sketchfab.com/3d-models/c26d7f5aa72f4b01a6da4578caa8f07f |
+| Micro UZI | UZI \| First Person Animations (2026 Remake) | 1Matzh | https://sketchfab.com/3d-models/73266e9f1eb949b69a3ab11d8f636048 |
+| 870 Pompalı | Animated Shotgun | teenjust500 | https://sketchfab.com/3d-models/e048ba220f9e49c29a3e808cddc22a0a |
+| AK-47 | FPS AK-74m animations (AK-74M: creationwasteland, kollar: DJMaesen) | ccransh | https://sketchfab.com/3d-models/94be8385c402474cacd39bc096c6ca14 |
+| AK-47 inceleme | Animated FPS hands (rifle animation pack) — rifle_inspect | ccransh | https://sketchfab.com/3d-models/5f2d0ed780a94724b36ab505f7564057 |
+Değişiklikler (CC-BY gereği belirtilir): dokular küçültüldü (silah 4K renk/normal, eller 2K), görünmeyen gövde parçaları silindi,
+Deagle silah köşeleri bind uzayına düzeltildi, AK paketine rifle paketinin inceleme klibi eklendi, oyunun malzeme/kol shader'ı uygulandı.

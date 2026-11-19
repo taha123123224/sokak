@@ -1,17 +1,31 @@
 {
- "kind": "rifle",
- "reload": {
-  "len": 2.0,
-  "attach": [
-   0.22,
-   0.79
-  ],
-  "mag_out": 0.24,
-  "mag_in": 0.79,
-  "bolt": 0.9
+ "rig": 1,
+ "credit": "FPS AK-74m animations \u2014 ccransh; AK-74M by creationwasteland, FP arms by DJMaesen (CC-BY 4.0)",
+ "sections": {
+  "draw": {
+   "anim": "Rig|AK_Draw"
+  },
+  "idle": {
+   "anim": "Rig|AK_Idle"
+  },
+  "fire": {
+   "anim": "Rig|AK_Shot"
+  },
+  "reload": {
+   "anim": "Rig|AK_Reload"
+  },
+  "reload_empty": {
+   "anim": "Rig|AK_Reload_full"
+  },
+  "inspect": {
+   "anim": "Rig|AK_Inspect"
+  },
+  "walk": {
+   "anim": "Rig|AK_Walk"
+  },
+  "sprint": {
+   "anim": "Rig|AK_Run"
+  }
  },
- "acts": {
-  "idle": 1.0,
-  "reload": 2.0
- }
+ "sight_dy": 0.0
 }

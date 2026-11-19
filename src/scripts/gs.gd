@@ -488,6 +488,12 @@ var MODES := {
 }
 ## CC-BY 4.0 assets: [work, author, licence/link] — shown in Ayarlar > Lisanslar
 const CREDITS := [
+	["Desert Eagle | First Person Animations (Deagle birinci şahıs eller + animasyon)", "1Matzh", "CC-BY 4.0 · sketchfab.com/3d-models/09a213d8510a42d1b747135e85712eff"],
+	["9mm Pistol | First Person Animations (Glock birinci şahıs; tabanca modeli: Urpo)", "1Matzh", "CC-BY 4.0 · sketchfab.com/3d-models/c26d7f5aa72f4b01a6da4578caa8f07f"],
+	["UZI | First Person Animations (2026 Remake) (Micro UZI birinci şahıs)", "1Matzh", "CC-BY 4.0 · sketchfab.com/3d-models/73266e9f1eb949b69a3ab11d8f636048"],
+	["Animated Shotgun (870 Pompalı birinci şahıs)", "teenjust500", "CC-BY 4.0 · sketchfab.com/3d-models/e048ba220f9e49c29a3e808cddc22a0a"],
+	["FPS AK-74m animations (AK-47 birinci şahıs; AK-74M: creationwasteland, kollar: DJMaesen)", "ccransh", "CC-BY 4.0 · sketchfab.com/3d-models/94be8385c402474cacd39bc096c6ca14"],
+	["Animated FPS hands (rifle animation pack) (AK-47 inceleme animasyonu)", "ccransh", "CC-BY 4.0 · sketchfab.com/3d-models/5f2d0ed780a94724b36ab505f7564057"],
 	["Karakter animasyonları: Pro Rifle Pack (tüfekli yürüme/koşma/çömelme/zıplama/ölüm)", "Mixamo (Adobe)", "Mixamo lisansı · mixamo.com"],
 	["Silah sesleri: Springfield M1903A3, Thompson 1928A1 kayıtları", "Pole Position Production — Sonniss GDC 2020 Game Audio Bundle", "royalty-free · sonniss.com/gameaudiogdc"],
 	["Silah / kovan / adım / düşme sesleri", "Freesound: felix.blume, qubodup, Franki-01234, DeltaCode, acidsnowflake, michorvath, SubwaySandwitch420, GryffDavid, jmdh, SecureSubset", "CC0 · freesound.org"],
