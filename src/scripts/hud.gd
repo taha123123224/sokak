@@ -969,6 +969,8 @@ func _kf_icon(wid: String) -> Texture2D:
 	var base: String = wid if wid.begins_with("_") else GS.weapon_base(wid)
 	var p := "res://assets/ui/kf/%s.png" % base
 	var t: Texture2D = load(p) if ResourceLoader.exists(p) else null
+	if wid == "_head" and UI.icon_tex("game/headshot"):
+		t = UI.icon_tex("game/headshot")   # v4.18 game-icons.net "headshot" (Skoll, CC BY 3.0)
 	_kf_cache[wid] = t
 	return t
 
@@ -1646,15 +1648,18 @@ func _build_board() -> void:
 	var sep := ColorRect.new(); sep.color = Color(1, 1, 1, 0.25); sep.custom_minimum_size = Vector2(2, 20)
 	sep.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	hb.add_child(sep)
+	hb.add_child(UI.icon("map", 18, Color(1, 1, 1, 0.55)))
 	var map_l := UI.lbl(GS.MAPS[m.map_id]["name"].to_upper(), 18, Color(1, 1, 1, 0.62), "Rajdhani-Bold")
 	map_l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	map_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hb.add_child(map_l)
 	if m.mode != "gungame":
+		hb.add_child(UI.icon("target", 16, Color(1, 1, 1, 0.5)))
 		var tg := UI.lbl("HEDEF  %d" % int(m.target_score), 15, Color(1, 1, 1, 0.5), "Rajdhani-Bold")
 		tg.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		hb.add_child(tg)
 	var tl := int(m.time_left)
+	hb.add_child(UI.icon("clock", 20, Color(1, 1, 1, 0.75)))
 	var clk := UI.lbl("%d:%02d" % [tl / 60, tl % 60], 30, Color.WHITE, "RussoOne-Regular")
 	clk.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	hb.add_child(clk)
@@ -1738,8 +1743,13 @@ func _build_board() -> void:
 			rc.add_child(row)
 			var fc := Color.WHITE if alive else Color(1, 1, 1, 0.42)
 			if me and alive: fc = Color("ffe7b3")
-			var ping: int = 12 if me else 18 + (abs(hash(str(e["name"]))) % 30)
-			_bcell(row, str(ping), 58, 17, Color(1, 1, 1, 0.55) if alive else Color(1, 1, 1, 0.3))
+			# real values only: own round-trip from Net when online, "BOT" for AI, "—" when unknown
+			var ping_t := "—"
+			if me and Net.active() and Net.ping_ms > 0:
+				ping_t = str(Net.ping_ms)
+			elif not me and not e.has("net_id"):
+				ping_t = "BOT"
+			_bcell(row, ping_t, 58, 15 if ping_t == "BOT" else 17, Color(1, 1, 1, 0.55) if alive else Color(1, 1, 1, 0.3))
 			# name cell: avatar, rank emblem, name, level, MVP star, skull
 			var pc := UI.hbox(8)
 			pc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1797,7 +1807,12 @@ func _build_board() -> void:
 			var kdc: Color = (Color("8dffb5") if kd >= 1.0 else Color("ff9a8c")) if kills + int(e["deaths"]) > 0 else Color(1, 1, 1, 0.4)
 			_bcell(row, "%.2f" % kd, cols[2][1], 18, kdc if alive else kdc * Color(1, 1, 1, 0.5), "Rajdhani-Bold")
 			_bcell(row, ("%d%%" % hsp) if kills > 0 else "-", cols[3][1], 18, fc, "Rajdhani-Bold")
-			_bcell(row, "★" if is_mvp else "", cols[4][1], 20, UI.GOLD)
+			var mc := _bcell(row, "", cols[4][1], 20, UI.GOLD)
+			if is_mvp:
+				var mi := UI.icon("game/star_medal", 22, UI.GOLD)
+				mi.anchor_left = 0.5; mi.anchor_right = 0.5; mi.anchor_top = 0.5; mi.anchor_bottom = 0.5
+				mi.offset_left = -11; mi.offset_right = 11; mi.offset_top = -11; mi.offset_bottom = 11
+				mc.add_child(mi)
 			var scs: String = str(e["score"]) if m.mode != "gungame" else GS.WEAPONS[GS.GUNGAME_ORDER[min(e["gg"], GS.GUNGAME_ORDER.size() - 1)]]["name"]
 			_bcell(row, scs, cols[5][1], 22 if m.mode != "gungame" else 16, fc, "RussoOne-Regular")
 	var foot := UI.lbl("TAB bırakınca kapanır   •   ENTER sohbet   •   Y takım sohbeti   •   V sesli konuş", 13, Color(1, 1, 1, 0.3), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
@@ -1869,10 +1884,13 @@ func show_end(r: Dictionary) -> void:
 	var stats := UI.hbox(14)
 	stats.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(stats)
-	for pair in [["ÖLDÜRME", str(pe["kills"])], ["ÖLÜM", str(pe["deaths"])], ["KAFADAN", str(pe["head"])], ["K/D", "%.2f" % (float(pe["kills"]) / max(1.0, float(pe["deaths"])))], ["SKOR", str(pe["score"])]]:
+	for pair in [["ÖLDÜRME", str(pe["kills"]), "game/skull"], ["ÖLÜM", str(pe["deaths"]), "game/death"], ["KAFADAN", str(pe["head"]), "game/headshot"], ["K/D", "%.2f" % (float(pe["kills"]) / max(1.0, float(pe["deaths"]))), "swords"], ["SKOR", str(pe["score"]), "trophy"]]:
 		var p := UI.panel(Color(1, 1, 1, 0.05), Color(1, 1, 1, 0.1), 14)
 		var pv := UI.vbox(0)
 		p.add_child(pv)
+		var pic := UI.icon(pair[2], 26, Color(1, 1, 1, 0.55))
+		pic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		pv.add_child(pic)
 		pv.add_child(UI.lbl(pair[1], 52, Color.WHITE, "Teko", HORIZONTAL_ALIGNMENT_CENTER))
 		pv.add_child(UI.lbl(pair[0], 18, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
 		p.custom_minimum_size = Vector2(170, 0)
@@ -1881,15 +1899,18 @@ func show_end(r: Dictionary) -> void:
 	var rw := UI.hbox(14)
 	rw.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(rw)
-	var rewards := [["TECRÜBE", "+%d XP" % r["xp"], Color("7fd1ff")], ["ALTIN", "+%s" % UI.money(r["gold"]), UI.GOLD]]
+	var rewards := [["TECRÜBE", "+%d XP" % r["xp"], Color("7fd1ff"), "zap"], ["ALTIN", "+%s" % UI.money(r["gold"]), UI.GOLD, "coins"]]
 	for k in r["mats"].keys():
 		if r["mats"][k] > 0:
-			rewards.append([GS.MATS[k].to_upper(), "+%d" % r["mats"][k], Color("c8d2dc")])
+			rewards.append([GS.MATS[k].to_upper(), "+%d" % r["mats"][k], Color("c8d2dc"), "gem"])
 	var i := 0
 	for rr in rewards:
 		var p := UI.panel(Color(1, 1, 1, 0.05), rr[2].darkened(0.3), 12)
 		var pv := UI.vbox(0)
 		p.add_child(pv)
+		var ric := UI.icon(rr[3], 22, rr[2])
+		ric.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		pv.add_child(ric)
 		pv.add_child(UI.lbl(rr[1], 34, rr[2], "Teko", HORIZONTAL_ALIGNMENT_CENTER))
 		pv.add_child(UI.lbl(rr[0], 16, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER))
 		p.custom_minimum_size = Vector2(150, 0)
@@ -1897,7 +1918,7 @@ func show_end(r: Dictionary) -> void:
 		rw.add_child(p)
 		var t2 := p.create_tween()
 		t2.tween_interval(0.6 + i * 0.18)
-		t2.tween_callback(func(): SFX.play("tick", -6))
+		t2.tween_callback(func(): SFX.ui("reward" if i == 0 else "shop_buy", -10))
 		t2.tween_property(p, "modulate:a", 1.0, 0.25)
 		i += 1
 	# competitive rank change
@@ -1929,7 +1950,7 @@ func show_end(r: Dictionary) -> void:
 	t3.tween_interval(1.2)
 	t3.tween_property(rbar, "value", float(ri["prog"]) * 100.0, 0.8)
 	if ri["i"] > ro["i"]:
-		t3.tween_callback(func(): SFX.play("success", -2))
+		t3.tween_callback(func(): SFX.ui("levelup_chime", -4))
 	if r["ups"] > 0:
 		v.add_child(UI.lbl("SEVİYE ATLADIN!  Yeni seviye: %d  (+500 Altın, +1 Kasa)" % int(GS.profile["level"]), 30, UI.GOLD, "RussoOne-Regular", HORIZONTAL_ALIGNMENT_CENTER))
 	var xpb := UI.bar(float(GS.profile["xp"]), float(GS.xp_for_level(int(GS.profile["level"]))), Color("7fd1ff"), 10)
@@ -1967,6 +1988,11 @@ class Crosshair extends Control:
 			rects.append(Rect2(c.x - th / 2, c.y + gap, th, ln))
 			if style != 3:
 				rects.append(Rect2(c.x - th / 2, c.y - gap - ln, th, ln))
+		if style == 5:
+			var xt: Texture2D = GS.xh_tex(str(s.get("xh_img", "kenney_053")))
+			if xt:
+				var xs: float = (ln * 2.0 + gap * 2.0 + 14.0) * 1.15
+				draw_texture_rect(xt, Rect2(c - Vector2(xs, xs) * 0.5, Vector2(xs, xs)), false, col)
 		if outline:
 			for r in rects:
 				draw_rect(r.grow(1.0), oc)
@@ -2546,12 +2572,12 @@ func _armor_card(it: Dictionary) -> Control:
 		(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.pressed.connect(func():
 		if not can:
-			SFX.play("fail", -6)
+			SFX.play("ui_error", -6)
 			return
 		player.money -= int(it["price"])
 		player.armor = maxf(player.armor, float(it["armor"]))
 		if it["helmet"]: player.helmet = true
-		SFX.play("buy", -4)
+		SFX.play("shop_buy", -4)
 		toggle_buy(true))
 	return b
 
@@ -2746,10 +2772,10 @@ func _buy_card(id: String, mode: String) -> Control:
 	if allowed:
 		b.pressed.connect(func():
 			player.equip_from_menu(cat, id)
-			SFX.play("buy", -6)
+			SFX.play("shop_buy", -6)
 			toggle_buy(false))
 	else:
-		b.pressed.connect(func(): SFX.play("fail", -6))
+		b.pressed.connect(func(): SFX.play("ui_error", -6))
 	return b
 
 func _buy_show(id: String, mode: String) -> void:

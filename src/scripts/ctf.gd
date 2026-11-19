@@ -322,6 +322,8 @@ func _show_event(kind: String, t: String, who: String) -> void:
 			var us: bool = t == m.player.team
 			m.hud.round_banner(("SAYI!  %s BAYRAĞI GETİRDİ" % who) if us else ("%s SAYI ALDI" % GS.TEAMS.get(t, "")), "%d  —  %d" % [int(m.team_score["a"]), int(m.team_score["b"])], col, int(m.team_score["a"]), int(m.team_score["b"]))
 			SFX.play("success" if us else "fail", -2)
+			if us and bool(GS.settings.get("announcer", true)):
+				m.hud._announce("ann_objective")
 
 # ------------------------------------------------------------------ online
 func _send_state() -> void:

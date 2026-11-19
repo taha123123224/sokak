@@ -7,8 +7,8 @@ signal update_available(info: Dictionary)
 signal progress(frac: float, text: String)
 signal failed(msg: String)
 
-const VERSION := "4.17.1"
-const BUILD := 74
+const VERSION := "4.18.0"
+const BUILD := 75
 var latest := {}
 var _dl: HTTPRequest
 var _total := 0
@@ -84,7 +84,7 @@ func _show_banner(info: Dictionary) -> void:
 	bv.add_child(b2)
 	var tw := panel.create_tween()
 	tw.tween_property(panel, "position:y", 74.0, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	SFX.play("success", -4)
+	SFX.play("ui_success", -4)
 
 func _banner_progress(panel: Control, lbl: Label) -> void:
 	for b in panel.find_children("*", "Button", true, false):

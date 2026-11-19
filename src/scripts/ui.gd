@@ -16,16 +16,77 @@ const GREEN := Color("38e07b")
 const GOLD := Color("ffc23d")
 
 static var _fonts := {}
+static var _icons := {}
 
-## v4.1: one modern type family for the whole game (Barlow, OFL). Old names are mapped so every call site follows.
-const FONT_MAP := {"Rajdhani-Bold": "BarlowSemiCondensed-Bold", "Rajdhani-SemiBold": "BarlowSemiCondensed-SemiBold",
-	"Rajdhani-Medium": "BarlowSemiCondensed-Medium", "RussoOne-Regular": "BarlowCondensed-ExtraBold", "Teko": "BarlowCondensed-Bold"}
-static func font(n: String) -> FontFile:
+## v4.18 typography (all SIL OFL 1.1, Google Fonts):
+##   Rajdhani Bold        -> headings, level / rank numbers, competitive read-outs ("RussoOne-Regular", "Teko")
+##   Roboto Condensed     -> navigation, buttons, scores and stats ("Rajdhani-Bold", "Rajdhani-SemiBold")
+##   Inter                -> descriptions, settings, dialogs, notifications, inputs ("Inter", "InterSemi", default font)
+## Fixed-width layouts tuned for condensed type keep Roboto Condensed ("Rajdhani-Medium") so nothing overflows.
+## Old names are kept as aliases so every existing call site follows the new roles. Barlow stays as glyph fallback.
+const FONT_ROLES := {
+	"RussoOne-Regular": ["Rajdhani-Bold", 0], "Teko": ["Rajdhani-Bold", 0], "Display": ["Rajdhani-Bold", 0],
+	"Rajdhani-Bold": ["RobotoCondensed-VF", 700], "Nav": ["RobotoCondensed-VF", 700],
+	"Rajdhani-SemiBold": ["RobotoCondensed-VF", 600], "Stat": ["RobotoCondensed-VF", 600],
+	"Rajdhani-Medium": ["RobotoCondensed-VF", 400], "Inter": ["Inter-VF", 450], "InterSemi": ["Inter-VF", 600],
+	"BarlowSemiCondensed-Bold": ["RobotoCondensed-VF", 700]}
+static func font(n: String) -> Font:
 	if _fonts.has(n):
 		return _fonts[n]
-	var f: FontFile = load("res://assets/fonts/%s.ttf" % str(FONT_MAP.get(n, n)))
+	var spec: Array = FONT_ROLES.get(n, [n, 0])
+	var base: FontFile = load("res://assets/fonts/%s.ttf" % str(spec[0]))
+	if base == null:
+		base = load("res://assets/fonts/BarlowSemiCondensed-SemiBold.ttf")
+	var fb: FontFile = load("res://assets/fonts/BarlowSemiCondensed-SemiBold.ttf")
+	if fb and fb != base and base.fallbacks.is_empty():
+		base.fallbacks = [fb]
+	var f: Font = base
+	if int(spec[1]) > 0:
+		var fv := FontVariation.new()
+		fv.base_font = base
+		fv.variation_opentype = {"wght": int(spec[1])}
+		f = fv
+	elif str(spec[0]) == "Rajdhani-Bold":
+		# display face: a touch narrower so headings sized for the old condensed face never overflow
+		var fd := FontVariation.new()
+		fd.base_font = base
+		fd.spacing_glyph = -1
+		f = fd
 	_fonts[n] = f
 	return f
+
+## Icon library: Lucide (ISC, UI chrome) under assets/icons/lucide, game-icons.net (CC BY 3.0, game items/medals)
+## under assets/icons/game. All SVGs are white so they can be tinted with modulate / draw colour.
+static func icon_tex(n: String) -> Texture2D:
+	if _icons.has(n):
+		return _icons[n]
+	var p := "res://assets/icons/%s.svg" % (n if "/" in n else "lucide/" + n)
+	var t: Texture2D = load(p) if ResourceLoader.exists(p) else null
+	_icons[n] = t
+	return t
+
+static func icon(n: String, sz: int = 20, col: Color = TEXT) -> TextureRect:
+	var r := TextureRect.new()
+	r.texture = icon_tex(n)
+	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	r.custom_minimum_size = Vector2(sz, sz)
+	r.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	r.modulate = col
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return r
+
+## button with a leading icon (Button.icon is tinted by the theme's icon colours)
+static func ibtn(ic: String, text: String, cb: Callable = Callable(), size: int = 18, primary: bool = false, minw: int = 0, minh: int = 44) -> Button:
+	var b := btn(text, cb, size, primary, minw, minh)
+	b.icon = icon_tex(ic)
+	b.expand_icon = false
+	b.add_theme_constant_override("icon_max_width", int(size * 1.15))
+	b.add_theme_constant_override("h_separation", 8)
+	b.add_theme_color_override("icon_normal_color", Color(0.08, 0.05, 0.02) if primary else Color(1, 1, 1, 0.8))
+	b.add_theme_color_override("icon_hover_color", Color(0.05, 0.03, 0.0) if primary else Color.WHITE)
+	b.add_theme_color_override("icon_pressed_color", Color.WHITE)
+	return b
 
 static func sb(bg: Color, border: Color = Color(0, 0, 0, 0), bw: int = 0, radius: int = 3, pad: int = 10, skew: float = 0.0) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
@@ -41,8 +102,17 @@ static func sb(bg: Color, border: Color = Color(0, 0, 0, 0), bw: int = 0, radius
 
 static func build_theme() -> Theme:
 	var t := Theme.new()
-	t.default_font = font("Rajdhani-SemiBold")
-	t.default_font_size = 20
+	t.default_font = font("Inter")
+	t.default_font_size = 18
+	# type variations (Godot "Theme type variations"): Label + theme_type_variation = "H1" etc.
+	for tv in [["H1", "Display", 40, Color.WHITE], ["H2", "Display", 28, Color.WHITE], ["H3", "Nav", 20, TEXT],
+			["StatValue", "Stat", 26, Color.WHITE], ["StatLabel", "Nav", 13, DIM], ["Body", "Inter", 16, TEXT], ["Caption", "Inter", 13, DIM]]:
+		t.set_type_variation(tv[0], "Label")
+		t.set_font("font", tv[0], font(tv[1])); t.set_font_size("font_size", tv[0], tv[2]); t.set_color("font_color", tv[0], tv[3])
+	t.set_type_variation("NavButton", "Button")
+	t.set_font("font", "NavButton", font("Nav"))
+	for c in ["Button", "OptionButton", "MenuButton", "CheckBox", "CheckButton"]:
+		t.set_font("font", c, font("Nav"))
 	# Button
 	var bn := sb(Color(0.12, 0.125, 0.14, 0.9), LINE, 1, 3, 14)
 	var bh := sb(Color(0.19, 0.2, 0.22, 0.95), Color(1, 1, 1, 0.32), 1, 3, 14)
@@ -90,11 +160,24 @@ static func build_theme() -> Theme:
 	# CheckBox / CheckButton
 	t.set_color("font_color", "CheckBox", TEXT); t.set_color("font_hover_color", "CheckBox", Color.WHITE)
 	t.set_color("font_color", "CheckButton", TEXT)
+	t.set_font("font", "LineEdit", font("Inter")); t.set_font("font", "TextEdit", font("Inter"))
+	t.set_font("normal_font", "RichTextLabel", font("Inter")); t.set_font("bold_font", "RichTextLabel", font("InterSemi"))
+	# Kenney UI Pack (CC0) grey check / radio glyphs, tinted to the palette
+	for pair in [["checked", "check_on"], ["unchecked", "check_off"], ["radio_checked", "radio_on"], ["radio_unchecked", "radio_off"]]:
+		var ct: Texture2D = load("res://assets/ui/kenney/%s.png" % pair[1]) if ResourceLoader.exists("res://assets/ui/kenney/%s.png" % pair[1]) else null
+		if ct:
+			t.set_icon(pair[0], "CheckBox", ct)
+	var arrow: Texture2D = load("res://assets/ui/kenney/arrow_down.png") if ResourceLoader.exists("res://assets/ui/kenney/arrow_down.png") else null
+	if arrow:
+		t.set_icon("arrow", "OptionButton", arrow)
 	# Scroll
 	t.set_stylebox("scroll", "VScrollBar", sb(Color(0, 0, 0, 0.2), Color(0, 0, 0, 0), 0, 3, 2))
 	t.set_stylebox("grabber", "VScrollBar", sb(Color(0.25, 0.28, 0.35), Color(0, 0, 0, 0), 0, 3, 2))
 	t.set_stylebox("grabber_highlight", "VScrollBar", sb(ACCENT, Color(0, 0, 0, 0), 0, 3, 2))
 	t.set_stylebox("grabber_pressed", "VScrollBar", sb(ACCENT, Color(0, 0, 0, 0), 0, 3, 2))
+	# popups / dialogs: Kenney Sci-Fi notched glass, tinted graphite
+	t.set_stylebox("panel", "PopupPanel", notch_sb(Color(0.075, 0.08, 0.095, 0.98), "panel_notches", 16))
+	t.set_stylebox("panel", "AcceptDialog", notch_sb(Color(0.075, 0.08, 0.095, 0.98), "panel_notches", 16))
 	# Tooltip
 	t.set_stylebox("panel", "TooltipPanel", sb(Color(0.02, 0.03, 0.05, 0.95), ACCENT, 1, 3, 8))
 	# PopupMenu
@@ -131,10 +214,30 @@ static func btn(text: String, cb: Callable = Callable(), size: int = 20, primary
 		b.add_theme_color_override("font_color", Color(0.08, 0.05, 0.02))
 		b.add_theme_color_override("font_hover_color", Color(0.05, 0.03, 0.0))
 		b.add_theme_color_override("font_pressed_color", Color.WHITE)
+	b.set_meta("sfx", true)
 	if cb.is_valid():
-		b.pressed.connect(func(): SFX.play("ui_click", -4); cb.call())
-	b.mouse_entered.connect(func(): SFX.play("ui_hover", -14))
+		b.pressed.connect(func():
+			if bool(GS.settings.get("ui_sounds", true)):
+				SFX.ui("ui_click", -4)
+			cb.call())
+	b.mouse_entered.connect(func():
+		if bool(GS.settings.get("ui_sounds", true)) and not b.disabled:
+			SFX.ui("ui_hover", -16))
 	return b
+
+## Kenney Sci-Fi UI (CC0) notched glass panel as a 9-slice, tinted to graphite. Used for toasts,
+## notifications, dialogs and HUD read-outs so every popup shares one silhouette.
+static func notch_sb(tint: Color = Color(0.11, 0.115, 0.13, 0.96), kind: String = "panel_notch_tr", pad: int = 14) -> StyleBox:
+	var p := "res://assets/ui/kenney/%s.png" % kind
+	if not ResourceLoader.exists(p):
+		return sb(tint, LINE, 1, 4, pad)
+	var s := StyleBoxTexture.new()
+	s.texture = load(p)
+	s.texture_margin_left = 22; s.texture_margin_right = 22; s.texture_margin_top = 22; s.texture_margin_bottom = 22
+	s.modulate_color = tint
+	s.content_margin_left = pad + 4; s.content_margin_right = pad + 4
+	s.content_margin_top = pad * 0.7; s.content_margin_bottom = pad * 0.7
+	return s
 
 ## CS2-style frosted panel
 static func glass(pad: int = 14, radius: int = 4) -> PanelContainer:

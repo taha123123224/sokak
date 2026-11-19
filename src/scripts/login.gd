@@ -23,6 +23,10 @@ var bar: ProgressBar
 var ticker: Label
 var logo: TextureRect
 var busy := false
+var remember_cb: CheckBox
+var terms_cb: CheckBox
+var terms_row: Control
+var remember_row: Control
 var resume_box: PanelContainer
 var resume_lbl: Label
 var resume_sub: Label
@@ -42,27 +46,12 @@ class Glyph extends Control:
 	var col := Color(0.55, 0.6, 0.68)
 	var slash := false
 	func _draw() -> void:
-		var c := size / 2
-		var k := minf(size.x, size.y) / 20.0
-		match kind:
-			"user":
-				draw_circle(c + Vector2(0, -4) * k, 4.2 * k, col)
-				draw_arc(c + Vector2(0, 9) * k, 7.5 * k, PI, TAU, 20, col, 3.0 * k, true)
-			"lock":
-				draw_arc(c + Vector2(0, -2) * k, 4.5 * k, PI, TAU, 16, col, 2.4 * k, true)
-				draw_line(c + Vector2(-4.5, -2) * k, c + Vector2(-4.5, 1) * k, col, 2.4 * k)
-				draw_line(c + Vector2(4.5, -2) * k, c + Vector2(4.5, 1) * k, col, 2.4 * k)
-				draw_rect(Rect2(c + Vector2(-7, 0) * k, Vector2(14, 10) * k), col)
-				draw_circle(c + Vector2(0, 4.5) * k, 1.6 * k, Color(0.07, 0.085, 0.12))
-			"eye":
-				var pts := PackedVector2Array()
-				for i in 25:
-					var a := i / 24.0 * TAU
-					pts.append(c + Vector2(cos(a) * 8.5, sin(a) * 4.8) * k)
-				draw_polyline(pts, col, 2.0 * k, true)
-				draw_circle(c, 2.6 * k, col)
-				if slash:
-					draw_line(c + Vector2(-8, 6) * k, c + Vector2(8, -6) * k, col, 2.0 * k, true)
+		# v4.18: Lucide (ISC) icons — user / lock / eye / eye-off
+		var n: String = {"user": "user", "lock": "lock", "eye": "eye-off" if slash else "eye"}.get(kind, kind)
+		var t: Texture2D = UI.icon_tex(n)
+		if t:
+			var sz := minf(size.x, size.y) * 0.95
+			draw_texture_rect(t, Rect2((size - Vector2(sz, sz)) * 0.5, Vector2(sz, sz)), false, col)
 
 class Avatar extends Control:
 	## round avatar: animated accent ring + the account's initial
@@ -83,7 +72,6 @@ class Avatar extends Control:
 		var fs := int(r * 1.05)
 		var w := f.get_string_size(letter, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		draw_string(f, Vector2(c.x - w / 2, c.y + fs * 0.36), letter, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
-const SERVERS := [["TR-İstanbul #1", 18], ["TR-Ankara #2", 24], ["EU-Frankfurt", 46]]
 
 func _ready() -> void:
 	_build_world()
@@ -283,7 +271,11 @@ func _build_ui() -> void:
 	var dt := create_tween().set_loops()
 	dt.tween_property(dot, "modulate:a", 0.35, 0.9)
 	dt.tween_property(dot, "modulate:a", 1.0, 0.9)
-	sh.add_child(UI.lbl(("SUNUCULAR ÇEVRİMİÇİ  •  %s  %d ms" % [SERVERS[0][0], SERVERS[0][1]]) if Online.configured() else "ÇEVRİMDIŞI MOD", 14, UI.DIM, "Rajdhani-Bold"))
+	var srv := UI.lbl("SUNUCU BAĞLANTISI ÖLÇÜLÜYOR…" if Online.configured() else "ÇEVRİMDIŞI MOD", 14, UI.DIM, "Rajdhani-Bold")
+	sh.add_child(srv)
+	if Online.configured():
+		# measured, not invented: real round trip to the account service
+		_show_ping(srv)
 	title_lbl = UI.lbl("HESABINA GİRİŞ YAP", 34, Color.WHITE, "RussoOne-Regular")
 	hv.add_child(title_lbl)
 	sub_lbl = UI.lbl("Kaldığın yerden devam et: envanterin ve rütben hesabında.", 16, Color(1, 1, 1, 0.55), "Rajdhani-SemiBold")
@@ -356,6 +348,36 @@ func _build_ui() -> void:
 		if register_mode: pass2_edit.grab_focus()
 		else: _login())
 	pass2_edit.text_submitted.connect(func(_t): _login())
+	# v4.18: "Oturum açık kalsın" + "Şifremi unuttum" (login) / terms of use (register)
+	remember_row = UI.hbox(10)
+	remember_cb = CheckBox.new()
+	remember_cb.text = "Oturum açık kalsın"
+	remember_cb.focus_mode = Control.FOCUS_ALL
+	remember_cb.button_pressed = bool(GS.settings.get("remember_me", true))
+	remember_cb.add_theme_font_override("font", UI.font("Rajdhani-SemiBold")); remember_cb.add_theme_font_size_override("font_size", 16)
+	remember_cb.toggled.connect(func(on): GS.settings["remember_me"] = on; Online.remember = on; GS.save_settings())
+	remember_row.add_child(remember_cb)
+	remember_row.add_child(UI.spacer())
+	var forgot := LinkButton.new()
+	forgot.text = "Şifremi unuttum"
+	forgot.add_theme_font_override("font", UI.font("Rajdhani-Bold")); forgot.add_theme_font_size_override("font_size", 16)
+	forgot.add_theme_color_override("font_color", UI.ACCENT2)
+	forgot.pressed.connect(func(): _dialog("ŞİFREMİ UNUTTUM", "SOKAK hesapları e-posta yerine kullanıcı adıyla açılır, bu yüzden e-postayla şifre sıfırlama bağlantısı gönderilemez.\n\n•  Hesabın bu ya da başka bir bilgisayarda hâlâ açıksa: Ayarlar > Oyun & Arayüz > HESAP > Şifre değiştir.\n•  Hiçbir cihazda açık değilse: oyun yöneticisine (sokakoperasyon) kullanıcı adınla ulaş; hesabın doğrulandıktan sonra sıfırlanır."))
+	remember_row.add_child(forgot)
+	form.add_child(remember_row)
+	terms_row = UI.hbox(8)
+	terms_cb = CheckBox.new()
+	terms_cb.text = "Kullanım koşullarını kabul ediyorum"
+	terms_cb.add_theme_font_override("font", UI.font("Rajdhani-SemiBold")); terms_cb.add_theme_font_size_override("font_size", 16)
+	terms_row.add_child(terms_cb)
+	var tl := LinkButton.new()
+	tl.text = "(oku)"
+	tl.add_theme_font_override("font", UI.font("Rajdhani-Bold")); tl.add_theme_font_size_override("font_size", 16)
+	tl.add_theme_color_override("font_color", UI.ACCENT2)
+	tl.pressed.connect(func(): _dialog("KULLANIM KOŞULLARI", TERMS))
+	terms_row.add_child(tl)
+	terms_row.visible = false
+	form.add_child(terms_row)
 	go_btn = UI.btn("GİRİŞ YAP", _login, 26, true, 0, 64)
 	go_btn.add_theme_font_override("font", UI.font("RussoOne-Regular"))
 	form.add_child(go_btn)
@@ -552,9 +574,19 @@ func _show_form(on: bool) -> void:
 		title_lbl.text = "YENİ HESAP OLUŞTUR" if register_mode else "HESABINA GİRİŞ YAP"
 		name_edit.grab_focus()
 
+func _show_ping(l: Label) -> void:
+	var ms: int = await Online.measure_ping()
+	if not is_instance_valid(l):
+		return
+	l.text = ("SUNUCU ÇEVRİMİÇİ  •  %d ms" % ms) if ms >= 0 else "SUNUCUYA ULAŞILAMADI — çevrimdışı oynayabilirsin"
+	if ms < 0:
+		l.add_theme_color_override("font_color", UI.RED)
+
 func _set_mode(reg: bool) -> void:
 	register_mode = reg
 	pass2_box.visible = reg
+	if terms_row: terms_row.visible = reg
+	if remember_row: remember_row.visible = not reg
 	go_btn.text = "HESAP OLUŞTUR" if reg else "GİRİŞ YAP"
 	title_lbl.text = "YENİ HESAP OLUŞTUR" if reg else "HESABINA GİRİŞ YAP"
 	sub_lbl.text = "Kullanıcı adın oyunda ve arkadaş listelerinde görünür." if reg else "Kaldığın yerden devam et: envanterin ve rütben hesabında."
@@ -570,6 +602,35 @@ func _set_mode(reg: bool) -> void:
 	if status_lbl:
 		_msg("", false)
 
+const TERMS := "SOKAK: Operasyon ücretsiz bir oyundur. Hesap açarak şunları kabul edersin:\n\n1.  Hile, bot, açık (exploit) kullanmak ve başkalarının hesaplarına erişmeye çalışmak yasaktır; hesap kalıcı olarak yasaklanabilir.\n2.  Küfür, hakaret, nefret söylemi ve taciz içeren isim, sohbet ve sesli konuşma yasaktır.\n3.  Hesabın ve şifrenin güvenliği senin sorumluluğundadır; hesabını başkasıyla paylaşma.\n4.  Oyun içi altın, kasa ve kaplamaların gerçek para karşılığı yoktur; satılamaz, devredilemez.\n5.  Sunucuda kullanıcı adın, oyuncu profilin (seviye, istatistik, envanter), arkadaş listen ve maç kayıtların saklanır. Şifren sunucuda şifrelenmiş tutulur, bilgisayarında düz metin olarak saklanmaz.\n6.  Kurallar ve oyun içerikleri güncellemelerle değişebilir; yöneticiler kurala aykırı hesapları uyarabilir veya yasaklayabilir."
+
+func _dialog(title: String, body: String) -> void:
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.62)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ui.add_child(dim)
+	var pc := PanelContainer.new()
+	pc.add_theme_stylebox_override("panel", UI.notch_sb(Color(0.08, 0.085, 0.1, 0.98), "panel_notches", 26))
+	pc.set_anchors_preset(Control.PRESET_CENTER)
+	pc.custom_minimum_size = Vector2(620, 0)
+	dim.add_child(pc)
+	var v := UI.vbox(14)
+	pc.add_child(v)
+	v.add_child(UI.lbl(title, 26, Color.WHITE, "RussoOne-Regular"))
+	var ln := ColorRect.new(); ln.color = UI.ACCENT; ln.custom_minimum_size = Vector2(60, 3)
+	v.add_child(ln)
+	var b := UI.lbl(body, 17, UI.TEXT, "Rajdhani-SemiBold")
+	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	b.custom_minimum_size = Vector2(568, 0)
+	v.add_child(b)
+	var ok := UI.btn("TAMAM", func(): dim.queue_free(), 18, true, 160, 44)
+	ok.size_flags_horizontal = Control.SIZE_SHRINK_END
+	v.add_child(ok)
+	pc.resized.connect(func(): pc.position = (dim.size - pc.size) * 0.5)
+	await get_tree().process_frame
+	pc.position = (dim.size - pc.size) * 0.5
+	ok.grab_focus()
+
 func _msg(t: String, err: bool) -> void:
 	status_lbl.text = (("⚠  " if err else "ℹ  ") + t) if t != "" else ""
 	status_lbl.add_theme_color_override("font_color", UI.RED.lightened(0.2) if err else UI.ACCENT2)
@@ -584,7 +645,7 @@ func _msg(t: String, err: bool) -> void:
 				tw.tween_property(card, "position:x", x0 + (7.0 if k % 2 == 0 else -7.0), 0.04)
 			tw.tween_property(card, "position:x", x0, 0.04)
 	if err:
-		SFX.play("fail", -6)
+		SFX.play("ui_error", -6)
 
 func _try_resume() -> void:
 	if OS.has_environment("LOGIN_MOCK"):   # screenshot test of the saved-account card
@@ -630,6 +691,9 @@ func _login() -> void:
 		_msg("Şifre en az 6 karakter olmalı", true); return
 	if register_mode and (pass2_edit.text == "" or pw != pass2_edit.text):
 		_msg("Şifreler aynı değil", true); pass2_edit.grab_focus(); return
+	if register_mode and terms_cb and not terms_cb.button_pressed:
+		_msg("Hesap açmak için kullanım koşullarını kabul etmelisin", true); return
+	Online.remember = bool(GS.settings.get("remember_me", true))
 	busy = true
 	SFX.play("ui_click")
 	bar.visible = true; bar.value = 0.3
@@ -687,7 +751,7 @@ func _enter(t: String) -> void:
 	busy = true
 	bar.visible = true
 	_msg(t, false)
-	SFX.play("success", -6)
+	SFX.play("ui_success", -6)
 	var tw := create_tween()
 	tw.tween_property(bar, "value", 1.0, 0.6)
 	tw.tween_callback(func(): if main: main.go_menu("mode"))

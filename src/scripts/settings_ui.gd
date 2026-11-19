@@ -38,25 +38,30 @@ func _ready() -> void:
 
 func _build_tabs() -> void:
 	UI.clear(tabs_box)
-	for t in [["grafik", "GRAFİK"], ["nisangah", "NİŞANGAH"], ["kontrol", "KONTROLLER"], ["ses", "SES"], ["oyun", "OYUN & ARAYÜZ"], ["lisans", "LİSANSLAR"]]:
-		var b := UI.btn(t[1], func(): tab = t[0]; _build_tabs(); _build(), 20, tab == t[0], 190, 46)
+	for t in [["grafik", "GRAFİK", "monitor"], ["nisangah", "NİŞANGAH", "crosshair"], ["kontrol", "KONTROLLER", "keyboard"], ["ses", "SES", "volume-2"], ["oyun", "OYUN & ARAYÜZ", "sliders-horizontal"], ["lisans", "LİSANSLAR", "info"]]:
+		var b := UI.ibtn(t[2], t[1], func(): tab = t[0]; SFX.ui("ui_tab", -6); _build_tabs(); _build(), 19, tab == t[0], 180, 46)
+		b.set_meta("sfx", true)
 		tabs_box.add_child(b)
 
 func _row(label: String, ctl: Control, hint: String = "") -> void:
 	var h := UI.hbox(16)
-	var l := UI.lbl(label, 21, UI.TEXT, "Rajdhani-SemiBold")
+	var l := UI.lbl(label, 18, UI.TEXT, "InterSemi")
 	l.custom_minimum_size = Vector2(340, 40)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	h.add_child(l)
 	h.add_child(ctl)
 	if hint != "":
-		h.add_child(UI.lbl(hint, 17, UI.DIM, "Rajdhani-Medium"))
+		var hl := UI.lbl(hint, 15, UI.DIM, "Inter")
+		hl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		hl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		h.add_child(hl)
 	body.add_child(h)
 
 func _check(key: String, label: String, hint: String = "") -> void:
 	var c := CheckButton.new()
 	c.button_pressed = bool(GS.settings[key])
 	c.focus_mode = Control.FOCUS_NONE
-	c.toggled.connect(func(on): GS.settings[key] = on; GS.settings["quality"] = "custom" if key in ["ssao", "ssil", "ssr", "sdfgi", "glow", "volumetric", "taa", "fxaa"] else GS.settings["quality"]; SFX.play("ui_click", -8))
+	c.toggled.connect(func(on): GS.settings[key] = on; GS.settings["quality"] = "custom" if key in ["ssao", "ssil", "ssr", "sdfgi", "glow", "volumetric", "taa", "fxaa"] else GS.settings["quality"]; SFX.ui("ui_toggle", -6))
 	_row(label, c, hint)
 
 func _slide(key: String, label: String, a: float, b: float, step: float, fmt: String = "%.2f", hint: String = "") -> void:
@@ -100,6 +105,26 @@ func _resolution_row() -> void:
 func _section(t: String) -> void:
 	body.add_child(UI.spacer(false, 0, 6))
 	body.add_child(UI.header(t, 22))
+
+func _change_pw(p1: LineEdit, p2: LineEdit, res: Label) -> void:
+	if p1.text != p2.text:
+		res.text = "✕  Şifreler aynı değil"
+		res.add_theme_color_override("font_color", UI.RED)
+		return
+	res.text = "Değiştiriliyor..."
+	var e: String = await Online.change_password(p1.text)
+	res.text = "✓  Şifren değiştirildi" if e == "" else "✕  " + e
+	res.add_theme_color_override("font_color", UI.GREEN if e == "" else UI.RED)
+	if e == "":
+		p1.text = ""
+		p2.text = ""
+
+func _remember_toggled(on: bool) -> void:
+	GS.settings["remember_me"] = on
+	Online.remember = on
+	GS.save_settings()
+	if not on:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(Online.SESSION))
 
 func _bench(maps: Array) -> void:
 	GS.save_settings()
@@ -210,7 +235,26 @@ func _build() -> void:
 			body.add_child(pv)
 			preview = pv
 			_section("STİL")
-			_options("xh_style", "Şekil", [[0, "Klasik Artı"], [1, "Nokta"], [2, "Daire"], [3, "T-Şekli"], [4, "Artı + Nokta"]])
+			_options("xh_style", "Şekil", [[0, "Klasik Artı"], [1, "Nokta"], [2, "Daire"], [3, "T-Şekli"], [4, "Artı + Nokta"], [5, "Hazır Şekil"]])
+			if int(GS.settings["xh_style"]) == 5:
+				var gal := HFlowContainer.new()
+				gal.add_theme_constant_override("h_separation", 6); gal.add_theme_constant_override("v_separation", 6)
+				gal.custom_minimum_size = Vector2(620, 0)
+				for xn in GS.XH_IMAGES:
+					var xb := Button.new()
+					xb.custom_minimum_size = Vector2(58, 58)
+					xb.focus_mode = Control.FOCUS_NONE
+					xb.tooltip_text = xn
+					var on: bool = str(GS.settings.get("xh_img", "")) == xn
+					var xsb := UI.sb(Color(0.3, 0.36, 0.42) if on else Color(0.16, 0.18, 0.21), UI.ACCENT if on else UI.LINE, 2 if on else 1, 4, 4)
+					for st in ["normal", "hover", "pressed"]:
+						xb.add_theme_stylebox_override(st, xsb)
+					xb.icon = GS.xh_tex(xn); xb.expand_icon = true
+					xb.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+					xb.add_theme_color_override("icon_normal_color", Color(str(GS.settings["xh_color"])))
+					xb.pressed.connect(func(): GS.settings["xh_img"] = xn; _build())
+					gal.add_child(xb)
+				_row("Hazır nişangahlar", gal, "Kenney + OpenGameArt (CC0)")
 			var cols := UI.hbox(6)
 			for c in ["3dff8a", "00e5ff", "ffffff", "ff3b3b", "ffd23d", "ff4fd8", "a46bff"]:
 				var b := Button.new()
@@ -262,6 +306,20 @@ func _build() -> void:
 			_check("announcer", "Yapay zeka anons sesi (Kafadan!, Çifte öldürme!...)")
 			_check("insertion", "Maç başında helikopterden paraşütle iniş")
 			_slide("vol_amb", "Ortam Sesleri", 0, 1, 0.01, "%.2f")
+			_slide("vol_ui", "Arayüz Sesleri (menü, bildirim)", 0, 1, 0.01, "%.2f")
+			_check("ui_sounds", "Buton üzerine gelme / tıklama sesleri")
+			var outs := AudioServer.get_output_device_list()
+			var oo := OptionButton.new()
+			oo.custom_minimum_size = Vector2(380, 40)
+			for d in outs:
+				oo.add_item("Varsayılan çıkış aygıtı" if d == "Default" else d)
+				oo.set_item_metadata(oo.item_count - 1, d)
+				if d == AudioServer.output_device:
+					oo.select(oo.item_count - 1)
+			oo.item_selected.connect(func(i):
+				AudioServer.output_device = str(oo.get_item_metadata(i))
+				GS.settings["out_device"] = str(oo.get_item_metadata(i)); GS.save_settings(); SFX.ui("ui_notify"))
+			_row("Ses çıkış aygıtı", oo, "Kulaklık / hoparlör seçimi")
 			_section("SESLİ SOHBET")
 			_check("voice_on", "Sesli sohbet açık (V tuşuna basılı tut: konuş)")
 			_slide("vol_voice", "Diğer oyuncuların sesi", 0, 1.5, 0.01, "%.2f")
@@ -314,6 +372,20 @@ func _build() -> void:
 			body.add_child(UI.lbl("Nasıl kullanılır: çevrimiçi odada veya maçta V tuşuna BASILI TUT ve konuş; bırakınca susar.\nYazılı sohbet: Enter (veya T) herkese, Y sadece takımına. Ekranda kimin konuştuğu görünür.", 16, UI.DIM, "Rajdhani-SemiBold"))
 			body.add_child(UI.btn("TEST: SİLAH SESİ", func(): GS.apply_settings(); SFX.play("shot_ak"), 18, false, 260, 42))
 		"oyun":
+			if Online.is_logged_in():
+				_section("HESAP  —  " + Online.username)
+				var ah := UI.hbox(8)
+				body.add_child(ah)
+				var p1 := LineEdit.new(); p1.secret = true; p1.placeholder_text = "yeni şifre (en az 6)"; p1.custom_minimum_size = Vector2(240, 42)
+				var p2 := LineEdit.new(); p2.secret = true; p2.placeholder_text = "yeni şifre (tekrar)"; p2.custom_minimum_size = Vector2(240, 42)
+				ah.add_child(p1); ah.add_child(p2)
+				var res := UI.lbl("", 16, UI.DIM, "Rajdhani-Bold")
+				ah.add_child(UI.btn("ŞİFREYİ DEĞİŞTİR", func(): _change_pw(p1, p2, res), 16, false, 0, 42))
+				ah.add_child(res)
+				var rc := CheckBox.new(); rc.text = "Oturum açık kalsın (kapalıysa oyun her açılışta şifre ister)"
+				rc.button_pressed = bool(GS.settings.get("remember_me", true))
+				rc.toggled.connect(_remember_toggled)
+				body.add_child(rc)
 			_section("ARAYÜZ")
 			_check("minimap", "Mini Harita")
 			_check("kill_feed", "Öldürme Akışı")
@@ -364,9 +436,9 @@ func _confirm_reset() -> void:
 	_reset_armed = false
 	var r: Dictionary = await GS.act("reset")
 	if r["ok"]:
-		SFX.play("success", -6)
+		SFX.play("ui_success", -6)
 	else:
-		SFX.play("fail", -6)
+		SFX.play("ui_error", -6)
 	_build()
 
 func _input(e: InputEvent) -> void:
@@ -393,7 +465,7 @@ func _reset() -> void:
 
 func _save_close() -> void:
 	GS.save_settings()
-	SFX.play("success", -8)
+	SFX.play("ui_success", -8)
 	if on_close.is_valid():
 		on_close.call()
 
@@ -414,6 +486,11 @@ class PreviewBox extends Control:
 			rects.append(Rect2(c.x - gap - ln, c.y - th / 2, ln, th)); rects.append(Rect2(c.x + gap, c.y - th / 2, ln, th))
 			rects.append(Rect2(c.x - th / 2, c.y + gap, th, ln))
 			if style != 3: rects.append(Rect2(c.x - th / 2, c.y - gap - ln, th, ln))
+		if style == 5:
+			var xt: Texture2D = GS.xh_tex(str(s.get("xh_img", "kenney_053")))
+			if xt:
+				var xs: float = (ln * 2.0 + gap * 2.0 + 14.0) * 1.15
+				draw_texture_rect(xt, Rect2(c - Vector2(xs, xs) * 0.5, Vector2(xs, xs)), false, col)
 		if s["xh_outline"]:
 			for r in rects: draw_rect(r.grow(1.0), oc)
 		for r in rects: draw_rect(r, col)

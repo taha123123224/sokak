@@ -149,7 +149,7 @@ func _on_gifts(mail: Array) -> void:
 		if str(g.get("skin", "")) != "": parts.append("STİL: " + str(GS.SKINS.get(g["skin"], {}).get("name", g["skin"])))
 		v.add_child(_wrap("  •  ".join(parts) if parts.size() > 0 else "Sürpriz!", 19))
 	v.add_child(UI.btn("TEŞEKKÜRLER!", func(): _close_modal(); show_page(page), 20, true, 260, 50))
-	SFX.play("success")
+	SFX.play("ui_success")
 	_refresh_currency()
 
 func _exit_tree() -> void:
@@ -588,7 +588,7 @@ func _inspect(id: String, skin: String = "") -> void:
 	close.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	close.position = Vector2(-200, 120)
 	insp_ui.add_child(close)
-	SFX.play("equip", -6)
+	SFX.play("inv_equip", -6)
 
 func _end_inspect() -> void:
 	inspecting = false
@@ -738,8 +738,8 @@ func thumb_rect(id: String, skin: String, size: Vector2) -> TextureRect:
 # ================================================================ top bar
 ## CS2-style top bar: a soft dark gradient (no hard box) with icon buttons on the left, the page tabs centred
 ## with the LOBİ tab in the middle, and currencies + level on the right; friends live in a slim rail on the right edge.
-const NAV_L := [["bag", "ÇANTA"], ["market", "MARKET"], ["crate", "KASA"], ["pass", "SEZON"]]
-const NAV_R := [["rooms", "ODALAR"], ["leader", "SIRALAMA"], ["mods", "EKLENTİLER"]]
+const NAV_L := [["bag", "ÇANTA"], ["loadout", "DONANIM"], ["market", "MAĞAZA"], ["crate", "KASA"]]
+const NAV_R := [["pass", "SEZON"], ["leader", "SIRALAMA"], ["rooms", "ODALAR"], ["mods", "EKLENTİLER"]]
 var friends_rail: VBoxContainer
 
 func _build_topbar() -> void:
@@ -793,7 +793,7 @@ func _build_topbar() -> void:
 	topbar.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	topbar.offset_top = 6
 	bar.add_child(topbar)
-	var items: Array = NAV_L + [["lobby", "LOBİ"]] + NAV_R
+	var items: Array = NAV_L + [["play", "OYNA"]] + NAV_R
 	for i in items.size():
 		var it: Array = items[i]
 		if i > 0:
@@ -803,7 +803,7 @@ func _build_topbar() -> void:
 			sep.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			topbar.add_child(sep)
-		var big: bool = it[0] == "lobby"
+		var big: bool = it[0] == "play"
 		var b := UI.btn(it[1], func(): show_page(it[0]), 30 if big else 19, false, 0, 56)
 		b.add_theme_font_override("font", UI.font("Teko" if big else "Rajdhani-SemiBold"))
 		for st in ["normal", "hover", "pressed", "focus"]:
@@ -888,6 +888,8 @@ func _build_friends_rail() -> void:
 	Online.friends_updated.connect(func(_l): _fill_friends_rail())
 	_fill_friends_rail()
 
+var _rail_seen := {}
+var _rail_seen_init := false
 func _fill_friends_rail() -> void:
 	if friends_rail == null or not is_instance_valid(friends_rail):
 		return
@@ -897,6 +899,16 @@ func _fill_friends_rail() -> void:
 	for f in all:
 		if f is Dictionary and not bool(f.get("pending", false)) and bool(f.get("online", false)) and str(f.get("status", "")) != "offline":
 			on.append(f)
+	# v4.18: chime when a friend comes online (not on the first fill after login)
+	var now_on := {}
+	for f in on:
+		now_on[str(f.get("username", ""))] = true
+	if _rail_seen_init:
+		for k in now_on.keys():
+			if not _rail_seen.has(k):
+				SFX.ui("friend_online", -8)
+				break
+	_rail_seen = now_on; _rail_seen_init = Online.is_logged_in()
 	var top := NavIcon.make("friends", "Arkadaşlar", func(): show_page("friends"))
 	top.custom_minimum_size = Vector2(60, 52)
 	top.badge = str(on.size()) if Online.is_logged_in() else ""
@@ -936,8 +948,9 @@ class NavIcon extends Control:
 		n.mouse_exited.connect(func(): n._hover = false; n.queue_redraw())
 		n.gui_input.connect(func(ev):
 			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
-				SFX.play("ui_click", -8)
+				SFX.ui("ui_click", -8)
 				n.cb.call())
+		n.mouse_entered.connect(func(): SFX.ui("ui_hover", -16))
 		return n
 	func _draw() -> void:
 		var c := size * 0.5
@@ -945,35 +958,15 @@ class NavIcon extends Control:
 		if _hover:
 			draw_rect(Rect2(Vector2.ZERO, size), Color(1, 1, 1, 0.08))
 		var col := UI.ACCENT2 if on else (Color(1, 1, 1, 0.45) if dim else (Color.WHITE if _hover else Color(1, 1, 1, 0.82)))
-		var w := 2.2
-		match kind:
-			"home":
-				draw_colored_polygon(PackedVector2Array([c + Vector2(-r * 1.05, -r * 0.05), c + Vector2(0, -r * 1.05), c + Vector2(r * 1.05, -r * 0.05)]), col)
-				draw_rect(Rect2(c + Vector2(-r * 0.75, -r * 0.1), Vector2(r * 1.5, r * 1.05)), col)
-				draw_rect(Rect2(c + Vector2(-r * 0.2, r * 0.35), Vector2(r * 0.4, r * 0.6)), Color(0.05, 0.06, 0.07))
-			"gear":
-				for i in 8:
-					var a := i * TAU / 8.0
-					draw_line(c + Vector2.from_angle(a) * r * 0.7, c + Vector2.from_angle(a) * r * 1.12, col, r * 0.42)
-				draw_circle(c, r * 0.78, col)
-				draw_circle(c, r * 0.34, Color(0.05, 0.06, 0.07))
-			"user":
-				draw_circle(c + Vector2(0, -r * 0.42), r * 0.46, col)
-				draw_colored_polygon(PackedVector2Array([c + Vector2(-r * 0.95, r * 1.0), c + Vector2(-r * 0.7, r * 0.25), c + Vector2(0, r * 0.05), c + Vector2(r * 0.7, r * 0.25), c + Vector2(r * 0.95, r * 1.0)]), col)
-			"friends":
-				draw_circle(c + Vector2(-r * 0.45, -r * 0.38), r * 0.4, col)
-				draw_colored_polygon(PackedVector2Array([c + Vector2(-r * 1.25, r * 0.9), c + Vector2(-r * 1.0, r * 0.2), c + Vector2(-r * 0.45, r * 0.05), c + Vector2(r * 0.1, r * 0.2), c + Vector2(r * 0.35, r * 0.9)]), col)
-				draw_circle(c + Vector2(r * 0.55, -r * 0.5), r * 0.32, col.darkened(0.25))
-				draw_colored_polygon(PackedVector2Array([c + Vector2(r * 0.25, r * 0.0), c + Vector2(r * 0.55, -r * 0.1), c + Vector2(r * 1.05, r * 0.05), c + Vector2(r * 1.25, r * 0.7), c + Vector2(r * 0.5, r * 0.7)]), col.darkened(0.25))
-			"shield":
-				draw_colored_polygon(PackedVector2Array([c + Vector2(0, -r * 1.05), c + Vector2(r * 0.9, -r * 0.65), c + Vector2(r * 0.75, r * 0.4), c + Vector2(0, r * 1.05), c + Vector2(-r * 0.75, r * 0.4), c + Vector2(-r * 0.9, -r * 0.65)]), Color("ff7a8a") if not _hover else Color("ffb0b8"))
-			"power":
-				draw_arc(c, r * 0.85, deg_to_rad(-55), deg_to_rad(235), 28, col, w, true)
-				draw_line(c + Vector2(0, -r * 1.05), c + Vector2(0, -r * 0.15), col, w)
-			"plus":
-				draw_arc(c, r * 0.95, 0, TAU, 32, col, 1.6, true)
-				draw_line(c + Vector2(-r * 0.45, 0), c + Vector2(r * 0.45, 0), col, w)
-				draw_line(c + Vector2(0, -r * 0.45), c + Vector2(0, r * 0.45), col, w)
+		# v4.18: Lucide (ISC) SVG icons instead of hand-drawn shapes
+		var ic: String = {"home": "house", "gear": "settings", "user": "user", "friends": "users", "shield": "shield",
+			"power": "power", "plus": "user-plus", "bell": "bell", "trophy": "trophy", "chat": "message-square"}.get(kind, kind)
+		var tex: Texture2D = UI.icon_tex(ic)
+		if tex:
+			var isz := r * 2.15
+			if kind == "shield":
+				col = Color("ff7a8a") if not _hover else Color("ffb0b8")
+			draw_texture_rect(tex, Rect2(c - Vector2(isz, isz) * 0.5 - Vector2(0, 2 if badge != "" else 0), Vector2(isz, isz)), false, col)
 		if badge != "":
 			var f: Font = UI.font("Rajdhani-Bold")
 			var tw := f.get_string_size(badge, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
@@ -1035,7 +1028,7 @@ func _topbar_apply(lvl: int) -> void:
 		var b = nav_btns[k]
 		if not is_instance_valid(b) or not (b is Button) or b.get_parent() != topbar:
 			continue
-		var big: bool = k == "lobby"
+		var big: bool = k == "play"
 		b.add_theme_font_size_override("font_size", big_fs if big else fs)
 		for st in ["normal", "hover", "pressed", "focus"]:
 			var sbx: StyleBox = b.get_theme_stylebox(st)
@@ -1060,7 +1053,9 @@ func _confirm_quit() -> void:
 	var cc := CenterContainer.new()
 	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.add_child(cc)
-	var p := UI.panel(Color(0.03, 0.035, 0.05, 0.98), Color(1, 0.35, 0.3, 0.7), 22, 10)
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UI.notch_sb(Color(0.085, 0.07, 0.075, 0.98), "panel_notches", 24))
+	SFX.ui("ui_open", -8)
 	cc.add_child(p)
 	var v := UI.vbox(14)
 	p.add_child(v)
@@ -1230,6 +1225,8 @@ func _reward_text(it: Dictionary) -> String:
 	return "ÖDÜL"
 
 func _rewards_dialog() -> void:
+	if "uishot" in " ".join(OS.get_cmdline_user_args()):
+		return
 	var v := _modal(1040, 600)
 	var head := UI.hbox(12)
 	v.add_child(head)
@@ -1324,7 +1321,9 @@ func _rewards_dialog() -> void:
 
 func reward_fx(head: String, title: String, sub: String, col: Color, items: Array, big_level: int = -1) -> void:
 	## reward reveal: dim + light rays, optional level badge, the items pop in one by one
-	SFX.play("success", -2)
+	if "uishot" in " ".join(OS.get_cmdline_user_args()):
+		return   # UI review screenshots: no auto popups over the page
+	SFX.ui("levelup_chime" if big_level > 0 else "reward", -4)
 	var layer := Control.new()
 	layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	layer.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -1558,24 +1557,40 @@ class LevelBadge extends Control:
 	var frac := 0.0
 	var pname := ""
 	var compact := false
+	var _sh: TextureRect
+	var _num: Label
+	func _sync_shield(t: Texture2D, h: float) -> void:
+		## v4.18 tier shield (Naro Rank Icons) + level number as child nodes, one shield step every 5 levels
+		if _sh == null:
+			_sh = TextureRect.new()
+			_sh.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			_sh.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			_sh.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			add_child(_sh)
+			_num = UI.lbl("", 20, Color.WHITE, "Display", HORIZONTAL_ALIGNMENT_CENTER)
+			_num.add_theme_constant_override("outline_size", 6)
+			_num.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+			_num.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			add_child(_num)
+		_sh.texture = t
+		_sh.visible = t != null
+		_sh.position = Vector2(-h * 0.04, -h * 0.04); _sh.size = Vector2(h * 1.08, h * 1.08)
+		_num.text = str(level)
+		_num.add_theme_font_size_override("font_size", int(h * (0.42 if level >= 100 else 0.5)))
+		_num.position = Vector2(0, 0); _num.size = Vector2(h, h * 0.98)
 	func _draw() -> void:
 		var h := size.y
 		var c := Vector2(h * 0.5, h * 0.5)
 		var r := h * 0.47
-		var pts := PackedVector2Array()
-		for i in 6:
-			pts.append(c + Vector2.from_angle(PI / 6 + i * TAU / 6) * r)
-		draw_colored_polygon(pts, Color(0.12, 0.08, 0.03))
-		pts.append(pts[0])
-		draw_polyline(pts, UI.ACCENT, 2.5)
-		var inner := PackedVector2Array()
-		for i in 7:
-			inner.append(c + Vector2.from_angle(PI / 6 + i * TAU / 6) * r * 0.78)
-		draw_polyline(inner, Color(1, 0.7, 0.3, 0.3), 1.0)
-		var f: Font = UI.font("Teko")
-		var t := str(level)
-		var tw := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, int(h * 0.62)).x
-		draw_string(f, Vector2(c.x - tw * 0.5, c.y + h * 0.22), t, HORIZONTAL_ALIGNMENT_LEFT, -1, int(h * 0.62), UI.ACCENT2)
+		var shield: Texture2D = GS.level_icon(level)
+		if shield == null:
+			var pts := PackedVector2Array()
+			for i in 6:
+				pts.append(c + Vector2.from_angle(PI / 6 + i * TAU / 6) * r)
+			draw_colored_polygon(pts, Color(0.12, 0.08, 0.03))
+			pts.append(pts[0])
+			draw_polyline(pts, UI.ACCENT, 2.5)
+		_sync_shield.call_deferred(shield, h)
 		var x0 := h + 8
 		if compact or size.x < x0 + 30:
 			return
@@ -1598,6 +1613,8 @@ class TopGlow extends Control:
 			draw_rect(Rect2(w * t0, 2, w / n + 1, 2), Color(UI.ACCENT.r, UI.ACCENT.g, UI.ACCENT.b, 0.12 * a))
 
 func show_page(p: String) -> void:
+	if p != page and page != "":
+		SFX.ui("ui_page", -10)
 	# while you are in a room, ODALAR takes you back into it (you only leave with the ÇIKIŞ button)
 	if p == "rooms":
 		if Net.active():
@@ -1656,6 +1673,7 @@ func show_page(p: String) -> void:
 		"play": _page_play()
 		"lobby": _page_lobby()
 		"bag": _page_bag()
+		"loadout": _page_loadout()
 		"market": _page_market()
 		"crate": _page_crate()
 		"pass": _page_pass()
@@ -1945,148 +1963,471 @@ func _char_picker() -> Control:
 		var b := UI.btn("SATIN AL   %s ALTIN" % UI.money(price), func():
 			var r: Dictionary = await _act("buy_char", {"id": c})
 			if r["ok"]:
-				SFX.play("buy")
+				SFX.play("shop_buy")
 				show_page("lobby"), 20, false, 0, 44)
 		b.disabled = int(GS.profile["gold"]) < price
 		v.add_child(b)
 	return p
 
 func _page_lobby() -> void:
-	## CS2-style lobby: the soldier on a sunlit street is the centrepiece; a compact player card under him,
-	## the loadout on the left, news + missions on the right and the PLAY block bottom-right — all frosted glass.
+	## v4.18 CS2-style lobby: nothing but the soldier in the street, a slim vertical player card at his feet,
+	## and a short stack of cards bottom-left (news, popular store items, missions, gifts). PLAY lives in the top bar.
 	var p := GS.profile
 	var ri: Dictionary = GS.rank_info(int(p.get("rp", 0)))
-	# ---- left: loadout
-	var left := UI.vbox(10)
-	left.position = Vector2(26, 14)
-	left.custom_minimum_size = Vector2(372, 0)
-	content.add_child(left)
-	left.add_child(_sets_panel(true))
-	left.add_child(_char_picker())
-	# ---- centre bottom: player card (click -> profile)
-	var card := UI.glass(12, 4)
-	card.anchor_left = 0.5; card.anchor_right = 0.5; card.anchor_top = 1; card.anchor_bottom = 1
-	card.offset_left = -170; card.offset_right = 170; card.offset_top = -132; card.offset_bottom = -26
-	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	card.tooltip_text = "Profilini aç"
-	card.gui_input.connect(func(ev): if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT: show_page("profile"))
-	content.add_child(card)
-	var ch := UI.hbox(12)
-	ch.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(ch)
-	var em := TextureRect.new()
-	em.texture = ri["icon"]; em.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; em.custom_minimum_size = Vector2(72, 72)
-	em.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	em.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	em.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ch.add_child(em)
-	var cv := UI.vbox(1)
-	cv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ch.add_child(cv)
-	var nm := UI.lbl(str(p["name"]), 24, Color.WHITE, "RussoOne-Regular")
-	nm.clip_text = true
-	cv.add_child(nm)
-	cv.add_child(UI.lbl("%s  ·  SEVİYE %d  ·  %d RP" % [str(ri["name"]).to_upper(), int(p["level"]), int(ri["rp"])], 14, ri["color"], "Rajdhani-Bold"))
-	var xb := UI.bar(float(p["xp"]), float(GS.xp_for_level(int(p["level"]))), Color("7fd1ff"), 4)
-	xb.add_theme_stylebox_override("background", UI.sb(Color(1, 1, 1, 0.1), Color(0, 0, 0, 0), 0, 2, 0))
-	cv.add_child(xb)
-	var st: Dictionary = p["stats"]
-	cv.add_child(UI.lbl("%d MAÇ   ·   %d GALİBİYET   ·   %.2f K/D" % [int(st["matches"]), int(st["wins"]), float(st["kills"]) / max(1.0, float(st["deaths"]))], 13, UI.DIM, "Rajdhani-Bold"))
-	for c in cv.get_children():
-		(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# ---- right: news + missions
-	var right := UI.vbox(10)
-	right.anchor_left = 1; right.anchor_right = 1
-	right.offset_left = -396; right.offset_right = -22; right.offset_top = 14
-	content.add_child(right)
-	var news := PanelContainer.new()
-	var nsb := UI.sb(Color(0, 0, 0, 0.5), Color(1, 1, 1, 0.1), 1, 4, 0)
-	news.add_theme_stylebox_override("panel", nsb)
-	news.custom_minimum_size = Vector2(374, 196)
-	news.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
-	right.add_child(news)
-	var nimg := TextureRect.new()
-	var nimg_p := "res://assets/ui/pass_banner.jpg"
-	nimg.texture = load(nimg_p) if ResourceLoader.exists(nimg_p) else load("res://assets/ui/map_liman.jpg")
-	nimg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	nimg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	news.add_child(nimg)
-	var shade := TextureRect.new()
-	var sgt := GradientTexture2D.new()
-	var sg := Gradient.new()
-	sg.set_color(0, Color(0, 0, 0, 0.0)); sg.set_color(1, Color(0, 0, 0, 0.88))
-	sgt.gradient = sg; sgt.fill_from = Vector2(0, 0.2); sgt.fill_to = Vector2(0, 1)
-	shade.texture = sgt; shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	news.add_child(shade)
-	var nm2 := MarginContainer.new()
-	for side in ["left", "right", "bottom"]:
-		nm2.add_theme_constant_override("margin_" + side, 14)
-	news.add_child(nm2)
-	var nv := UI.vbox(0)
-	nv.alignment = BoxContainer.ALIGNMENT_END
-	nm2.add_child(nv)
-	nv.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, UI.ACCENT2, "Rajdhani-Bold"))
-	nv.add_child(UI.lbl("SİLAH DÜZELTMELERİ + PERFORMANS TESTİ", 26, Color.WHITE, "RussoOne-Regular"))
-	nv.add_child(_wrap("Bıçaklarda eller geri geldi, AK-47 eski görünümünde, Desert Eagle düz tutuluyor, UZI ve 870'te kollar karakterinle aynı. Ayarlar > Grafik > PERFORMANS TESTİ ile FPS ölç", 15))
-	right.add_child(_rewards_strip())
-	var mp := UI.glass(12, 4)
-	right.add_child(mp)
-	var mv := UI.vbox(7)
-	mp.add_child(mv)
-	var mh := UI.hbox(8)
-	mv.add_child(mh)
-	mh.add_child(UI.lbl("GÜNLÜK GÖREVLER", 17, Color.WHITE, "Rajdhani-Bold"))
-	mh.add_child(UI.spacer())
+	_lobby_player_card(p, ri)
+	var stack := UI.vbox(8)
+	stack.anchor_top = 1; stack.anchor_bottom = 1
+	stack.offset_left = 16; stack.offset_right = 16 + 340; stack.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	stack.offset_bottom = -16; stack.offset_top = -16
+	content.add_child(stack)
+	stack.add_child(_lobby_news_card())
+	stack.add_child(_lobby_store_card())
+	stack.add_child(_lobby_missions_card(p))
+	stack.add_child(_rewards_strip())
+	_lobby_popups.call_deferred()
+
+func _card_shell(h: int) -> PanelContainer:
+	var c := PanelContainer.new()
+	var sbx := UI.sb(Color(0.035, 0.04, 0.048, 1.0), Color(1, 1, 1, 0.08), 1, 2, 0)   # opaque: clip_children masks by this alpha
+	c.add_theme_stylebox_override("panel", sbx)
+	c.custom_minimum_size = Vector2(340, h)
+	c.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	c.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	return c
+
+func _lobby_news_card() -> Control:
+	var c := _card_shell(168)
+	var img := TextureRect.new()
+	var ip := "res://assets/ui/pass_banner.jpg"
+	img.texture = load(ip) if ResourceLoader.exists(ip) else load("res://assets/ui/map_liman.jpg")
+	img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	img.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.add_child(img)
+	c.add_child(_grad_fill(Color(0, 0, 0, 0.05), Color(0, 0, 0, 0.85)))
+	var m := MarginContainer.new()
+	for sd in ["left", "right", "top", "bottom"]: m.add_theme_constant_override("margin_" + sd, 12)
+	m.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.add_child(m)
+	var v := UI.vbox(2)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	m.add_child(v)
+	v.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, Color.WHITE, "Nav"))
+	v.add_child(UI.spacer())
+	var t := UI.lbl("CS2 TARZI YENİ ARAYÜZ", 24, Color.WHITE, "Display")
+	v.add_child(t)
+	var tag := UI.lbl("  SEZON PASOSU  ", 14, Color.WHITE, "Nav")
+	tag.add_theme_stylebox_override("normal", UI.sb(Color("2f9e57"), Color(0, 0, 0, 0), 0, 2, 2))
+	tag.size_flags_horizontal = Control.SIZE_SHRINK_END
+	v.add_child(tag)
+	for x in v.get_children(): (x as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.gui_input.connect(func(ev): if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT: show_page("pass"))
+	return c
+
+func _grad_fill(c1: Color, c2: Color) -> TextureRect:
+	var tr := TextureRect.new()
+	var gt := GradientTexture2D.new()
+	var g := Gradient.new(); g.set_color(0, c1); g.set_color(1, c2)
+	gt.gradient = g; gt.fill_from = Vector2(0, 0); gt.fill_to = Vector2(0, 1)
+	tr.texture = gt; tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; tr.stretch_mode = TextureRect.STRETCH_SCALE
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return tr
+
+var _pop_i := 0
+func _lobby_store_card() -> Control:
+	## "YENİ & POPÜLER": real store weapons the player does not own yet, most expensive first, with real prices
+	var ids: Array = []
+	for id in GS.WEAPONS.keys():
+		var w: Dictionary = GS.WEAPONS[id]
+		if not w.get("hidden", false) and not GS.owned(id) and int(w.get("price", 0)) > 0:
+			ids.append(id)
+	ids.sort_custom(func(x, y): return int(GS.WEAPONS[x]["price"]) > int(GS.WEAPONS[y]["price"]))
+	ids = ids.slice(0, 5)
+	var c := _card_shell(150)
+	var v := UI.vbox(4)
+	var m := MarginContainer.new()
+	for sd in ["left", "right", "top", "bottom"]: m.add_theme_constant_override("margin_" + sd, 10)
+	c.add_child(m)
+	m.add_child(v)
+	var hh := UI.hbox(8)
+	hh.add_child(UI.lbl("YENİ & POPÜLER", 15, Color.WHITE, "Nav"))
+	var sm := LinkButton.new(); sm.text = "Tümünü gör"; sm.underline = LinkButton.UNDERLINE_MODE_ON_HOVER
+	sm.add_theme_font_size_override("font_size", 13); sm.add_theme_color_override("font_color", UI.DIM)
+	sm.pressed.connect(func(): market_tab = "silah"; show_page("market"))
+	hh.add_child(sm)
+	v.add_child(hh)
+	if ids.is_empty():
+		v.add_child(UI.lbl("Tüm silahlara sahipsin — kaplamalara göz at.", 14, UI.DIM, "Inter"))
+		return c
+	_pop_i = _pop_i % ids.size()
+	var row := UI.hbox(10)
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(row)
+	var id: String = ids[_pop_i]
+	var th := thumb_rect(id, "std", Vector2(150, 76))
+	row.add_child(th)
+	var iv := UI.vbox(0)
+	iv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(iv)
+	iv.add_child(UI.lbl(str(GS.WEAPONS[id]["name"]), 18, Color.WHITE, "Nav"))
+	iv.add_child(UI.lbl("◉ " + UI.money(int(GS.WEAPONS[id]["price"])), 15, UI.GOLD, "Stat"))
+	var nav := UI.hbox(4)
+	nav.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(nav)
+	nav.add_child(UI.btn("◀", func(): _pop_i = (_pop_i + ids.size() - 1) % ids.size(); show_page("lobby"), 12, false, 26, 22))
+	for i in ids.size():
+		var d := ColorRect.new()
+		d.color = Color(1, 1, 1, 0.85 if i == _pop_i else 0.2); d.custom_minimum_size = Vector2(14, 8)
+		d.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		nav.add_child(d)
+	nav.add_child(UI.btn("▶", func(): _pop_i = (_pop_i + 1) % ids.size(); show_page("lobby"), 12, false, 26, 22))
+	row.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	row.gui_input.connect(func(ev): if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT: market_tab = "silah"; show_page("market"))
+	return c
+
+func _lobby_missions_card(p: Dictionary) -> Control:
+	var c := _card_shell(0)
+	var m := MarginContainer.new()
+	for sd in ["left", "right", "top", "bottom"]: m.add_theme_constant_override("margin_" + sd, 10)
+	c.add_child(m)
+	var v := UI.vbox(5)
+	m.add_child(v)
 	var ndone := 0
-	for ms in GS.MISSIONS:
-		if p["missions"]["claimed"].has(ms["id"]): ndone += 1
-	mh.add_child(UI.lbl("%d / %d" % [ndone, GS.MISSIONS.size()], 15, UI.DIM, "Rajdhani-Bold"))
+	var claimable := 0
 	for ms in GS.MISSIONS:
 		var have := int(p["missions"].get(ms["key"], 0))
+		if p["missions"]["claimed"].has(ms["id"]): ndone += 1
+		elif have >= int(ms["goal"]): claimable += 1
+	var hh := UI.hbox(8)
+	hh.add_child(UI.icon("target", 16, UI.ACCENT2))
+	var t := UI.lbl("GÜNLÜK GÖREVLER", 15, Color.WHITE, "Nav")
+	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hh.add_child(t)
+	hh.add_child(UI.lbl("%d / %d" % [ndone, GS.MISSIONS.size()], 14, UI.DIM, "Stat"))
+	v.add_child(hh)
+	for ms in GS.MISSIONS:
+		if p["missions"]["claimed"].has(ms["id"]):
+			continue
+		var have := int(p["missions"].get(ms["key"], 0))
 		var done := have >= int(ms["goal"])
-		var claimed: bool = p["missions"]["claimed"].has(ms["id"])
-		var rh := UI.hbox(8)
-		var ml := UI.lbl(("✓ " if claimed else "") + str(ms["text"]), 15, UI.DIM if claimed else Color(1, 1, 1, 0.92), "Rajdhani-SemiBold")
-		ml.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		ml.clip_text = true
+		var rh := UI.hbox(6)
+		var ml := UI.lbl(str(ms["text"]), 14, Color(1, 1, 1, 0.9), "Inter")
+		ml.size_flags_horizontal = Control.SIZE_EXPAND_FILL; ml.clip_text = true
 		rh.add_child(ml)
-		if done and not claimed:
-			rh.add_child(UI.btn("ÖDÜLÜ AL", func(): _claim(ms), 13, true, 0, 26))
-		elif not claimed:
-			rh.add_child(UI.lbl("%d/%d" % [min(have, int(ms["goal"])), int(ms["goal"])], 14, UI.ACCENT2, "Rajdhani-Bold"))
-		mv.add_child(rh)
-		if not claimed:
-			var pb0 := UI.bar(min(have, int(ms["goal"])), int(ms["goal"]), UI.GREEN if done else UI.ACCENT, 3)
-			pb0.add_theme_stylebox_override("background", UI.sb(Color(1, 1, 1, 0.08), Color(0, 0, 0, 0), 0, 2, 0))
-			mv.add_child(pb0)
-	# ---- PLAY block (bottom right)
-	var pb := UI.vbox(8)
-	pb.anchor_left = 1; pb.anchor_right = 1; pb.anchor_top = 1; pb.anchor_bottom = 1
-	pb.offset_left = -396; pb.offset_right = -22; pb.offset_top = -176; pb.offset_bottom = -26
-	content.add_child(pb)
-	_lobby_popups.call_deferred()
-	var mode_txt := "ÇEVRİMİÇİ" if GS.play_mode == "online" else "BOT MAÇI"
-	var info := UI.lbl(mode_txt + "  ·  " + str(GS.MAPS.size()) + " HARİTA  ·  " + str(GS.MODES.size()) + " MOD", 14, Color(1, 1, 1, 0.8), "Rajdhani-Bold")
-	info.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
-	info.add_theme_constant_override("shadow_outline_size", 4)
-	pb.add_child(info)
-	var quick := UI.btn("OYNA", func(): show_page("play"), 44, true, 374, 82)
-	quick.add_theme_font_override("font", UI.font("RussoOne-Regular"))
-	pb.add_child(quick)
-	var pulse := quick.create_tween().set_loops()
-	pulse.tween_property(quick, "modulate", Color(1.1, 1.1, 1.1), 1.0).set_trans(Tween.TRANS_SINE)
-	pulse.tween_property(quick, "modulate", Color(1, 1, 1), 1.0).set_trans(Tween.TRANS_SINE)
-	var h2 := UI.hbox(8)
-	pb.add_child(h2)
-	var b1 := UI.btn("ODA LİSTESİ", func(): show_page("rooms"), 17, false, 0, 42)
-	b1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var b2 := UI.btn("ODA KUR", _create_room_dialog, 17, false, 0, 42)
-	b2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	h2.add_child(b1); h2.add_child(b2)
+		if done:
+			rh.add_child(UI.btn("AL", func(): _claim(ms), 12, true, 44, 22))
+		else:
+			rh.add_child(UI.lbl("%d/%d" % [mini(have, int(ms["goal"])), int(ms["goal"])], 13, UI.ACCENT2, "Stat"))
+		v.add_child(rh)
+	if ndone == GS.MISSIONS.size():
+		v.add_child(UI.lbl("Bugünün görevleri tamam. Yarın yenileri gelir.", 13, UI.GREEN, "Inter"))
+	c.mouse_default_cursor_shape = Control.CURSOR_ARROW
+	return c
+
+## ---- CS2-style slim vertical player card under the soldier (click -> profile popup card)
+func _lobby_player_card(p: Dictionary, ri: Dictionary) -> void:
+	var col := UI.vbox(4)
+	col.anchor_left = 0.5; col.anchor_right = 0.5; col.anchor_top = 1; col.anchor_bottom = 1
+	col.offset_left = 150; col.offset_right = 150 + 84; col.offset_top = -330; col.offset_bottom = -60
+	col.mouse_filter = Control.MOUSE_FILTER_PASS
+	content.add_child(col)
+	var nm := UI.lbl(str(p["name"]), 15, Color.WHITE, "Nav", HORIZONTAL_ALIGNMENT_CENTER)
+	nm.add_theme_constant_override("outline_size", 4); nm.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	nm.clip_text = true
+	col.add_child(nm)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UI.sb(Color(0.03, 0.035, 0.045, 0.82), Color(1, 1, 1, 0.12), 1, 2, 4))
+	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	card.tooltip_text = "Oyuncu kartı"
+	col.add_child(card)
+	var v := UI.vbox(6)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(v)
+	v.add_child(_agent_avatar(72))
+	var em := TextureRect.new()
+	em.texture = ri["icon"]; em.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	em.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED; em.custom_minimum_size = Vector2(72, 52)
+	em.tooltip_text = str(ri["name"])
+	v.add_child(em)
+	var lv := TextureRect.new()
+	lv.texture = GS.level_icon(int(p["level"])); lv.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	lv.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED; lv.custom_minimum_size = Vector2(72, 40)
+	v.add_child(lv)
+	var xb := UI.bar(float(p["xp"]), float(GS.xp_for_level(int(p["level"]))), Color("4fa3ff"), 4)
+	xb.add_theme_stylebox_override("background", UI.sb(Color(1, 1, 1, 0.12), Color(0, 0, 0, 0), 0, 1, 0))
+	v.add_child(xb)
+	v.add_child(_rp_chip(int(ri["rp"]), ri["color"]))
+	for x in v.get_children(): (x as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.gui_input.connect(func(ev):
+		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+			_player_popup(card.get_global_rect()))
+
+func _agent_avatar(sz: int) -> Control:
+	var art_p := "res://assets/ui/agents/%s.jpg" % GS.cur_char()
+	if ResourceLoader.exists(art_p):
+		var at := AtlasTexture.new()
+		at.atlas = load(art_p)
+		var aw: float = at.atlas.get_width()
+		at.region = Rect2(aw * 0.25, aw * 0.04, aw * 0.5, aw * 0.5)
+		var ar := TextureRect.new()
+		ar.texture = at; ar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; ar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		ar.custom_minimum_size = Vector2(sz, sz)
+		ar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		return ar
+	var l := UI.lbl(str(GS.profile["name"]).substr(0, 1).to_upper(), int(sz * 0.6), Color.WHITE, "Display", HORIZONTAL_ALIGNMENT_CENTER)
+	l.custom_minimum_size = Vector2(sz, sz)
+	return l
+
+func _rp_chip(rp: int, c: Color) -> Control:
+	## slanted rating plate (CS2 "Premier" style) with the real RP value
+	var pc := PanelContainer.new()
+	var sbx := UI.sb(c.darkened(0.55), c, 1, 0, 4, -0.25)
+	sbx.border_width_left = 4
+	pc.add_theme_stylebox_override("panel", sbx)
+	var l := UI.lbl(UI.money(rp), 18, Color.WHITE, "Display", HORIZONTAL_ALIGNMENT_CENTER)
+	l.add_theme_constant_override("outline_size", 3); l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	pc.add_child(l)
+	pc.tooltip_text = "Dereceli puan (RP)"
+	return pc
+
+## ---- real achievements derived from the saved profile (nothing invented): lit when reached
+func _achievements(p: Dictionary) -> Array:
+	var st: Dictionary = p["stats"]
+	return [
+		["İlk Kan", "game/skull", int(st["kills"]) >= 1, "1 düşman indir"],
+		["Avcı", "game/skull", int(st["kills"]) >= 100, "100 düşman indir (%d)" % int(st["kills"])],
+		["Keskin Nişancı", "game/headshot", int(st["headshots"]) >= 50, "50 kafadan vuruş (%d)" % int(st["headshots"])],
+		["Galip", "game/medal", int(st["wins"]) >= 10, "10 maç kazan (%d)" % int(st["wins"])],
+		["Kıdemli", "game/laurel", int(p["level"]) >= 10, "Seviye 10'a ulaş (%d)" % int(p["level"])],
+		["Koleksiyoncu", "game/chest", (p["owned"] as Dictionary).size() >= 20, "20 silah topla (%d)" % (p["owned"] as Dictionary).size()],
+		["Usta", "game/star_medal", int(st["matches"]) >= 100, "100 maç oyna (%d)" % int(st["matches"])]]
+
+func _player_popup(anchor: Rect2) -> void:
+	## CS2-style player card popup: avatar, achievement medals, rank + level bar, rating, stats, actions
+	var p := GS.profile
+	var ri: Dictionary = GS.rank_info(int(p.get("rp", 0)))
+	var dim := Control.new()
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ui.add_child(dim)
+	var pc := PanelContainer.new()
+	pc.add_theme_stylebox_override("panel", UI.sb(Color(0.13, 0.135, 0.15, 0.98), Color(1, 1, 1, 0.08), 1, 2, 0))
+	pc.custom_minimum_size = Vector2(560, 0)
+	dim.add_child(pc)
+	dim.gui_input.connect(func(ev): if ev is InputEventMouseButton and ev.pressed: dim.queue_free())
+	SFX.ui("ui_open", -8)
+	var v := UI.vbox(0)
+	pc.add_child(v)
+	var top := MarginContainer.new()
+	for sd in ["left", "right", "top", "bottom"]: top.add_theme_constant_override("margin_" + sd, 18)
+	v.add_child(top)
+	var tv := UI.vbox(14)
+	top.add_child(tv)
+	var r1 := UI.hbox(16)
+	tv.add_child(r1)
+	r1.add_child(_agent_avatar(96))
+	var nv := UI.vbox(8)
+	nv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	r1.add_child(nv)
+	nv.add_child(UI.lbl(str(p["name"]), 26, Color.WHITE, "Nav"))
+	var med := UI.hbox(6)
+	nv.add_child(med)
+	for a in _achievements(p):
+		var ic := UI.icon(a[1], 34, UI.GOLD if a[2] else Color(1, 1, 1, 0.18))
+		ic.mouse_filter = Control.MOUSE_FILTER_STOP
+		ic.tooltip_text = "%s — %s%s" % [a[0], a[3], "  ✓" if a[2] else ""]
+		med.add_child(ic)
+	# rank + level
+	var r2 := UI.hbox(16)
+	tv.add_child(r2)
+	var em := TextureRect.new()
+	em.texture = ri["icon"]; em.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; em.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	em.custom_minimum_size = Vector2(96, 64)
+	r2.add_child(em)
+	var lv := UI.vbox(6)
+	lv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	r2.add_child(lv)
+	lv.add_child(UI.lbl("%s  —  Seviye %d" % [str(ri["name"]), int(p["level"])], 18, Color.WHITE, "InterSemi"))
+	var xb := UI.bar(float(p["xp"]), float(GS.xp_for_level(int(p["level"]))), Color("4fa3ff"), 6)
+	xb.add_theme_stylebox_override("background", UI.sb(Color(0, 0, 0, 0.5), Color(0, 0, 0, 0), 0, 1, 0))
+	lv.add_child(xb)
+	var r3 := UI.hbox(16)
+	tv.add_child(r3)
+	var chip := _rp_chip(int(ri["rp"]), ri["color"])
+	chip.custom_minimum_size = Vector2(96, 0)
+	r3.add_child(chip)
+	r3.add_child(UI.lbl("Dereceli puan  ·  en yüksek %s" % GS.rank_info(int(p.get("rp_peak", 0)))["name"], 16, UI.TEXT, "Inter"))
+	var st: Dictionary = p["stats"]
+	var r4 := UI.hbox(26)
+	r4.alignment = BoxContainer.ALIGNMENT_CENTER
+	tv.add_child(r4)
+	for it in [["gamepad-2", str(st["matches"]), "Maç"], ["trophy", str(st["wins"]), "Galibiyet"], ["game/skull", str(st["kills"]), "Öldürme"], ["game/headshot", str(st["headshots"]), "Kafadan"]]:
+		var h := UI.hbox(6)
+		h.tooltip_text = it[2]
+		h.add_child(UI.icon(it[0], 20, Color(1, 1, 1, 0.7)))
+		h.add_child(UI.lbl(it[1], 18, Color.WHITE, "Stat"))
+		r4.add_child(h)
+	# footer actions
+	var foot := PanelContainer.new()
+	foot.add_theme_stylebox_override("panel", UI.sb(Color(0.08, 0.085, 0.095, 1), Color(0, 0, 0, 0), 0, 0, 8))
+	v.add_child(foot)
+	var fh := UI.hbox(30)
+	fh.alignment = BoxContainer.ALIGNMENT_CENTER
+	foot.add_child(fh)
+	for b in [["user", "Profil", func(): dim.queue_free(); show_page("profile")], ["backpack", "Donanım", func(): dim.queue_free(); show_page("bag")]]:
+		var bb := Button.new()
+		bb.icon = UI.icon_tex(b[0]); bb.text = b[1]
+		bb.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER; bb.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+		bb.add_theme_constant_override("icon_max_width", 24)
+		bb.flat = true; bb.focus_mode = Control.FOCUS_NONE
+		bb.add_theme_font_size_override("font_size", 14)
+		bb.custom_minimum_size = Vector2(110, 56)
+		bb.pressed.connect(b[2])
+		fh.add_child(bb)
+	# place next to the card, kept on screen
+	await get_tree().process_frame
+	if not is_instance_valid(pc):
+		return
+	var pos := Vector2(anchor.end.x + 12, anchor.position.y)
+	pos.x = minf(pos.x, ui.size.x - pc.size.x - 90)
+	pos.y = clampf(pos.y, 80, ui.size.y - pc.size.y - 16)
+	pc.position = pos
+	pc.modulate.a = 0.0
+	pc.create_tween().tween_property(pc, "modulate:a", 1.0, 0.12)
+
+## ================================================================ LOADOUT (CS2 "Loadout" overlay)
+func _page_loadout() -> void:
+	## framed sheet over the street: set tabs on a vertical accent strip, utility slots on the left, the soldier in the
+	## middle, owned pistols and primaries in columns on the right. Clicking a weapon equips it in the active set.
+	soldier.visible = true
+	cam_target = LOBBY_CAM
+	var set := GS.active_set()
+	var vw: float = ui.size.x if ui.size.x > 0 else 1920.0
+	var vh: float = ui.size.y if ui.size.y > 0 else 1080.0
+	var frame := Control.new()
+	frame.set_anchors_preset(Control.PRESET_FULL_RECT)
+	frame.offset_left = 60; frame.offset_right = -110; frame.offset_top = 40; frame.offset_bottom = -60
+	content.add_child(frame)
+	var bgp := Panel.new()
+	bgp.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var bsb := UI.sb(Color(0.085, 0.115, 0.125, 0.88), Color(0, 0, 0, 0), 0, 0, 0)
+	bsb.border_width_left = 10; bsb.border_width_right = 10; bsb.border_color = Color("8fc4f5")
+	bgp.add_theme_stylebox_override("panel", bsb)
+	bgp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.add_child(bgp)
+	var row := UI.hbox(0)
+	row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 10; row.offset_right = -10
+	frame.add_child(row)
+	# vertical set tabs
+	var tabs := UI.vbox(4)
+	tabs.custom_minimum_size = Vector2(46, 0)
+	tabs.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_child(tabs)
+	for i in GS.Econ.SET_COUNT:
+		var on: bool = int(GS.profile["active_set"]) == i
+		var tb := _pill(str(i + 1), on, func(): GS.profile["active_set"] = i; GS.save_profile(); show_page("loadout"))
+		tb.tooltip_text = "Set %d" % (i + 1)
+		tb.custom_minimum_size = Vector2(40, 40)
+		tabs.add_child(tb)
+	# left utility column: knife, grenade, agent, gear
+	var lc := UI.vbox(14)
+	lc.custom_minimum_size = Vector2(160, 0)
+	lc.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_child(lc)
+	for c in ["bicak", "bomba"]:
+		var id := str(set.get(c, ""))
+		if GS.WEAPONS.has(id):
+			lc.add_child(_lo_tile(id, true, c, Vector2(170, 86)))
+	var ag := VBoxContainer.new()
+	ag.add_child(_agent_avatar(84))
+	ag.add_child(UI.lbl(str(GS.CHARACTERS.get(GS.cur_char(), {}).get("name", "Ajan")), 14, UI.TEXT, "Nav", HORIZONTAL_ALIGNMENT_CENTER))
+	ag.tooltip_text = "Ajan değiştir (Çanta)"
+	lc.add_child(ag)
+	# centre: soldier shows through
+	var mid := Control.new()
+	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(mid)
+	# right columns: pistols | primaries (split in two)
+	var pist: Array = []
+	var prim: Array = []
+	for id in GS.WEAPONS.keys():
+		if GS.WEAPONS[id].get("hidden", false) or not GS.owned(id):
+			continue
+		match str(GS.WEAPONS[id]["cat"]):
+			"tabanca": pist.append(id)
+			"ana": prim.append(id)
+	var rows_fit := clampi(int((vh - 140.0) / 100.0), 4, 8)
+	var cols: Array = [pist.slice(0, rows_fit)]
+	var pi := 0
+	while pi < prim.size() and cols.size() < 4:
+		cols.append(prim.slice(pi, pi + rows_fit)); pi += rows_fit
+	for ci in cols.size():
+		if ci > 0:
+			var sep := ColorRect.new(); sep.color = Color(1, 1, 1, 0.12); sep.custom_minimum_size = Vector2(1, 0)
+			row.add_child(sep)
+		var colv := UI.vbox(10)
+		colv.alignment = BoxContainer.ALIGNMENT_CENTER
+		colv.custom_minimum_size = Vector2(186, 0)
+		row.add_child(colv)
+		var hdr := UI.lbl("TABANCALAR" if ci == 0 else ("ANA SİLAHLAR" if ci == 1 else ""), 12, Color(1, 1, 1, 0.5), "Nav", HORIZONTAL_ALIGNMENT_CENTER)
+		colv.add_child(hdr)
+		for id in cols[ci]:
+			colv.add_child(_lo_tile(id, str(set.get(GS.WEAPONS[id]["cat"], "")) == id, str(GS.WEAPONS[id]["cat"]), Vector2(176, 82)))
+	# close (X)
+	var x := UI.btn("✕", func(): show_page("lobby"), 22, false, 46, 46)
+	x.anchor_left = 1; x.anchor_right = 1; x.offset_left = -50; x.offset_right = -4; x.offset_top = 4; x.offset_bottom = 50
+	frame.add_child(x)
+	# bottom strip (CS2 HUD-like): set + equipped primary
+	var info := UI.lbl("SET %d  ·  %s" % [int(GS.profile["active_set"]) + 1, str(GS.WEAPONS.get(str(set.get("ana", "")), {}).get("name", "—"))], 16, Color.WHITE, "Nav")
+	info.anchor_top = 1; info.anchor_bottom = 1; info.offset_top = 6; info.offset_bottom = 40; info.offset_left = 20
+	frame.add_child(info)
+
+func _lo_tile(id: String, equipped: bool, cat: String, sz: Vector2) -> Control:
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = sz
+	b.flat = true
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	b.set_meta("sfx", true)
+	b.tooltip_text = "%s  ·  %s%s" % [GS.WEAPONS[id]["name"], GS.SKINS[GS.wskin(id)]["name"], "  (kuşanılı)" if equipped else "  — tıkla: kuşan"]
+	var th := thumb_rect(id, GS.wskin(id), sz - Vector2(4, 8))
+	th.position = Vector2(2, 0)
+	th.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	th.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(th)
+	var dot := ColorRect.new()
+	dot.color = GS.RARITY_COLORS[int(GS.SKINS[GS.wskin(id)]["rarity"])]
+	dot.size = Vector2(6, 6); dot.position = Vector2(8, sz.y - 10)
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(dot)
+	if equipped:
+		var br := Brackets.new()
+		br.set_anchors_preset(Control.PRESET_FULL_RECT)
+		br.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(br)
+	b.mouse_entered.connect(func(): SFX.ui("ui_hover", -16))
+	b.pressed.connect(func():
+		if not equipped:
+			GS.active_set()[cat] = id
+			GS.save_profile()
+			SFX.ui("inv_equip", -4)
+			set_showcase(id)
+		show_page("loadout"))
+	return b
+
+class Brackets extends Control:
+	## CS2 "selected" corner brackets
+	func _draw() -> void:
+		var c := Color(1, 1, 1, 0.85)
+		var l := 12.0
+		for p in [[Vector2(0, 0), Vector2(1, 1)], [Vector2(size.x, 0), Vector2(-1, 1)], [Vector2(0, size.y), Vector2(1, -1)], [Vector2(size.x, size.y), Vector2(-1, -1)]]:
+			var o: Vector2 = p[0]; var d: Vector2 = p[1]
+			draw_line(o, o + Vector2(l * d.x, 0), c, 2.0)
+			draw_line(o, o + Vector2(0, l * d.y), c, 2.0)
 
 func _wrap(t: String, s: int) -> Label:
-	var l := UI.lbl(t, s, UI.TEXT, "Rajdhani-Medium")
+	var l := UI.lbl(t, s - 1, UI.TEXT, "Inter")
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(380, 0)
 	return l
@@ -2098,7 +2439,7 @@ func _rank(l: int) -> String:
 func _claim(ms: Dictionary) -> void:
 	var r: Dictionary = await _act("claim_mission", {"id": ms["id"]})
 	if r["ok"]:
-		SFX.play("buy")
+		SFX.play("shop_buy")
 	show_page("lobby")
 
 # ================================================================ PLAY (CS2-style matchmaking panel)
@@ -2109,129 +2450,135 @@ var play_bots := 9
 var play_time := 8
 
 func _page_play() -> void:
-	## CS2: one screen, mode tabs on top, a grid of maps to tick, one big GO button. No room, no chat.
+	## v4.18 CS2 play screen: centred pill tabs (bot / online, then modes), a grid of tall map cards with an
+	## emblem and a tick box, and one bottom bar with the match options and the GO button — all on one screen.
 	soldier.visible = false
 	var online_mode: bool = GS.play_mode == "online"
 	var dim := ColorRect.new()
-	dim.color = Color(0.015, 0.018, 0.024, 0.82)
+	dim.color = Color(0.11, 0.115, 0.12, 0.9)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(dim)
 	var root := MarginContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	for side in ["left", "right"]:
-		root.add_theme_constant_override("margin_" + side, 90)
-	root.add_theme_constant_override("margin_top", 26)
-	root.add_theme_constant_override("margin_bottom", 34)
+	root.add_theme_constant_override("margin_left", 40); root.add_theme_constant_override("margin_right", 96)
+	root.add_theme_constant_override("margin_top", 8); root.add_theme_constant_override("margin_bottom", 14)
 	content.add_child(root)
-	var v := UI.vbox(18)
+	var v := UI.vbox(10)
 	root.add_child(v)
-	# header
-	var hh := UI.hbox(16)
-	v.add_child(hh)
-	hh.add_child(UI.lbl("OYNA", 52, Color.WHITE, "Teko"))
-	var sub := UI.lbl("ÇEVRİMİÇİ MAÇ" if online_mode else "BOTLARLA MAÇ", 20, UI.ACCENT2, "Rajdhani-Bold")
-	sub.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	hh.add_child(sub)
-	hh.add_child(UI.spacer())
-	var sw := UI.btn("MODU DEĞİŞTİR ⇄", func(): show_page("mode"), 16, false, 0, 40)
-	sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	hh.add_child(sw)
-	# mode tabs (CS2 top tabs)
-	var tabs := UI.hbox(0)
-	v.add_child(tabs)
-	for md in GS.MODES.keys():
-		var on: bool = md == play_sel_mode
-		var b := Button.new()
-		b.text = str(GS.MODES[md]["name"]).to_upper()
-		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(0, 50)
-		b.add_theme_font_override("font", UI.font("Rajdhani-Bold"))
-		b.add_theme_font_size_override("font_size", 20)
-		var nsb := UI.sb(Color(1, 1, 1, 0.08) if on else Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0, 0, 0)
-		nsb.content_margin_left = 26; nsb.content_margin_right = 26
-		nsb.border_width_bottom = 3; nsb.border_color = UI.ACCENT if on else Color(1, 1, 1, 0.08)
-		b.add_theme_stylebox_override("normal", nsb)
-		var hsb := nsb.duplicate()
-		hsb.bg_color = Color(1, 1, 1, 0.12)
-		b.add_theme_stylebox_override("hover", hsb)
-		b.add_theme_stylebox_override("pressed", hsb)
-		b.add_theme_color_override("font_color", Color.WHITE if on else Color(1, 1, 1, 0.6))
-		b.add_theme_color_override("font_hover_color", Color.WHITE)
-		b.pressed.connect(func(): SFX.play("ui_click", -8); play_sel_mode = md; show_page("play"))
-		tabs.add_child(b)
-	v.add_child(UI.lbl(str(GS.MODES[play_sel_mode]["desc"]), 18, UI.DIM, "Rajdhani-SemiBold"))
-	# body: map grid + summary
-	var body := UI.hbox(26)
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(body)
-	var gv := UI.vbox(10)
-	gv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.add_child(gv)
-	var gh := UI.hbox(10)
-	gv.add_child(gh)
-	gh.add_child(UI.lbl("HARİTALAR", 18, Color.WHITE, "Rajdhani-Bold"))
-	gh.add_child(UI.lbl("(boş bırakırsan rastgele)" if play_maps.is_empty() else "%d seçili" % play_maps.size(), 16, UI.DIM, "Rajdhani-SemiBold"))
-	gh.add_child(UI.spacer())
-	gh.add_child(_chip("TÜMÜNÜ TEMİZLE", false, func(): play_maps.clear(); show_page("play")))
+	# row 1: play type (CS2 MATCHMAKING / PRACTICE)
+	var r1 := UI.hbox(6)
+	r1.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(r1)
+	r1.add_child(_pill("BOT MAÇI", not online_mode, func(): if online_mode: show_page("mode")))
+	r1.add_child(_pill("ÇEVRİMİÇİ", online_mode, func(): if not online_mode: show_page("mode")))
+	r1.add_child(UI.spacer(false, 6))
+	var rb := _pill("ODALAR", false, func(): show_page("rooms"))
+	r1.add_child(rb)
+	# row 2: modes
+	var r2 := UI.hbox(2)
+	r2.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(r2)
+	var keys: Array = GS.MODES.keys()
+	for i in keys.size():
+		var md: String = keys[i]
+		if i > 0:
+			var sep := ColorRect.new(); sep.color = Color(1, 1, 1, 0.2); sep.custom_minimum_size = Vector2(1, 14)
+			sep.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			r2.add_child(sep)
+		r2.add_child(_pill(str(GS.MODES[md]["name"]).to_upper(), md == play_sel_mode, func(): play_sel_mode = md; show_page("play")))
+	var desc := UI.lbl(str(GS.MODES[play_sel_mode]["desc"]), 15, Color(1, 1, 1, 0.6), "Inter", HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(desc)
+	# map grid (tall cards)
+	var sc := ScrollContainer.new()
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(sc)
+	var cc := CenterContainer.new()
+	cc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(cc)
 	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 14)
-	grid.add_theme_constant_override("v_separation", 14)
-	gv.add_child(grid)
+	var vw: float = ui.size.x if ui.size.x > 0 else 1920.0
+	var vh: float = ui.size.y if ui.size.y > 0 else 1080.0
+	var cw := clampf((vh - 300.0) / 2.0 * 0.62, 150.0, 260.0)
+	grid.columns = clampi(int((vw - 160.0) / (cw + 10.0)), 3, 6)
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	cc.add_child(grid)
 	for mid in GS.MAPS.keys():
-		grid.add_child(_play_map_card(mid))
-	# summary column
-	var side := UI.glass(20, 4)
-	side.custom_minimum_size = Vector2(430, 0)
-	body.add_child(side)
-	var sv := UI.vbox(12)
-	side.add_child(sv)
-	sv.add_child(UI.lbl("MAÇ AYARI", 16, UI.DIM, "Rajdhani-Bold"))
-	sv.add_child(UI.lbl(str(GS.MODES[play_sel_mode]["name"]), 34, Color.WHITE, "RussoOne-Regular"))
+		grid.add_child(_play_map_card(mid, Vector2(cw, cw / 0.62)))
+	# bottom bar: options + GO
+	var bar := PanelContainer.new()
+	bar.add_theme_stylebox_override("panel", UI.sb(Color(0.06, 0.065, 0.07, 0.95), Color(1, 1, 1, 0.08), 1, 2, 10))
+	v.add_child(bar)
+	var bh := UI.hbox(14)
+	bar.add_child(bh)
+	var info := UI.vbox(0)
+	info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bh.add_child(info)
+	info.add_child(UI.lbl(str(GS.MODES[play_sel_mode]["name"]).to_upper(), 22, Color.WHITE, "Display"))
 	var mn: Array = []
 	for m in play_maps:
 		mn.append(GS.MAPS[m]["name"])
-	sv.add_child(UI.lbl("Harita: " + (", ".join(mn) if mn.size() > 0 else "Rastgele"), 17, UI.TEXT, "Rajdhani-SemiBold"))
+	var ml := UI.lbl(("Harita: " + ", ".join(mn)) if mn.size() > 0 else "Harita seçmezsen rastgele", 13, UI.DIM, "Inter")
+	ml.custom_minimum_size = Vector2(240, 0); ml.clip_text = true
+	info.add_child(ml)
+	if not play_maps.is_empty():
+		bh.add_child(_pill("TEMİZLE", false, func(): play_maps.clear(); show_page("play")))
+	bh.add_child(UI.spacer())
 	if not online_mode:
-		sv.add_child(UI.lbl("ZORLUK", 15, UI.DIM, "Rajdhani-Bold"))
-		var dh := UI.hbox(6)
-		sv.add_child(dh)
-		for i in 3:
-			dh.add_child(_chip(["KOLAY", "NORMAL", "ZOR"][i], play_diff == i, func(): play_diff = i; show_page("play"), 120))
-		sv.add_child(UI.lbl("BOT SAYISI", 15, UI.DIM, "Rajdhani-Bold"))
-		var bh := UI.hbox(6)
-		sv.add_child(bh)
-		for n in [5, 7, 9, 11, 13]:
-			bh.add_child(_chip(str(n), play_bots == n, func(): play_bots = n; show_page("play"), 66))
+		bh.add_child(_opt_group("ZORLUK", ["KOLAY", "NORMAL", "ZOR"], [0, 1, 2], play_diff, func(x): play_diff = x))
+		bh.add_child(_opt_group("BOT", ["5", "7", "9", "11", "13"], [5, 7, 9, 11, 13], play_bots, func(x): play_bots = x))
 		if play_sel_mode != "sabotaj":
-			sv.add_child(UI.lbl("SÜRE", 15, UI.DIM, "Rajdhani-Bold"))
-			var th := UI.hbox(6)
-			sv.add_child(th)
-			for n in [5, 8, 10, 15]:
-				th.add_child(_chip("%d dk" % n, play_time == n, func(): play_time = n; show_page("play"), 80))
-	var sp := Control.new()
-	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	sv.add_child(sp)
-	var go := UI.btn("BAŞLAT", func(): _play_go(), 40, true, 0, 84)
-	go.add_theme_font_override("font", UI.font("Teko"))
-	sv.add_child(go)
-	var adv := UI.btn("Gelişmiş oda kur (sohbet, takım, şifre)", func(): show_page("rooms"), 15, false, 0, 36)
-	sv.add_child(adv)
+			bh.add_child(_opt_group("SÜRE", ["5", "8", "10", "15"], [5, 8, 10, 15], play_time, func(x): play_time = x))
+	var go := UI.ibtn("play", "BAŞLAT", func(): _play_go(), 30, true, 220, 62)
+	go.add_theme_font_override("font", UI.font("Display"))
+	go.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bh.add_child(go)
 
-func _play_map_card(mid: String) -> Control:
+func _pill(text: String, on: bool, cb: Callable) -> Button:
+	## CS2 sub-tab: small caps text, the active one gets a soft blue-grey plate
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	b.add_theme_font_override("font", UI.font("Nav"))
+	b.add_theme_font_size_override("font_size", 15)
+	var n := UI.sb(Color(0.33, 0.47, 0.6, 0.55) if on else Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0, 2, 12)
+	n.content_margin_top = 5; n.content_margin_bottom = 5
+	var h := n.duplicate(); h.bg_color = Color(0.33, 0.47, 0.6, 0.7) if on else Color(1, 1, 1, 0.08)
+	b.add_theme_stylebox_override("normal", n); b.add_theme_stylebox_override("hover", h); b.add_theme_stylebox_override("pressed", h)
+	b.add_theme_color_override("font_color", Color.WHITE if on else Color(1, 1, 1, 0.7))
+	b.add_theme_color_override("font_hover_color", Color.WHITE)
+	b.set_meta("sfx", true)
+	b.mouse_entered.connect(func(): SFX.ui("ui_hover", -16))
+	b.pressed.connect(func(): SFX.ui("ui_tab", -8); cb.call())
+	return b
+
+func _opt_group(title: String, labels: Array, vals: Array, cur, setter: Callable) -> Control:
+	var v := UI.vbox(2)
+	v.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	v.add_child(UI.lbl(title, 11, UI.DIM, "Nav"))
+	var h := UI.hbox(2)
+	v.add_child(h)
+	for i in labels.size():
+		var x = vals[i]
+		h.add_child(_pill(labels[i], x == cur, func(): setter.call(x); show_page("play")))
+	return v
+
+func _play_map_card(mid: String, sz: Vector2 = Vector2(220, 355)) -> Control:
+	## CS2 map tile: tall art, round emblem in the middle, name + size at the bottom, tick box top-right
 	var on: bool = mid in play_maps
 	var card := Button.new()
 	card.focus_mode = Control.FOCUS_NONE
-	card.custom_minimum_size = Vector2(0, 205)
-	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.custom_minimum_size = sz
 	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	var nsb := UI.sb(Color(0, 0, 0, 0.3), UI.ACCENT if on else Color(1, 1, 1, 0.08), 3 if on else 1, 4, 0)
+	card.set_meta("sfx", true)
+	var nsb := UI.sb(Color(0.05, 0.05, 0.055, 1.0), Color(0.55, 0.75, 1.0, 0.95) if on else Color(1, 1, 1, 0.06), 2 if on else 1, 2, 0)
 	card.add_theme_stylebox_override("normal", nsb)
-	var hsb := nsb.duplicate()
-	hsb.border_color = UI.ACCENT2 if on else Color(1, 1, 1, 0.45)
-	card.add_theme_stylebox_override("hover", hsb)
-	card.add_theme_stylebox_override("pressed", hsb)
+	var hsb := nsb.duplicate(); hsb.border_color = Color(1, 1, 1, 0.55)
+	card.add_theme_stylebox_override("hover", hsb); card.add_theme_stylebox_override("pressed", hsb)
+	card.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
 	var img := TextureRect.new()
 	var pth := "res://assets/ui/map_%s.jpg" % mid
 	if ResourceLoader.exists(pth):
@@ -2239,47 +2586,79 @@ func _play_map_card(mid: String) -> Control:
 	img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	img.set_anchors_preset(Control.PRESET_FULL_RECT)
-	img.offset_left = 3; img.offset_top = 3; img.offset_right = -3; img.offset_bottom = -3
 	img.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	img.modulate = Color.WHITE if on or play_maps.is_empty() else Color(0.62, 0.62, 0.62)
+	img.modulate = Color.WHITE if on or play_maps.is_empty() else Color(0.6, 0.6, 0.62)
 	card.add_child(img)
-	var shade := TextureRect.new()
-	var gt := GradientTexture2D.new()
-	var g := Gradient.new()
-	g.set_color(0, Color(0, 0, 0, 0)); g.set_color(1, Color(0, 0, 0, 0.85))
-	gt.gradient = g; gt.fill_from = Vector2(0, 0.35); gt.fill_to = Vector2(0, 1)
-	shade.texture = gt
+	var shade := _grad_fill(Color(0, 0, 0, 0.0), Color(0, 0, 0, 0.8))
 	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
-	shade.offset_left = 3; shade.offset_top = 3; shade.offset_right = -3; shade.offset_bottom = -3
-	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(shade)
-	var nm := UI.lbl(str(GS.MAPS[mid]["name"]).to_upper(), 24, Color.WHITE, "RussoOne-Regular")
-	nm.position = Vector2(16, 146)
+	var emb := MapEmblem.new()
+	emb.text = str(GS.MAPS[mid]["name"])
+	emb.glyph = UI.icon_tex("maps/" + mid)
+	emb.col = Color.from_hsv(float(absi(hash(mid)) % 360) / 360.0, 0.55, 0.62)
+	var es := sz.x * 0.52
+	emb.position = Vector2((sz.x - es) * 0.5, sz.y * 0.36 - es * 0.5); emb.size = Vector2(es, es)
+	emb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(emb)
+	var nm := UI.lbl(str(GS.MAPS[mid]["name"]), 22, Color.WHITE, "Display", HORIZONTAL_ALIGNMENT_CENTER)
+	nm.position = Vector2(0, sz.y - 58); nm.size = Vector2(sz.x, 28)
+	nm.add_theme_constant_override("outline_size", 4); nm.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(nm)
-	var sz := UI.lbl(str(GS.MAPS[mid]["size"]).to_upper() + " HARİTA", 14, UI.DIM, "Rajdhani-Bold")
-	sz.position = Vector2(17, 178)
-	sz.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(sz)
-	# tick box (CS2 map checkbox)
-	var tick := UI.lbl("✔" if on else "", 20, Color.BLACK, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
+	var szl := UI.lbl(str(GS.MAPS[mid]["size"]).capitalize() + " harita", 12, Color(1, 1, 1, 0.65), "Inter", HORIZONTAL_ALIGNMENT_CENTER)
+	szl.position = Vector2(0, sz.y - 30); szl.size = Vector2(sz.x, 18)
+	szl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(szl)
 	var tp := PanelContainer.new()
-	tp.add_theme_stylebox_override("panel", UI.sb(UI.ACCENT if on else Color(0, 0, 0, 0.45), Color(1, 1, 1, 0.6), 1, 3, 0))
-	tp.custom_minimum_size = Vector2(30, 30)
-	tp.position = Vector2(14, 14)
+	tp.add_theme_stylebox_override("panel", UI.sb(Color(0.55, 0.75, 1.0) if on else Color(0, 0, 0, 0.35), Color(1, 1, 1, 0.75), 1, 1, 0))
+	tp.size = Vector2(20, 20); tp.position = Vector2(sz.x - 30, 10)
 	tp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tick.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tp.add_child(tick)
+	if on:
+		var ck := UI.icon("circle-check", 16, Color(0.05, 0.1, 0.18))
+		tp.add_child(ck)
 	card.add_child(tp)
+	card.mouse_entered.connect(func(): SFX.ui("ui_hover", -16))
 	card.pressed.connect(func():
-		SFX.play("ui_click", -8)
+		SFX.ui("ui_toggle", -6)
 		if on: play_maps.erase(mid)
 		else: play_maps.append(mid)
 		show_page("play"))
 	return card
 
+class MapEmblem extends Control:
+	## round CS2-like map badge: coloured disc, double ring, map name across a band
+	var text := ""
+	var glyph: Texture2D   # game-icons.net symbol for the map (assets/icons/maps, CC BY 3.0)
+	var col := Color(0.6, 0.3, 0.2)
+	func _draw() -> void:
+		var c := size * 0.5
+		var r := minf(size.x, size.y) * 0.5 - 2
+		draw_circle(c, r + 2, Color(0, 0, 0, 0.45))
+		draw_circle(c, r, col.darkened(0.45))
+		draw_arc(c, r, 0, TAU, 64, Color(1, 1, 1, 0.9), 3.0, true)
+		draw_arc(c, r * 0.82, 0, TAU, 64, col.lightened(0.35), 2.0, true)
+		draw_circle(c, r * 0.78, col)
+		var bh := r * 0.42
+		draw_rect(Rect2(c.x - r * 1.02, c.y - bh * 0.5, r * 2.04, bh), Color(0.06, 0.06, 0.07, 0.92))
+		draw_rect(Rect2(c.x - r * 1.02, c.y - bh * 0.5, r * 2.04, 2), Color(1, 1, 1, 0.85))
+		draw_rect(Rect2(c.x - r * 1.02, c.y + bh * 0.5 - 2, r * 2.04, 2), Color(1, 1, 1, 0.85))
+		var f: Font = UI.font("Display")
+		var t := text.to_upper()
+		var fs := int(bh * 0.72)
+		while fs > 8 and f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > r * 1.9:
+			fs -= 1
+		var tw := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		draw_string(f, Vector2(c.x - tw * 0.5, c.y + fs * 0.36), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+		if glyph:
+			var s := r * 0.62
+			draw_texture_rect(glyph, Rect2(c.x - s * 0.5, c.y - r * 0.86, s, s * 0.95), false, Color(1, 1, 1, 0.92))
+		var st: Texture2D = UI.icon_tex("game/star_medal")
+		if st:
+			var s2 := r * 0.34
+			draw_texture_rect(st, Rect2(c.x - s2 * 0.5, c.y + r * 0.3, s2, s2), false, Color(1, 1, 1, 0.55))
+
 func _play_go() -> void:
-	SFX.play("beep_go", -4)
+	SFX.ui("mm_accept", -6)
 	if GS.play_mode == "online":
 		online.quick_join()
 		return
@@ -2335,8 +2714,8 @@ func _page_bag() -> void:
 	th.add_child(UI.lbl("ÇANTA", 24, Color.WHITE, "RussoOne-Regular"))
 	th.add_child(UI.lbl("%d silah" % ids.size(), 16, UI.DIM, "Rajdhani-Bold"))
 	th.add_child(UI.spacer(false, 16))
-	for c in [["tum", "TÜMÜ"], ["ana", "ANA SİLAH"], ["tabanca", "TABANCA"], ["bicak", "BIÇAK"], ["bomba", "BOMBA"]]:
-		th.add_child(UI.btn(c[1], func(): bag_cat = c[0]; show_page("bag"), 15, bag_cat == c[0], 0, 32))
+	for c in [["tum", "TÜMÜ", "backpack"], ["ana", "ANA SİLAH", "game/ak47"], ["tabanca", "TABANCA", "game/pistol"], ["bicak", "BIÇAK", "game/knife"], ["bomba", "BOMBA", "game/grenade"]]:
+		th.add_child(UI.ibtn(c[2], c[1], func(): bag_cat = c[0]; SFX.ui("ui_tab", -8); show_page("bag"), 15, bag_cat == c[0], 0, 32))
 	var csc := ScrollContainer.new()
 	csc.custom_minimum_size = Vector2(0, 160)
 	csc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -2376,7 +2755,7 @@ func _page_bag() -> void:
 	ab.columns = 2
 	ab.add_theme_constant_override("h_separation", 6); ab.add_theme_constant_override("v_separation", 6)
 	dv.add_child(ab)
-	ab.add_child(UI.btn("✔ KUŞANILDI" if in_set else "KUŞAN (Set %d)" % (int(GS.profile["active_set"]) + 1), func(): GS.active_set()[w["cat"]] = bag_sel; GS.save_profile(); SFX.play("equip"); show_page("bag"), 17, not in_set, 212, 44))
+	ab.add_child(UI.btn("✔ KUŞANILDI" if in_set else "KUŞAN (Set %d)" % (int(GS.profile["active_set"]) + 1), func(): GS.active_set()[w["cat"]] = bag_sel; GS.save_profile(); SFX.play("inv_equip"); show_page("bag"), 17, not in_set, 212, 44))
 	var up_btn := UI.btn("YÜKSELT ⬆" if lvl < GS.MAX_LVL else "MAKS. SEVİYE", func(): _upgrade_dialog(bag_sel), 17, false, 212, 44)
 	up_btn.disabled = lvl >= GS.MAX_LVL
 	ab.add_child(up_btn)
@@ -2428,7 +2807,7 @@ func _page_bag() -> void:
 		b.pressed.connect(func():
 			if have:
 				GS.profile["owned"][bag_sel]["skin"] = sk
-				GS.save_profile(); SFX.play("equip", -4); show_page("bag")
+				GS.save_profile(); SFX.play("inv_equip", -4); show_page("bag")
 			else:
 				_inspect(bag_sel, sk))
 		sg.add_child(b)
@@ -2733,7 +3112,7 @@ func _parts_dialog(id: String) -> void:
 			if not fits:
 				b = UI.btn("UYUMSUZ", Callable(), 15, false, 0, 34); b.disabled = true
 			elif on:
-				b = UI.btn("ÇIKAR", func(): GS.remove_part(id, pid); SFX.play("equip", -6); _parts_dialog(id), 15, false, 0, 34)
+				b = UI.btn("ÇIKAR", func(): GS.remove_part(id, pid); SFX.play("inv_equip", -6); _parts_dialog(id), 15, false, 0, 34)
 			elif have:
 				b = UI.btn("TAK  (x%d)" % GS.parts_owned(pid), func(): GS.fit_part(id, pid); SFX.play("bolt_fwd", -4); set_showcase(id); _parts_dialog(id), 15, true, 0, 34)
 			else:
@@ -2741,7 +3120,7 @@ func _parts_dialog(id: String) -> void:
 					var r: Dictionary = await _act("buy_part", {"id": pid})
 					if not r["ok"]: return
 					GS.fit_part(id, pid)
-					SFX.play("buy"); _refresh_currency(); set_showcase(id); _parts_dialog(id), 15, false, 0, 34)
+					SFX.play("shop_buy"); _refresh_currency(); set_showcase(id); _parts_dialog(id), 15, false, 0, 34)
 			cv.add_child(b)
 	v.add_child(UI.lbl("Eklentileri Eklenti Paketi kasasından kazanabilir ya da buradan satın alabilirsin. Bir eklentiye sahip olunca tüm uyumlu silahlarına takabilirsin.", 15, UI.DIM, "Rajdhani-SemiBold"))
 
@@ -3222,7 +3601,7 @@ func _upgrade_dialog(id: String) -> void:
 			var ok := bool(up.get("success", false))
 			var nl := int(up.get("lvl", lvl + 1 if ok else lvl))
 			if ok:
-				SFX.play("success")
+				SFX.play("ui_success")
 				stage.lvl = nl; stage.burst = 0.0; stage.flash = 1.0
 				track.lvl = nl; track.pop = nl; track.pop_t = 0.0
 				big.text = "+%d" % nl
@@ -3251,7 +3630,7 @@ func _upgrade_dialog(id: String) -> void:
 				t3.parallel().tween_method(func(x): gm.set_shader_parameter("glow", x), 2.4, 0.25, 1.8).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 				t3.parallel().tween_method(func(x): gm.set_shader_parameter("outline", x), 1.8, 0.35, 2.0).set_ease(Tween.EASE_OUT)
 			else:
-				SFX.play("fail")
+				SFX.play("ui_error")
 				stage.col = UI.RED; stage.flash = 0.8; stage.lvl = nl
 				track.lvl = nl
 				gm.set_shader_parameter("glow_col", Color(1.0, 0.15, 0.1))
@@ -3335,7 +3714,7 @@ func _pass_claim_all(cur_t: int) -> void:
 			if not r["ok"]:
 				_toast(str(r["err"]), UI.RED)
 				break
-	SFX.play("success")
+	SFX.play("ui_success")
 	_refresh_currency()
 	show_page("pass")
 
@@ -3414,6 +3793,7 @@ func _page_pass() -> void:
 	hero.add_child(hv)
 	var tagr := UI.hbox(10)
 	hv.add_child(tagr)
+	tagr.add_child(UI.icon("game/laurel", 26, purple.lightened(0.3)))
 	tagr.add_child(_store_grade_chip("SEZON PASOSU", purple))
 	tagr.add_child(_store_grade_chip("ÜCRETSİZ  •  %d SEVİYE" % tiers.size(), UI.GOLD))
 	var title := UI.lbl(GS.Econ.PASS_SEASON.to_upper(), 66, Color.WHITE, "RussoOne-Regular")
@@ -3727,7 +4107,7 @@ func _pass_tier_card(tier: int, it: Dictionary, open: bool, got: bool) -> Contro
 				if tex and not rs.has("dup"):
 					purchase_fx(tex, _pass_reward_name(it), "SEZON ÖDÜLÜ • SEVİYE %d" % tier, c)
 				else:
-					SFX.play("success")
+					SFX.play("ui_success")
 				_toast(("Ödül alındı: " + _pass_reward_name(it)) if not rs.has("dup") else "Zaten sendeydi: +%s altın" % UI.money(int(rs["dup"])), UI.GREEN)
 				show_page("pass"), 16, true, 0, 40))
 		var sh := CardShine.new()
@@ -3803,10 +4183,16 @@ func _page_market() -> void:
 	var ttl := UI.lbl("MAĞAZA", 50, Color.WHITE, "Teko")
 	ttl.custom_minimum_size = Vector2(210, 0)
 	th.add_child(ttl)
-	for t in [["silah", "SİLAHLAR"], ["ekipman", "EKİPMAN"], ["stil", "KAPLAMALAR"], ["kasa", "KASALAR"], ["karakter", "AJANLAR"], ["eklenti", "EKLENTİLER"], ["malzeme", "MALZEME"]]:
+	for t in [["silah", "SİLAHLAR", "game/ak47"], ["ekipman", "EKİPMAN", "game/kevlar"], ["stil", "KAPLAMALAR", "gem"], ["kasa", "KASALAR", "game/chest"], ["karakter", "AJANLAR", "user"], ["eklenti", "EKLENTİLER", "package"], ["malzeme", "MALZEME", "coins"]]:
 		var on: bool = market_tab == t[0]
 		var tb := Button.new()
 		tb.text = t[1]
+		tb.icon = UI.icon_tex(t[2])
+		tb.add_theme_constant_override("icon_max_width", 22)
+		tb.add_theme_constant_override("h_separation", 8)
+		tb.add_theme_color_override("icon_normal_color", Color(1, 1, 1, 0.9) if on else Color(1, 1, 1, 0.5))
+		tb.add_theme_color_override("icon_hover_color", Color.WHITE)
+		tb.set_meta("sfx", true)
 		tb.focus_mode = Control.FOCUS_NONE
 		tb.size_flags_vertical = Control.SIZE_SHRINK_END
 		tb.custom_minimum_size = Vector2(0, 48)
@@ -3821,7 +4207,7 @@ func _page_market() -> void:
 		tb.add_theme_stylebox_override("pressed", hsb)
 		tb.add_theme_color_override("font_color", Color.WHITE if on else Color(1, 1, 1, 0.55))
 		tb.add_theme_color_override("font_hover_color", Color.WHITE)
-		tb.pressed.connect(func(): SFX.play("ui_click", -8); market_tab = t[0]; show_page("market"))
+		tb.pressed.connect(func(): SFX.ui("ui_tab", -8); market_tab = t[0]; show_page("market"))
 		th.add_child(tb)
 	# hidden legacy preview card (other tabs still feed it on hover)
 	mk_info = UI.panel(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0)
@@ -3980,7 +4366,7 @@ func _agent_card(c: String) -> Control:
 		var bb := UI.btn("◉ " + UI.money(pr) + "  SATIN AL", func():
 			var r: Dictionary = await _act("buy_char", {"id": c})
 			if not r["ok"]: return
-			SFX.play("buy"); show_page("market"), 18, true, 0, 40)
+			SFX.play("shop_buy"); show_page("market"), 18, true, 0, 40)
 		bb.disabled = int(GS.profile["gold"]) < pr
 		v.add_child(bb)
 	return p
@@ -4225,7 +4611,7 @@ func _store_part_tile(pid: String) -> Control:
 	var bb := UI.btn("◉ " + UI.money(int(pd["price"])), func():
 		var r: Dictionary = await _act("buy_part", {"id": pid})
 		if not r["ok"]: return
-		SFX.play("buy"); _toast(pd["name"] + " alındı! Çanta > Özelleştir ile tak.", UI.GREEN); show_page("market"), 17, true, 130, 38)
+		SFX.play("shop_buy"); _toast(pd["name"] + " alındı! Çanta > Özelleştir ile tak.", UI.GREEN); show_page("market"), 17, true, 130, 38)
 	bb.disabled = int(GS.profile["gold"]) < int(pd["price"])
 	bh.add_child(bb)
 	return p
@@ -4276,7 +4662,7 @@ func _store_hero() -> Control:
 		var fbb := UI.btn("◉ %s   SATIN AL" % UI.money(fp), func():
 			var r: Dictionary = await _act("buy_weapon", {"id": feat})
 			if not r["ok"]: return
-			SFX.play("buy"); _toast(GS.WEAPONS[feat]["name"] + " alındı!", UI.GREEN); show_page("market"), 20, true, 260, 50)
+			SFX.play("shop_buy"); _toast(GS.WEAPONS[feat]["name"] + " alındı!", UI.GREEN); show_page("market"), 20, true, 260, 50)
 		ph.add_child(fbb)
 		ph.add_child(UI.btn("3D İNCELE", func(): _inspect(feat, "std"), 17, false, 150, 50))
 	else:
@@ -4503,7 +4889,7 @@ func _equip_gear(slot: String, gid: String) -> void:
 	var r: Dictionary = await _act("equip_gear", {"slot": slot, "id": gid})
 	if not r["ok"]:
 		return
-	SFX.play("equip", -6)
+	SFX.play("inv_equip", -6)
 	show_page("market")
 
 ## full-screen purchase celebration: light rays, the item pops in, name + price, then it fades away
@@ -4524,7 +4910,7 @@ void fragment() {
 }
 """
 func purchase_fx(tex: Texture2D, title: String, sub: String, col: Color, price: int = 0) -> void:
-	SFX.play("buy", -2)
+	SFX.play("shop_buy", -2)
 	var layer := Control.new()
 	layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	layer.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -4605,7 +4991,7 @@ func _buy_pack(i: int) -> void:
 	var r: Dictionary = await _act("buy_pack", {"i": i})
 	if not r["ok"]:
 		return
-	SFX.play("buy")
+	SFX.play("shop_buy")
 	_toast(str(GS.Econ.PACKS[i][0]) + " alındı!", UI.GREEN)
 
 func _act(a: String, args: Dictionary = {}) -> Dictionary:
@@ -4613,19 +4999,50 @@ func _act(a: String, args: Dictionary = {}) -> Dictionary:
 	var r: Dictionary = await GS.act(a, args)
 	if not r["ok"]:
 		_toast(r["err"] if r["err"] != "" else "İşlem yapılamadı", UI.RED)
-		SFX.play("fail", -6)
+		SFX.play("ui_error", -6)
 	_refresh_currency()
 	return r
 
+var _toasts: Array = []
 func _toast(t: String, c: Color) -> void:
-	var p := UI.panel(Color(0.03, 0.04, 0.06, 0.95), c, 14)
-	p.add_child(UI.lbl(t, 22, c, "Rajdhani-Bold"))
-	p.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	p.position = Vector2(ui.size.x / 2 - 220, ui.size.y - 140)
+	## v4.18 notification: notched Kenney glass plate + Lucide status icon, slides up, stacks, auto-dismisses
+	var bad := c == UI.RED or c.r > 0.9 and c.g < 0.4
+	var good := c == UI.GREEN or (c.g > 0.75 and c.r < 0.4)
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UI.notch_sb(Color(0.085, 0.09, 0.105, 0.97)))
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var h := UI.hbox(12)
+	p.add_child(h)
+	var strip := ColorRect.new()
+	strip.color = c; strip.custom_minimum_size = Vector2(3, 0)
+	h.add_child(strip)
+	h.add_child(UI.icon("triangle-alert" if bad else ("circle-check" if good else "bell"), 22, c))
+	var l := UI.lbl(t, 18, UI.TEXT, "InterSemi")
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(minf(520.0, ui.size.x * 0.4), 0)
+	h.add_child(l)
 	ui.add_child(p)
+	SFX.ui("ui_error" if bad else ("ui_success" if good else "ui_notify"), -8)
+	_toasts = _toasts.filter(func(x): return is_instance_valid(x))
+	_toasts.push_front(p)
+	await get_tree().process_frame
+	if not is_instance_valid(p):
+		return
+	var y := ui.size.y - 150.0
+	for q in _toasts:
+		if not is_instance_valid(q):
+			continue
+		var tgt: Vector2 = Vector2(ui.size.x / 2 - q.size.x / 2, y - q.size.y)
+		if q == p:
+			q.position = tgt + Vector2(0, 26); q.modulate.a = 0.0
+			var ti: Tween = q.create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+			ti.tween_property(q, "position", tgt, 0.22); ti.tween_property(q, "modulate:a", 1.0, 0.18)
+		else:
+			q.create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT).tween_property(q, "position", tgt, 0.18)
+		y = tgt.y - 8.0
 	var tw := p.create_tween()
-	tw.tween_interval(1.8)
-	tw.tween_property(p, "modulate:a", 0.0, 0.4)
+	tw.tween_interval(2.6)
+	tw.tween_property(p, "modulate:a", 0.0, 0.35)
 	tw.tween_callback(p.queue_free)
 
 # ================================================================ CRATE (Kasa)
@@ -4896,7 +5313,7 @@ func _page_crate() -> void:
 		tw.tween_interval(0.5)
 		tw.tween_callback(func():
 			var label: String = win["label"] + ("  (zaten vardı: +%s altın)" % UI.money(int(win["dup"])) if win.has("dup") else "")
-			SFX.play("success")
+			SFX.play("ui_success")
 			res.text = "KAZANDIN: " + label
 			res.add_theme_color_override("font_color", win["color"])
 			nc.modulate = Color(2, 2, 2)
@@ -5223,7 +5640,7 @@ func _crate_reveal(it: Dictionary, label: String) -> void:
 	tw.tween_property(ov, "color", Color(0.008, 0.01, 0.016, 0.92), 0.2)
 	tw.tween_callback(func():
 		sp.emitting = true
-		SFX.play("success")
+		SFX.play("ui_success")
 		if rar >= 2: SFX.play("medal", -2)
 		if str(it.get("type", "")) == "skin" and GS.SKINS.get(str(it.get("id", "")), {}).get("anim", false):
 			_dragon_splash(ov, vs, col)
@@ -5439,7 +5856,7 @@ func _choose_mode(md: String) -> void:
 		main.go_login()
 		return
 	GS.play_mode = md
-	SFX.play("success", -8)
+	SFX.play("ui_success", -8)
 	show_page("rooms" if md == "online" else "lobby")
 
 func _page_mode() -> void:
@@ -6151,7 +6568,7 @@ func _page_room() -> void:
 		"teams": teams, "players": room_players,
 		"info_extra": [["Zorluk", ["Kolay", "Normal", "Zor"][int(cfg["diff"])]], ["Oyuncu", "%d / 16" % room_players.size()]],
 		"on_settings": func(): cfg["_edit"] = true; _room_dialog(cfg),
-		"on_leave": func(): local_room = false; _room_key = ""; show_page("rooms"),
+		"on_leave": func(): SFX.ui("mm_decline", -8); local_room = false; _room_key = ""; show_page("rooms"),
 		"on_chat": func(t): _chat(str(GS.profile["name"]), t, Color.WHITE); _bot_reply(),
 		"host_box": func(box):
 			box.add_child(UI.lbl("ODA AYARLARI", 16, UI.DIM, "Rajdhani-Bold"))
@@ -6310,7 +6727,7 @@ func _page_profile() -> void:
 	rcv.add_child(lad)
 	for k in GS.RANKS.size():
 		var tr := TextureRect.new()
-		tr.texture = load("res://assets/ui/ranks/r%d.png" % k); tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.texture = GS.rank_icon(k); tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tr.custom_minimum_size = Vector2(30, 30); tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		tr.tooltip_text = "%s — %d RP" % [GS.RANKS[k], int(GS.Econ.RANK_RP[k])]
 		tr.modulate = Color.WHITE if k <= int(ri["i"]) else Color(1, 1, 1, 0.2)
@@ -6324,16 +6741,19 @@ func _page_profile() -> void:
 	var acc: float = 100.0 * float(st.get("hits", 0)) / max(1.0, float(st.get("shots", 0)))
 	var kd: float = float(st["kills"]) / maxf(1.0, float(st["deaths"]))
 	var wr: float = 100.0 * float(st["wins"]) / maxf(1.0, float(st["matches"]))
-	for it in [["K/D", "%.2f" % kd, UI.GREEN if kd >= 1.0 else UI.RED, kd / 2.0], ["KAZANMA", "%%%d" % int(wr), UI.ACCENT, wr / 100.0],
-			["İSABET", "%%%.1f" % acc, Color("7fd1ff"), acc / 60.0], ["KAFADAN", str(st["headshots"]), Color("ff7a5a"), float(st["headshots"]) / max(1.0, float(st["kills"]))],
-			["MAÇ", str(st["matches"]), Color.WHITE, 1.0], ["GALİBİYET", str(st["wins"]), UI.GOLD, wr / 100.0],
-			["ÖLDÜRME", str(st["kills"]), Color.WHITE, 1.0], ["ÖLÜM", str(st["deaths"]), Color(1, 1, 1, 0.6), 1.0]]:
+	for it in [["K/D", "%.2f" % kd, UI.GREEN if kd >= 1.0 else UI.RED, kd / 2.0, "swords"], ["KAZANMA", "%%%d" % int(wr), UI.ACCENT, wr / 100.0, "trophy"],
+			["İSABET", "%%%.1f" % acc, Color("7fd1ff"), acc / 60.0, "crosshair"], ["KAFADAN", str(st["headshots"]), Color("ff7a5a"), float(st["headshots"]) / max(1.0, float(st["kills"])), "game/headshot"],
+			["MAÇ", str(st["matches"]), Color.WHITE, 1.0, "gamepad-2"], ["GALİBİYET", str(st["wins"]), UI.GOLD, wr / 100.0, "game/medal"],
+			["ÖLDÜRME", str(st["kills"]), Color.WHITE, 1.0, "game/skull"], ["ÖLÜM", str(st["deaths"]), Color(1, 1, 1, 0.6), 1.0, "game/death"]]:
 		var c := PanelContainer.new()
 		c.add_theme_stylebox_override("panel", UI.sb(Color(0.055, 0.062, 0.078, 0.96), Color(1, 1, 1, 0.05), 1, 6, 12))
 		c.custom_minimum_size = Vector2(205, 0)
 		var cv := UI.vbox(0)
 		c.add_child(cv)
-		cv.add_child(UI.lbl(it[0], 14, Color(1, 1, 1, 0.5), "Rajdhani-Bold"))
+		var sh := UI.hbox(6)
+		sh.add_child(UI.icon(it[4], 15, Color(1, 1, 1, 0.45)))
+		sh.add_child(UI.lbl(it[0], 14, Color(1, 1, 1, 0.5), "Rajdhani-Bold"))
+		cv.add_child(sh)
 		cv.add_child(UI.lbl(it[1], 40, it[2], "Teko"))
 		var pb := UI.bar(clampf(float(it[3]), 0.0, 1.0) * 100.0, 100.0, it[2], 4)
 		cv.add_child(pb)

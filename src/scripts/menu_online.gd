@@ -209,7 +209,7 @@ func page_friends() -> void:
 		var il := UI.lbl(str(f["username"]), 18, Color.WHITE, "Rajdhani-Bold")
 		il.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		ih.add_child(il)
-		ih.add_child(UI.btn("✔ KABUL", func(): await Online.accept_friend(int(f["friendship_id"])); SFX.play("success", -6); m.show_page("friends"), 15, true, 100, 36))
+		ih.add_child(UI.btn("✔ KABUL", func(): await Online.accept_friend(int(f["friendship_id"])); SFX.play("ui_success", -6); m.show_page("friends"), 15, true, 100, 36))
 		ih.add_child(UI.btn("✕", func(): await Online.remove_friend(int(f["friendship_id"])); m.show_page("friends"), 15, false, 40, 36))
 	if outgoing.size() > 0:
 		var oq := _card(Color(0.05, 0.06, 0.085, 0.96), Color(1, 1, 1, 0.07), 16, 12)
@@ -313,7 +313,7 @@ func _on_friend_request(f: Dictionary) -> void:
 	var fid := int(f.get("friendship_id", 0))
 	var nm := str(f.get("username", "?"))
 	_notify("ARKADAŞLIK İSTEĞİ", "%s seni arkadaş olarak eklemek istiyor." % nm, nm, Color("ff6b8a"),
-		[["✔ KABUL ET", func(): await Online.accept_friend(fid); SFX.play("success", -6); m._toast("%s ile artık arkadaşsınız" % nm, UI.GREEN); if m.page == "friends": m.show_page("friends"), true],
+		[["✔ KABUL ET", func(): await Online.accept_friend(fid); SFX.play("ui_success", -6); m._toast("%s ile artık arkadaşsınız" % nm, UI.GREEN); if m.page == "friends": m.show_page("friends"), true],
 		 ["REDDET", func(): await Online.remove_friend(fid); if m.page == "friends": m.show_page("friends"), false]], 25.0)
 	m._update_friend_badge()
 
@@ -485,11 +485,14 @@ func quick_join() -> void:
 	if not Online.is_logged_in():
 		m.show_page("mode"); return
 	m._toast("Uygun oda aranıyor…", UI.GREEN)
+	SFX.ui("mm_search", -6)
 	var rooms: Array = await Online.list_rooms()
 	for r in rooms:
 		if str(r["state"]) == "lobby" and int(r["players"]) < int(r["max_players"]):
+			SFX.ui("mm_found", -4)
 			join_room(str(r["code"]))
 			return
+	SFX.ui("mm_found", -6)
 	create_room()
 
 # ================================================================ LEADERBOARD (SIRALAMA)
@@ -514,6 +517,7 @@ func page_leaderboard() -> void:
 	p.add_child(v)
 	var th := UI.hbox(10)
 	v.add_child(th)
+	th.add_child(UI.icon("game/podium", 34, UI.GOLD))
 	th.add_child(UI.lbl("SIRALAMA", 34, Color.WHITE, "RussoOne-Regular"))
 	th.add_child(UI.spacer(false, 14))
 	var live := UI.lbl("● CANLI", 18, UI.GREEN, "Rajdhani-Bold")
@@ -683,6 +687,7 @@ func join_room(code: String) -> void:
 		m.show_page("netroom")
 
 func leave_room() -> void:
+	SFX.ui("mm_decline", -8)
 	if Net.is_host():
 		Online.close_room(Net.code)
 	Net.leave()

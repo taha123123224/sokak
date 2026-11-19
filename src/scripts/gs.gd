@@ -488,6 +488,19 @@ var MODES := {
 }
 ## CC-BY 4.0 assets: [work, author, licence/link] — shown in Ayarlar > Lisanslar
 const CREDITS := [
+	["v4.18 ARAYÜZ — Yazı tipleri: Rajdhani, Roboto Condensed, Inter", "Indian Type Foundry / Christian Robertson / Rasmus Andersson", "SIL OFL 1.1 · fonts.google.com"],
+	["v4.18 ARAYÜZ — Lucide ikonları (menü, ayarlar, bildirim, skor tablosu)", "Lucide Contributors", "ISC · lucide.dev"],
+	["v4.18 ARAYÜZ — game-icons.net: ak47, headshot, bowie-knife", "Skoll", "CC BY 3.0 · game-icons.net"],
+	["v4.18 ARAYÜZ — game-icons.net: trophy, laurel-crown, medal, skull-crossed-bones", "Lorc", "CC BY 3.0 · game-icons.net"],
+	["v4.18 ARAYÜZ — game-icons.net: grenade, death-skull, kevlar", "sbed", "CC BY 3.0 · game-icons.net"],
+	["v4.18 ARAYÜZ — game-icons.net: star-medal, podium, chest", "Delapouite", "CC BY 3.0 · game-icons.net"],
+	["v4.18 ARAYÜZ — game-icons.net: pistol-gun", "John Colburn", "CC BY 3.0 · game-icons.net"],
+	["v4.18 Harita amblemleri — game-icons.net: village, house, cargo-ship, crane, tire-iron, factory, axe-in-log (Delapouite); anchor, cannon (Lorc); nuclear (sbed)", "Delapouite, Lorc, sbed", "CC BY 3.0 · game-icons.net"],
+	["v4.18 Seviye kalkanları: Naro Rank Vector Icons", "@NarekArts (TheColourfulSuit)", "Ücretsiz, ticari oyunlarda kullanım serbest · thecolourfulsuit.itch.io/naro-rank-icons"],
+	["v4.18 Arayüz sesleri: Interface Sounds, UI Audio; UI Pack, UI Pack Sci-Fi, Crosshair Pack", "Kenney", "CC0 · kenney.nl"],
+	["v4.18 Arayüz sesleri: Cinematic Sound Design (UI) + Epic Stock Media (anons)", "Sonniss GDC 2026 Game Audio Bundle", "Telifsiz, atıfsız ticari kullanım · gdc.sonniss.com"],
+	["v4.18 OpenGameArt: UI Sound Effects (Robin Lamb), GUI Sound Effects (LokiF), Interface beeps (bart), 5 Menu Screen Slides (CleytonKauffman), Accept/Decline UI Menu (KarateStudios)", "OpenGameArt.org yazarları", "CC0 · opengameart.org"],
+	["v4.18 OpenGameArt nişangahlar: Crosshairs and Reticles (hc), 64 crosshairs pack (para)", "hc, para", "CC0 · opengameart.org"],
 	["Desert Eagle | First Person Animations (Deagle birinci şahıs eller + animasyon)", "1Matzh", "CC-BY 4.0 · sketchfab.com/3d-models/09a213d8510a42d1b747135e85712eff"],
 	["9mm Pistol | First Person Animations (Glock birinci şahıs; tabanca modeli: Urpo)", "1Matzh", "CC-BY 4.0 · sketchfab.com/3d-models/c26d7f5aa72f4b01a6da4578caa8f07f"],
 	["UZI | First Person Animations (2026 Remake) (Micro UZI birinci şahıs)", "1Matzh", "CC-BY 4.0 · sketchfab.com/3d-models/73266e9f1eb949b69a3ab11d8f636048"],
@@ -800,6 +813,27 @@ const RANKS := ["Er I", "Er II", "Er III", "Onbaşı I", "Onbaşı II", "Çavuş
 const RANK_COLORS := [Color("c48a5a"), Color("c48a5a"), Color("c48a5a"), Color("c3ccd8"), Color("c3ccd8"), Color("f0be4a"), Color("f0be4a"), Color("f0be4a"), Color("f0be4a"),
 	Color("4fd8cc"), Color("4fd8cc"), Color("4fd8cc"), Color("b27cff"), Color("b27cff"), Color("b27cff"), Color("ff5a4a"), Color("ff5a4a"), Color("ffc43a")]
 
+## v4.18 level tier shields: "Naro Rank Vector Icons" by @NarekArts (itch.io, free for commercial games; credited in
+## Lisanslar). Every 5 levels moves one step: bronze -> silver -> gold -> diamond -> amethyst -> ruby -> galaxy.
+## (Competitive ranks keep their own Turkish military emblems r0..r17.)
+const LEVEL_TIERS := ["bronze_1", "bronze_2", "bronze_3", "silver_3", "silver_5", "gold_2", "gold_3", "gold_4", "gold_5",
+	"diamond_3", "diamond_4", "diamond_5", "amethyst_4", "amethyst_5", "amethyst_6", "ruby_5", "ruby_6", "galaxy_6"]
+## v4.18 ready-made crosshair shapes: Kenney Crosshair Pack (CC0) + OpenGameArt "Crosshairs and Reticles" (hc, CC0)
+## + "64 crosshairs pack" (para, CC0). White art, tinted with the player's crosshair colour.
+const XH_IMAGES := ["kenney_053", "kenney_072", "kenney_088", "kenney_020", "kenney_025", "kenney_036", "kenney_132", "kenney_141",
+	"kenney_175", "kenney_194", "oga_hc_4", "oga_hc_5", "oga_hc_6", "oga_hc_7", "oga_para_20", "oga_para_34", "oga_para_35"]
+func xh_tex(n: String) -> Texture2D:
+	var p := "res://assets/ui/crosshairs/%s.png" % n
+	return load(p) if ResourceLoader.exists(p) else null
+
+func level_tier(lvl: int) -> int:
+	return clampi((maxi(lvl, 1) - 1) / 5, 0, LEVEL_TIERS.size() - 1)
+func level_icon(lvl: int) -> Texture2D:
+	var p := "res://assets/ui/ranks/%s.png" % LEVEL_TIERS[level_tier(lvl)]
+	return load(p) if ResourceLoader.exists(p) else null
+func rank_icon(i: int) -> Texture2D:
+	return load("res://assets/ui/ranks/r%d.png" % clampi(i, 0, RANKS.size() - 1))
+
 func rank_index(rp: int) -> int:
 	var i := 0
 	for k in Econ.RANK_RP.size():
@@ -813,7 +847,7 @@ func rank_info(rp: int) -> Dictionary:
 	var hi: int = Econ.RANK_RP[i + 1] if i + 1 < Econ.RANK_RP.size() else lo
 	return {"i": i, "name": RANKS[i], "color": RANK_COLORS[i], "lo": lo, "hi": hi, "rp": rp,
 		"prog": 1.0 if hi == lo else clampf(float(rp - lo) / float(hi - lo), 0.0, 1.0),
-		"icon": load("res://assets/ui/ranks/r%d.png" % i)}
+		"icon": rank_icon(i)}
 
 func wskin(id: String) -> String:
 	return str(profile["owned"][id]["skin"]) if owned(id) else "std"
@@ -876,8 +910,8 @@ func default_settings() -> Dictionary:
 		"msaa": 0, "taa": false, "fxaa": true, "shadows": 2, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false,
 		"dyn_res": true, "dyn_target": 75,
 		"motion_blur": false, "draw_distance": 1.0, "sharpen": 0.3, "brightness": 1.0, "color_pack": "dogal", "spray": "gg", "show_fps": true, "perf_overlay": 1, "grass": true, "shadow_dist": 1.0, "announcer": true, "insertion": true,
-		"vol_master": 0.8, "vol_sfx": 1.0, "vol_music": 0.5, "vol_amb": 0.6, "vol_voice": 1.0, "voice_on": true, "voice_mode": "ptt",
-		"xh_style": 0, "xh_color": "3dff8a", "xh_size": 7.0, "xh_gap": 5.0, "xh_thick": 2.0, "xh_dot": false, "xh_outline": true, "xh_dynamic": true, "xh_alpha": 1.0,
+		"vol_master": 0.8, "vol_sfx": 1.0, "vol_music": 0.5, "vol_amb": 0.6, "vol_ui": 0.8, "ui_sounds": true, "vol_voice": 1.0, "voice_on": true, "voice_mode": "ptt",
+		"xh_style": 0, "xh_img": "kenney_053", "xh_color": "3dff8a", "xh_size": 7.0, "xh_gap": 5.0, "xh_thick": 2.0, "xh_dot": false, "xh_outline": true, "xh_dynamic": true, "xh_alpha": 1.0,
 		"hit_marker": true, "kill_feed": true, "blood": true, "minimap": true, "damage_numbers": true,
 		"binds": {},
 	}
@@ -1021,6 +1055,9 @@ func apply_settings() -> void:
 	var md := str(settings.get("mic_device", ""))
 	if md != "" and md in AudioServer.get_input_device_list():
 		AudioServer.input_device = md
+	var od := str(settings.get("out_device", ""))
+	if od != "" and od in AudioServer.get_output_device_list():
+		AudioServer.output_device = od
 	apply_display()
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if settings["vsync"] else DisplayServer.VSYNC_DISABLED)
 	Engine.max_fps = fps_limit()
@@ -1062,6 +1099,7 @@ func apply_settings() -> void:
 	_set_bus("SFX", settings["vol_sfx"])
 	_set_bus("Music", settings["vol_music"])
 	_set_bus("Amb", settings["vol_amb"])
+	_set_bus("UI", settings.get("vol_ui", 0.8))
 	apply_binds()
 
 func _set_bus(n: String, v: float) -> void:

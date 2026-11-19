@@ -31,10 +31,13 @@ var _fr_t := 0.0
 var _save_t := -1.0
 var _seen_invites := {}
 const SESSION := "user://session.json"
+## v4.18 "Oturum açık kalsın": when off, the refresh token is not kept on disk (next launch asks for the password)
+var remember := true
 const EMAIL_DOMAIN := "@sokak-oyun.app"
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	remember = bool(GS.settings.get("remember_me", true))
 	var f := FileAccess.open("res://online_config.json", FileAccess.READ)
 	if f:
 		var c = JSON.parse_string(f.get_as_text())
@@ -55,6 +58,17 @@ func _ready() -> void:
 
 func configured() -> bool:
 	return url != "" and anon != ""
+
+## v4.18 real service latency for the login screen: round trip of a tiny auth health request.
+## Returns -1 when the service can't be reached (never a made-up number).
+var last_ping_ms := -1
+func measure_ping() -> int:
+	if not configured():
+		return -1
+	var t0 := Time.get_ticks_msec()
+	var r: Dictionary = await _req(HTTPClient.METHOD_GET, "/auth/v1/health", null, PackedStringArray(), false)
+	last_ping_ms = (Time.get_ticks_msec() - t0) if int(r.get("code", 0)) > 0 else -1
+	return last_ping_ms
 
 func is_logged_in() -> bool:
 	return token != "" and uid != ""
@@ -197,6 +211,18 @@ func go_offline() -> void:
 	server_v2 = -1
 	GS.load_profile()
 
+## v4.18: change the signed-in account's password (Supabase PUT /auth/v1/user with the player's own token)
+func change_password(new_pw: String) -> String:
+	if not is_logged_in():
+		return "Önce giriş yapmalısın"
+	if new_pw.length() < 6:
+		return "Şifre en az 6 karakter olmalı"
+	var r := await _req(HTTPClient.METHOD_PUT, "/auth/v1/user", {"password": new_pw})
+	if not r["ok"]:
+		var d = r.get("data", {})
+		return "Şifre değiştirilemedi" + ((": " + str(d.get("msg", d.get("message", "")))) if d is Dictionary else "")
+	return ""
+
 func logout() -> void:
 	if is_logged_in():
 		await set_status("offline")
@@ -213,6 +239,9 @@ func _take_session(d: Dictionary) -> void:
 	expires_at = Time.get_unix_time_from_system() + float(d.get("expires_in", 3600))
 	var u: Dictionary = d.get("user", {})
 	uid = str(u.get("id", uid))
+	if not remember:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SESSION))
+		return
 	var f := FileAccess.open(SESSION, FileAccess.WRITE)
 	f.store_string(JSON.stringify({"refresh": refresh}))
 

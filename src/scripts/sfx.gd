@@ -37,17 +37,23 @@ func _pick(n: String) -> AudioStream:
 	var a: Array = variants[n]
 	return a[randi() % a.size()] if a.size() > 0 else null
 
+## v4.18 interface sounds (Kenney CC0, OpenGameArt CC0, Sonniss GDC 2026 royalty-free) and announcer lines
+const UI_DIR := "res://assets/audio/ui/"
+const ANN_DIR := "res://assets/audio/announcer/"
+
 func get_stream(n: String) -> AudioStream:
 	if streams.has(n):
 		return streams[n]
-	var path := DIR + n + ".wav"
 	var s: AudioStream = null
-	if ResourceLoader.exists(path):
-		s = load(path)
-	elif ResourceLoader.exists(DIR + n + ".ogg"):
-		s = load(DIR + n + ".ogg")
+	for d in [UI_DIR, ANN_DIR, DIR]:
+		for ext in [".ogg", ".wav"]:
+			if s == null and ResourceLoader.exists(d + n + ext):
+				s = load(d + n + ext)
 	streams[n] = s
 	return s
+
+func is_ui(n: String) -> bool:
+	return ResourceLoader.exists(UI_DIR + n + ".ogg")
 
 func play(n: String, vol_db: float = 0.0, pitch: float = 1.0) -> void:
 	if silent:
@@ -63,7 +69,12 @@ func play(n: String, vol_db: float = 0.0, pitch: float = 1.0) -> void:
 	best.stream = s
 	best.volume_db = vol_db
 	best.pitch_scale = pitch
+	best.bus = "UI" if is_ui(n) and AudioServer.get_bus_index("UI") >= 0 else "SFX"
 	best.play()
+
+## interface sound with a little pitch variety so rapid hovers/clicks don't sound machine-gunned
+func ui(n: String, vol_db: float = 0.0) -> void:
+	play(n, vol_db, randf_range(0.97, 1.03))
 
 func play_var(base: String, count: int, vol_db: float = 0.0, pitch_var: float = 0.08) -> void:
 	play("%s%d" % [base, randi() % count], vol_db, 1.0 + randf_range(-pitch_var, pitch_var))

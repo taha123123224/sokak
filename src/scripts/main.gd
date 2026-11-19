@@ -17,7 +17,7 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		var kv := a.trim_prefix("--").split("=")
 		args[kv[0]] = kv[1] if kv.size() > 1 else "1"
-	var testrun := args.has("shot") or args.has("bench") or args.has("econtest") or args.has("match") or args.has("simstat") or args.has("netsim") or args.has("nettest") or args.has("dumpcatalog")
+	var testrun := args.has("shot") or args.has("bench") or args.has("uishot") or args.has("econtest") or args.has("match") or args.has("simstat") or args.has("netsim") or args.has("nettest") or args.has("dumpcatalog")
 	if not testrun or args.has("gfxtest"):
 		# make sure 3D really draws on this PC (switches to DirectX 12 / OpenGL and restarts if not)
 		if await preload("res://scripts/gfx.gd").startup(self):
@@ -47,6 +47,35 @@ func _ready() -> void:
 		return
 	if args.has("shot"):
 		_test(args)
+		return
+	if args.has("uishot"):
+		# v4.18 UI review: --uishot=lobby,play,bag,... [--uidir=/tmp] [--w= --h=] screenshots every menu page, then quits
+		GS.settings["fullscreen"] = false
+		GS.settings["window_mode"] = "windowed"
+		GS.apply_settings()
+		DisplayServer.window_set_size(Vector2i(int(args.get("w", "1920")), int(args.get("h", "1080"))))
+		go_menu("lobby")
+		await get_tree().create_timer(4.0).timeout
+		for pg in str(args["uishot"]).split(","):
+			if pg in ["login", "register"]:
+				go_login()
+				await get_tree().create_timer(3.0).timeout
+				if pg == "register" and current and current.has_method("_set_mode"):
+					if current.has_method("_show_form"): current._show_form(true)
+					current._set_mode(true)
+			elif pg == "popup" and current and current.has_method("_player_popup"):
+				current.show_page("lobby")
+				await get_tree().create_timer(1.0).timeout
+				current._player_popup(Rect2(Vector2(get_viewport().get_visible_rect().size.x * 0.5 + 70, get_viewport().get_visible_rect().size.y - 330), Vector2(84, 260)))
+			elif current and current.has_method("show_page"):
+				current.show_page(pg)
+			elif pg != "":
+				go_menu(pg)
+			await get_tree().create_timer(2.5).timeout
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png("%s/ui_%s.png" % [args.get("uidir", "/tmp"), pg])
+			print("UISHOT ", pg)
+		get_tree().quit()
 		return
 	if args.has("bench"):
 		# v4.18: SOKAK.exe -- --bench=all|hurda,liman [--bench-profile=high] [--bench-time=60] [--bench-res=2560x1440]

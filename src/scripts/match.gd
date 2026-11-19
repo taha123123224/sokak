@@ -542,6 +542,7 @@ func _build() -> void:
 	SFX.play_music("music_match", -13, false)
 	SFX.play_amb(GS.MAPS.get(map_id, {}).get("amb", {"mahalle": "amb_city", "safranbolu": "amb_town", "gemi": "amb_ship", "liman": "amb_port", "insaat": "amb_site", "canakkale": "amb_sea"}.get(map_id, "amb_town")))
 	# dip to black, then reveal the match (no messy cross-fade of the loading art over the HUD)
+	SFX.ui("ui_loaded", -14)
 	var blk := ColorRect.new()
 	blk.color = Color(0, 0, 0, 0)
 	blk.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1570,6 +1571,10 @@ func _sp_on_death(victim, attacker, wid: String, head: bool) -> void:
 		if head: ae["head"] += 1
 		if teams and sab == null and ctf == null:
 			team_score[ae["team"]] += 1
+			# v4.18 announcer (Sonniss GDC 2026 / Epic Stock Media): once per match when a team is 10 kills from the target
+			if not has_meta("ann_ten") and int(target_score) > 15 and int(team_score[ae["team"]]) == int(target_score) - 10:
+				set_meta("ann_ten", true)
+				if hud and bool(GS.settings.get("announcer", true)): hud._announce("ann_ten_left")
 	elif teams:
 		pass
 	var klvl := 0
@@ -2201,6 +2206,11 @@ func test_hook(i: int) -> void:
 	if i == 23:
 		hud.force_board = true
 		return
+	if i == 141:
+		# v4.18 UI review: post-match screen with the real end-of-match rewards path
+		hud.force_board = false
+		end_match()
+		return
 	if i == 102:
 		# v4.9 viewmodel review: equip the next gun from env GUNS ("ak47,m4a1,..."), no skin, still pose
 		var lst: PackedStringArray = OS.get_environment("GUNS").split(",")
@@ -2330,6 +2340,8 @@ func test_hook(i: int) -> void:
 		player.ammo[wid] = [int(GS.WEAPONS[wid].get("mag", 1)), 99]
 		player.cur = ""
 		player.switch_to(wid, true)
+	elif i == 140:
+		_qa_audit()
 	elif i == 133:
 		# v4.16 FP animation check: FPA="reload,fire,..." FR="0.3,..." -> plays clip k frozen at fraction k
 		var an: PackedStringArray = (OS.get_environment("FPA") if OS.has_environment("FPA") else "reload").split(",")
@@ -2817,3 +2829,121 @@ func _fix_imported_mats(vis: Node) -> void:
 				sm.alpha_scissor_threshold = 0.45
 				sm.cull_mode = BaseMaterial3D.CULL_DISABLED
 			_micro_detail(sm)
+
+
+# ---------------------------------------------------------------- v4.18 automatic map QA (hook 140)
+## spawns (ground under them, room for a standing player, nav reachability), objects floating above or buried in the
+## ground, surfaces without a material, scene stats; prints one QA {json} line and quits
+func _qa_audit() -> void:
+	var space := get_world_3d().direct_space_state
+	var r := {"map": map_id, "spawns": spawn_points.size(), "spawn_issues": [], "floating": [], "buried": [], "no_material": 0,
+		"meshes": 0, "surfaces": 0, "tris": 0, "lights": 0, "omni_shadow": 0}
+	var excl: Array = [player.get_rid()] if player else []
+	for c in combatants:
+		if c["node"] is CollisionObject3D: excl.append((c["node"] as CollisionObject3D).get_rid())
+	var nm: RID = get_world_3d().navigation_map
+	var a0: Vector3 = spawn_points[0]["pos"] if spawn_points.size() > 0 else Vector3.ZERO
+	for k in spawn_points.size():
+		var sp: Vector3 = spawn_points[k]["pos"]
+		var q := PhysicsRayQueryParameters3D.create(sp + Vector3(0, 0.5, 0), sp + Vector3(0, -1.5, 0))
+		q.exclude = excl
+		var hit := space.intersect_ray(q)
+		var issue := []
+		if hit.is_empty():
+			issue.append("no ground within 1.5 m")
+		elif sp.y - hit["position"].y > 0.6:
+			issue.append("%.2f m above ground" % (sp.y - hit["position"].y))
+		var gy: float = hit["position"].y if not hit.is_empty() else sp.y
+		var cap := CapsuleShape3D.new(); cap.radius = 0.35; cap.height = 1.75
+		var sq := PhysicsShapeQueryParameters3D.new()
+		sq.shape = cap
+		sq.transform = Transform3D(Basis(), Vector3(sp.x, gy + 0.2 + 0.875, sp.z))
+		sq.exclude = excl
+		var ov := space.intersect_shape(sq, 4)
+		if not ov.is_empty():
+			var names := []
+			for o in ov:
+				var co = o["collider"]
+				var desc := "?"
+				if co and co is CollisionObject3D:
+					desc = "%s@(%.1f,%.1f,%.1f)" % [co.name, co.global_position.x, co.global_position.y, co.global_position.z]
+					for ch in co.get_children():
+						if ch is CollisionShape3D and ch.shape is BoxShape3D:
+							var bs: Vector3 = (ch.shape as BoxShape3D).size
+							desc += " box(%.1f,%.1f,%.1f)" % [bs.x, bs.y, bs.z]
+				names.append(desc)
+			issue.append("inside geometry: " + ",".join(names))
+			# suggest the nearest free standing spot (ground below, capsule clear)
+			var best = null
+			for rr in [0.6, 1.0, 1.5, 2.0, 2.5, 3.0]:
+				for ka in 12:
+					var cand: Vector3 = sp + Vector3(cos(ka * TAU / 12.0), 0, sin(ka * TAU / 12.0)) * rr
+					var qg := PhysicsRayQueryParameters3D.create(cand + Vector3(0, 0.8, 0), cand + Vector3(0, -1.5, 0))
+					qg.exclude = excl
+					var hg := space.intersect_ray(qg)
+					if hg.is_empty() or absf(hg["position"].y - gy) > 0.4:
+						continue
+					sq.transform = Transform3D(Basis(), Vector3(cand.x, hg["position"].y + 0.2 + 0.875, cand.z))
+					if space.intersect_shape(sq, 1).is_empty():
+						best = [snappedf(cand.x, 0.1), snappedf(hg["position"].y + 0.05, 0.01), snappedf(cand.z, 0.1)]
+						break
+				if best != null:
+					break
+			if best != null:
+				issue.append("move to %s" % str(best))
+		if nm.is_valid() and NavigationServer3D.map_get_iteration_id(nm) > 0:
+			var path := NavigationServer3D.map_get_path(nm, NavigationServer3D.map_get_closest_point(nm, a0), NavigationServer3D.map_get_closest_point(nm, sp), true)
+			var off := NavigationServer3D.map_get_closest_point(nm, sp).distance_to(sp)
+			if path.size() == 0 or path[path.size() - 1].distance_to(sp) > 2.5 or off > 1.5:
+				var pe: Vector3 = path[path.size() - 1] if path.size() > 0 else a0
+				issue.append("nav unreachable from spawn 0 (path ends %.1f m away at %.0f,%.0f,%.0f)" % [pe.distance_to(sp), pe.x, pe.y, pe.z])
+		if not issue.is_empty():
+			r["spawn_issues"].append({"i": k, "pos": [snappedf(sp.x, 0.1), snappedf(sp.y, 0.1), snappedf(sp.z, 0.1)], "why": issue})
+	for li in find_children("*", "Light3D", true, false):
+		r["lights"] += 1
+		if li is OmniLight3D and (li as Light3D).shadow_enabled: r["omni_shadow"] += 1
+	if map_vis:
+		for mi in map_vis.find_children("*", "MeshInstance3D", true, false):
+			var m3 := mi as MeshInstance3D
+			if m3.mesh == null or not m3.is_visible_in_tree():
+				continue
+			r["meshes"] += 1
+			for si in m3.mesh.get_surface_count():
+				r["surfaces"] += 1
+				if m3.get_active_material(si) == null:
+					r["no_material"] += 1
+				var arr = m3.mesh.surface_get_arrays(si) if m3.mesh is ArrayMesh and r["tris"] < 40000000 else null
+				if arr != null and arr[Mesh.ARRAY_INDEX] != null:
+					r["tris"] += (arr[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+			var bb := m3.global_transform * m3.get_aabb()
+			var sz := bb.size
+			if sz.x > 60 or sz.z > 60 or sz.length() < 0.25 or String(m3.name).begins_with("far"):
+				continue
+			var bc := Vector3(bb.get_center().x, bb.position.y, bb.get_center().z)
+			# floating: nothing under the object's base within 0.35 m and the ground is clearly lower
+			var q2 := PhysicsRayQueryParameters3D.create(bc + Vector3(0, 0.05, 0), bc + Vector3(0, -6.0, 0))
+			q2.exclude = excl
+			var h2 := space.intersect_ray(q2)
+			if not h2.is_empty() and bc.y - h2["position"].y > 0.35 and sz.y < 6.0 and sz.y > 0.15:
+				# skip things mounted on walls/ceilings: something solid right beside or above them
+				var q3 := PhysicsRayQueryParameters3D.create(bb.get_center(), bb.get_center() + Vector3(0, 4, 0))
+				q3.exclude = excl
+				var side := false
+				for d in [Vector3.RIGHT, Vector3.LEFT, Vector3.FORWARD, Vector3.BACK]:
+					var q4 := PhysicsRayQueryParameters3D.create(bb.get_center(), bb.get_center() + d * (maxf(sz.x, sz.z) * 0.5 + 0.3))
+					q4.exclude = excl
+					if not space.intersect_ray(q4).is_empty(): side = true
+				if space.intersect_ray(q3).is_empty() and not side:
+					r["floating"].append({"n": String(m3.get_path()).get_slice("Map/", 1).left(80), "gap": snappedf(bc.y - h2["position"].y, 0.01),
+						"at": [snappedf(bc.x, 0.1), snappedf(bc.y, 0.1), snappedf(bc.z, 0.1)], "size": [snappedf(sz.x, 0.1), snappedf(sz.y, 0.1), snappedf(sz.z, 0.1)]})
+			# buried: ground hit from far above lands over the object's top
+			var top := bb.get_center() + Vector3(0, sz.y * 0.5, 0)
+			var q5 := PhysicsRayQueryParameters3D.create(top + Vector3(0, 30, 0), top + Vector3(0, -0.01, 0))
+			q5.exclude = excl
+			var h5 := space.intersect_ray(q5)
+			if not h5.is_empty() and h5["position"].y > top.y + 0.2 and sz.y > 0.3 and str(h5["collider"].name).to_lower().contains("terrain"):
+				r["buried"].append({"n": String(m3.get_path()).get_slice("Map/", 1).left(80), "depth": snappedf(h5["position"].y - top.y, 0.01)})
+	r["floating_n"] = r["floating"].size(); r["buried_n"] = r["buried"].size()
+	if r["floating"].size() > 25: r["floating"] = r["floating"].slice(0, 25)
+	print("QA ", JSON.stringify(r))
+	get_tree().quit()

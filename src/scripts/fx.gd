@@ -253,7 +253,7 @@ func tracer(a: Vector3, b: Vector3, width: float = 0.018) -> void:
 	var dir := (b - a).normalized()
 	var start := a + dir * 1.0
 	mi.global_position = start + dir * seg * 0.5
-	mi.look_at(b, Vector3.UP if abs(dir.y) < 0.99 else Vector3.RIGHT)
+	mi.look_at(mi.global_position + dir, Vector3.UP if abs(dir.y) < 0.99 else Vector3.RIGHT)   # v4.18: short tracers centred on b broke look_at
 	mi.scale = Vector3(width, width, seg)
 	var speed := 380.0
 	var travel: float = max(len - 1.0 - seg * 0.5, 0.0)

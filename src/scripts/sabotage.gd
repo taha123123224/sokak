@@ -461,6 +461,8 @@ func _end_round(winner: String, why: String) -> void:
 	var mvp := _round_mvp()
 	m.hud.round_banner("TURU %s KAZANDI" % GS.TEAMS[winner], why + ("   •   " + mvp if mvp != "" else ""), GS.TEAM_COLORS.get(winner, UI.ACCENT2), int(m.team_score["a"]), int(m.team_score["b"]))
 	SFX.play("success" if mine else "fail", -4)
+	if mine and bool(GS.settings.get("announcer", true)) and why.begins_with("BOMBA"):
+		m.hud._announce("ann_objective")
 	for c in m.combatants:
 		if "obj_goal" in c["node"]:
 			c["node"].obj_goal = Vector3.INF
