@@ -34,6 +34,7 @@ Online="*res://scripts/online.gd"
 Net="*res://scripts/net.gd"
 Updater="*res://scripts/updater.gd"
 Voice="*res://scripts/voice.gd"
+UiSfx="*res://scripts/ui_sfx.gd"
 
 [display]
 

@@ -121,3 +121,20 @@ Ayrıntı ve bağlantılar: `docs/ANIMATION_AUDIO_ASSET_RESEARCH.md`.
 | AK-47 inceleme | Animated FPS hands (rifle animation pack) — rifle_inspect | ccransh | https://sketchfab.com/3d-models/5f2d0ed780a94724b36ab505f7564057 |
 Değişiklikler (CC-BY gereği belirtilir): dokular küçültüldü (silah 4K renk/normal, eller 2K), görünmeyen gövde parçaları silindi,
 Deagle silah köşeleri bind uzayına düzeltildi, AK paketine rifle paketinin inceleme klibi eklendi, oyunun malzeme/kol shader'ı uygulandı.
+
+## v4.18 Arayüz (UI/UX) varlıkları
+
+Ayrıntılı kaynak raporu: `docs/UI_ASSET_REPORT.md`.
+
+| Varlık | Kaynak / Yazar | Lisans | Kullanım |
+|---|---|---|---|
+| Rajdhani, Roboto Condensed, Inter | Google Fonts (google/fonts) | SIL OFL 1.1 | Başlık / menü-skor / metin fontları |
+| 31 Lucide SVG ikonu | lucide.dev (npm lucide-static 1.76.0) | ISC | Menü, ayarlar, bildirim, skor tablosu |
+| 14 game-icons SVG | game-icons.net — Skoll, Lorc, sbed, Delapouite, John Colburn | CC BY 3.0 | Silah kategorileri, madalya, headshot |
+| UI Pack, UI Pack Sci-Fi, Crosshair Pack, Interface Sounds, UI Audio | Kenney (kenney.nl) | CC0 | Onay kutuları, paneller, 10 nişangah, 11 ses |
+| Naro Rank Vector Icons (18 kalkan) | @NarekArts / TheColourfulSuit (itch.io) | Ücretsiz ticari kullanım, yeniden dağıtım yasak | Seviye kalkanı |
+| 8 UI sesi + 2 anons | Sonniss GDC 2026 Game Audio Bundle (Cinematic Sound Design, Epic Stock Media) | Sonniss GDC lisansı (telifsiz, atıfsız) | Bildirim, başarı/hata, satın alma, maç bulundu, anons |
+| UI sesleri | OpenGameArt: Robin Lamb, LokiF, bart, CleytonKauffman, KarateStudios | CC0 | Sayfa geçişi, maç arama/kabul/çıkış, kayıt, arkadaş |
+| 7 nişangah | OpenGameArt: hc, para | CC0 | Hazır nişangah galerisi |
+
+Naro ve Sonniss dosyaları lisansları gereği açık kaynak deposuna ham olarak konmaz; yalnızca oyun paketinde dağıtılır.
