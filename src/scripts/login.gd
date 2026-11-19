@@ -229,7 +229,7 @@ func _build_ui() -> void:
 	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	# v3.1: the key art has the operators on the left, so the wordmark sits top-right above the login card
 	logo.anchor_left = 1; logo.anchor_right = 1
-	logo.offset_left = -585; logo.offset_right = -85; logo.offset_top = 58; logo.offset_bottom = 208
+	logo.offset_left = -500; logo.offset_right = -80; logo.offset_top = 46; logo.offset_bottom = 176
 	logo.pivot_offset = Vector2(250, 75)
 	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(logo)
@@ -243,18 +243,33 @@ func _build_ui() -> void:
 	ui.add_child(em)
 	var tag := UI.lbl("TÜRKİYE'NİN SOKAKLARINDA TAKTİK ÇATIŞMA", 18, Color(1, 1, 1, 0.8), "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_CENTER)
 	tag.anchor_left = 1; tag.anchor_right = 1
-	tag.offset_left = -585; tag.offset_right = -85; tag.offset_top = 212; tag.offset_bottom = 240
+	tag.offset_left = -540; tag.offset_right = -40; tag.offset_top = 178; tag.offset_bottom = 204
 	tag.add_theme_constant_override("outline_size", 6)
 	tag.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	ui.add_child(tag)
 	# ---------------- account card (right): glass panel, segmented tabs, icon fields, saved-account profile card
+	# v4.18.1: full-height client sidebar on the right (operators in the key art stay visible on the left)
+	var sidebar := Panel.new()
+	var ssb := UI.sb(Color(0.055, 0.058, 0.066, 0.97), Color(0, 0, 0, 0), 0, 0, 0)
+	ssb.border_width_left = 1; ssb.border_color = Color(1, 1, 1, 0.08)
+	ssb.shadow_color = Color(0, 0, 0, 0.6); ssb.shadow_size = 40
+	sidebar.add_theme_stylebox_override("panel", ssb)
+	sidebar.anchor_left = 1; sidebar.anchor_right = 1; sidebar.anchor_bottom = 1
+	sidebar.offset_left = -580; sidebar.offset_bottom = -40
+	sidebar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(sidebar)
+	ui.move_child(sidebar, logo.get_index())
+	var acc := ColorRect.new()
+	acc.color = UI.ACCENT
+	acc.anchor_left = 1; acc.anchor_right = 1; acc.offset_left = -580; acc.offset_right = -576; acc.anchor_bottom = 1; acc.offset_bottom = -40
+	acc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(acc)
+	ui.move_child(acc, logo.get_index())
 	card = PanelContainer.new()
-	var csb := UI.sb(Color(0.045, 0.05, 0.058, 0.8), Color(1, 1, 1, 0.1), 1, 8, 34)
-	csb.shadow_color = Color(0, 0, 0, 0.55); csb.shadow_size = 30
+	var csb := StyleBoxEmpty.new()
 	card.add_theme_stylebox_override("panel", csb)
-	card.anchor_left = 1; card.anchor_right = 1; card.anchor_top = 0.5; card.anchor_bottom = 0.5
-	card.offset_left = -580; card.offset_right = -90; card.offset_top = 70; card.offset_bottom = 70
-	card.grow_vertical = Control.GROW_DIRECTION_BOTH
+	card.anchor_left = 1; card.anchor_right = 1; card.anchor_top = 0; card.anchor_bottom = 1
+	card.offset_left = -530; card.offset_right = -50; card.offset_top = 222; card.offset_bottom = -60
 	ui.add_child(card)
 	var strip := ColorRect.new()
 	strip.color = UI.ACCENT
@@ -276,9 +291,9 @@ func _build_ui() -> void:
 	if Online.configured():
 		# measured, not invented: real round trip to the account service
 		_show_ping(srv)
-	title_lbl = UI.lbl("HESABINA GİRİŞ YAP", 34, Color.WHITE, "RussoOne-Regular")
+	title_lbl = UI.lbl("HESABINA GİRİŞ YAP", 40, Color.WHITE, "Display")
 	hv.add_child(title_lbl)
-	sub_lbl = UI.lbl("Kaldığın yerden devam et: envanterin ve rütben hesabında.", 16, Color(1, 1, 1, 0.55), "Rajdhani-SemiBold")
+	sub_lbl = UI.lbl("Kaldığın yerden devam et: envanterin ve rütben hesabında.", 15, Color(1, 1, 1, 0.55), "Inter")
 	sub_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hv.add_child(sub_lbl)
 	v.add_child(strip)
@@ -415,8 +430,8 @@ func _build_ui() -> void:
 	var ct := create_tween()
 	ct.tween_interval(0.15)
 	ct.tween_property(card, "modulate:a", 1.0, 0.45)
-	ct.parallel().tween_property(card, "offset_left", -580.0, 0.55).from(-500.0).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	ct.parallel().tween_property(card, "offset_right", -90.0, 0.55).from(-10.0).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	ct.parallel().tween_property(card, "offset_left", -530.0, 0.55).from(-470.0).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	ct.parallel().tween_property(card, "offset_right", -50.0, 0.55).from(10.0).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 	# update banner (filled by the updater)
 	upd_panel = PanelContainer.new()
 	upd_panel.add_theme_stylebox_override("panel", UI.sb(Color(0.2, 0.1, 0.02, 0.95), UI.ACCENT, 2, 8, 16))
@@ -465,7 +480,7 @@ func _build_ui() -> void:
 	clip.offset_top = -40; clip.offset_left = 150; clip.offset_right = -260
 	ui.add_child(clip)
 	ui.add_child(bp)
-	ticker = UI.lbl("YENİ v3.6: KURT ADAM MODU — 3 ile kurda dönüş, takla, duvara tırmanma, pençe   •   SEZON PASOSU: 30 seviye ücretsiz ödül   •   Hareketli özel eklentiler: Plazma ve Magma susturucu, Hologram dürbün   •   Yeni silah seviye rozetleri", 19, Color(1, 1, 1, 0.9), "Rajdhani-SemiBold")
+	ticker = UI.lbl("YENİ v%s: CS2 tarzı arayüz — sade lobi, harita kartları, DONANIM ekranı, yeni mağaza   •   17 hazır nişangah   •   Arayüz sesleri ve yeni anonslar   •   KURT ADAM ve SABOTAJ modları   •   SEZON PASOSU: 30 seviye ücretsiz ödül" % str(preload("res://scripts/updater.gd").VERSION), 17, Color(1, 1, 1, 0.9), "Nav")
 	ticker.position = Vector2(1400, 8)
 	clip.add_child(ticker)
 	var ver := UI.lbl("SOKAK: Operasyon  v%s   " % Updater.VERSION, 16, UI.DIM, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_RIGHT)
@@ -478,9 +493,10 @@ func _field(t: String, secret: bool) -> LineEdit:
 	e.text = t
 	e.secret = secret
 	e.max_length = 16 if not secret else 64
-	e.custom_minimum_size = Vector2(0, 52)
-	e.add_theme_font_override("font", UI.font("Rajdhani-Bold"))
-	e.add_theme_font_size_override("font_size", 24)
+	e.custom_minimum_size = Vector2(0, 54)
+	e.add_theme_font_override("font", UI.font("InterSemi"))
+	e.add_theme_font_size_override("font_size", 19)
+	e.add_theme_color_override("font_placeholder_color", Color(1, 1, 1, 0.32))
 	e.add_theme_stylebox_override("normal", UI.sb(Color(0.1, 0.105, 0.115, 1), Color(1, 1, 1, 0.12), 1, 4, 14))
 	e.add_theme_stylebox_override("focus", UI.sb(Color(0.13, 0.135, 0.15, 1), UI.ACCENT, 2, 4, 14))
 	return e
@@ -488,13 +504,14 @@ func _field(t: String, secret: bool) -> LineEdit:
 func _icon_field(icon: String, label: String, t: String, secret: bool) -> Array:
 	## label + framed field with a leading icon (and a show/hide eye for passwords); returns [container, LineEdit]
 	var box := UI.vbox(4)
-	box.add_child(UI.lbl(label, 13, UI.DIM, "Rajdhani-Bold"))
+	box.add_child(UI.lbl(label, 12, Color(1, 1, 1, 0.55), "Nav"))
 	var fr := PanelContainer.new()
-	var nsb := UI.sb(Color(0.09, 0.095, 0.105, 1), Color(1, 1, 1, 0.1), 1, 4, 0)
-	nsb.content_margin_left = 14; nsb.content_margin_right = 8
-	var fsb := UI.sb(Color(0.115, 0.12, 0.13, 1), UI.ACCENT, 2, 4, 0)
-	fsb.content_margin_left = 14; fsb.content_margin_right = 8
-	fsb.shadow_color = Color(1, 0.55, 0.12, 0.25); fsb.shadow_size = 8
+	var nsb := UI.sb(Color(0.12, 0.125, 0.135, 1), Color(0, 0, 0, 0), 0, 3, 0)
+	nsb.content_margin_left = 16; nsb.content_margin_right = 8
+	nsb.border_width_bottom = 2; nsb.border_color = Color(1, 1, 1, 0.12)
+	var fsb := UI.sb(Color(0.15, 0.155, 0.17, 1), Color(0, 0, 0, 0), 0, 3, 0)
+	fsb.content_margin_left = 16; fsb.content_margin_right = 8
+	fsb.border_width_bottom = 2; fsb.border_color = UI.ACCENT
 	fr.add_theme_stylebox_override("panel", nsb)
 	box.add_child(fr)
 	var h := UI.hbox(10)

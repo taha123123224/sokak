@@ -171,3 +171,18 @@ Kullanıcının gönderdiği 4 CS2 görseline göre ekranların **düzeni** yeni
 | Oyuncu kartı açılır penceresi | Lobi > oyuncu kartına tık | Ajan, isim, 7 başarım madalyası (profildeki gerçek istatistiklerden; ulaşılmamışlar soluk, üzerine gelince hedef ve ilerleme), rütbe + seviye çubuğu, RP plakası, maç/galibiyet/öldürme/kafadan, Profil ve Donanım butonları. |
 
 Not: Oyunda ayrı bir "Başarımlar" sayfası yoktu; başarımlar artık oyuncu kartında gerçek verilerle gösteriliyor.
+
+## v4.18.1 — ikinci tasarım turu (kullanıcı geri bildirimi)
+
+- **Ortak CS:GO eşya kartı (`ItemTile`)**: koyu metal degrade, eşyanın arkasında nadirlik ışıması, altta nadirlik şeridi ve
+  yukarı doğru renk geçişi, seçilince beyaz çerçeve + turuncu köşe işaretleri. Market, Donanım ve Oda Kur'da kullanılıyor.
+- **Silah kartı (`_weapon_panel`)**: nadirlik/sınıf, büyük isim, kaplama, nadirlik ışımalı büyük görsel, yetenek satırı,
+  HASAR / ATIŞ / ŞARJÖR / FİYAT-SEVİYE rakamları, 10 bölmeli istatistik çubukları (gerçek silah verisinden), işlem butonları.
+- **Market**: sol tarafta öne çıkan + eşya ızgarası, sağda seçili silahın/kaplamanın kartı (SATIN AL, 3D İNCELE).
+  Kaplamalar sekmesi de aynı düzende. Diğer sekmelerin kart arka planları aynı metal tona çekildi.
+- **Donanım**: iki eşit ana silah sütunu, büyük kartlar, sağda seçili silahın kartı (KUŞAN, 3D İNCELE, KAPLAMA/GELİŞTİR),
+  karakter kamerası sol boşluğa alındı, panel ortada şeffaf.
+- **Giriş**: tam boy sağ panel (oyun istemcisi düzeni), logo panelin içinde, büyük düz giriş alanları (odakta turuncu alt çizgi),
+  CheckBox'ların arkasındaki turuncu dolgu hatası giderildi, haber şeridi güncellendi.
+- **Oda Kur**: haritalar amblemli eşya kartları, modlar ikonlu kartlar, tüm seçenekler CS2 hap butonları, mavi üst şeritli panel.
+- Oyuncu kartı açılır penceresi başka sayfaya geçince artık kapanıyor.

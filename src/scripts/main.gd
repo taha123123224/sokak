@@ -63,6 +63,10 @@ func _ready() -> void:
 				if pg == "register" and current and current.has_method("_set_mode"):
 					if current.has_method("_show_form"): current._show_form(true)
 					current._set_mode(true)
+			elif pg == "roomdlg" and current and current.has_method("_create_room_dialog"):
+				current.show_page("lobby")
+				await get_tree().create_timer(1.0).timeout
+				current._create_room_dialog()
 			elif pg == "popup" and current and current.has_method("_player_popup"):
 				current.show_page("lobby")
 				await get_tree().create_timer(1.0).timeout

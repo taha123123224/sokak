@@ -162,6 +162,15 @@ static func build_theme() -> Theme:
 	t.set_color("font_color", "CheckButton", TEXT)
 	t.set_font("font", "LineEdit", font("Inter")); t.set_font("font", "TextEdit", font("Inter"))
 	t.set_font("normal_font", "RichTextLabel", font("Inter")); t.set_font("bold_font", "RichTextLabel", font("InterSemi"))
+	# CheckBox / CheckButton inherit Button styles otherwise (orange "pressed" plate behind the box)
+	var cb_empty := StyleBoxEmpty.new()
+	cb_empty.content_margin_left = 4; cb_empty.content_margin_right = 6; cb_empty.content_margin_top = 4; cb_empty.content_margin_bottom = 4
+	var cb_hover := sb(Color(1, 1, 1, 0.05), Color(0, 0, 0, 0), 0, 3, 6)
+	for ct in ["CheckBox", "CheckButton"]:
+		for st in ["normal", "pressed", "disabled", "hover_pressed", "focus"]:
+			t.set_stylebox(st, ct, cb_empty)
+		t.set_stylebox("hover", ct, cb_hover)
+		t.set_color("font_pressed_color", ct, Color.WHITE); t.set_color("font_hover_pressed_color", ct, Color.WHITE)
 	# Kenney UI Pack (CC0) grey check / radio glyphs, tinted to the palette
 	for pair in [["checked", "check_on"], ["unchecked", "check_off"], ["radio_checked", "radio_on"], ["radio_unchecked", "radio_off"]]:
 		var ct: Texture2D = load("res://assets/ui/kenney/%s.png" % pair[1]) if ResourceLoader.exists("res://assets/ui/kenney/%s.png" % pair[1]) else null

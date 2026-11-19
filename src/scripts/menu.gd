@@ -1612,7 +1612,10 @@ class TopGlow extends Control:
 			draw_rect(Rect2(w * t0, 0, w / n + 1, 2), Color(UI.ACCENT.r, UI.ACCENT.g, UI.ACCENT.b, 0.25 + 0.75 * a))
 			draw_rect(Rect2(w * t0, 2, w / n + 1, 2), Color(UI.ACCENT.r, UI.ACCENT.g, UI.ACCENT.b, 0.12 * a))
 
+var _pp_dim: Control
 func show_page(p: String) -> void:
+	if _pp_dim and is_instance_valid(_pp_dim):
+		_pp_dim.queue_free()
 	if p != page and page != "":
 		SFX.ui("ui_page", -10)
 	# while you are in a room, ODALAR takes you back into it (you only leave with the ÇIKIŞ button)
@@ -2208,6 +2211,7 @@ func _player_popup(anchor: Rect2) -> void:
 	var dim := Control.new()
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	ui.add_child(dim)
+	_pp_dim = dim
 	var pc := PanelContainer.new()
 	pc.add_theme_stylebox_override("panel", UI.sb(Color(0.13, 0.135, 0.15, 0.98), Color(1, 1, 1, 0.08), 1, 2, 0))
 	pc.custom_minimum_size = Vector2(560, 0)
@@ -2294,61 +2298,232 @@ func _player_popup(anchor: Rect2) -> void:
 	pc.modulate.a = 0.0
 	pc.create_tween().tween_property(pc, "modulate:a", 1.0, 0.12)
 
+## ================================================================ v4.18.1 shared CS:GO item visuals
+class ItemTile extends Button:
+	## CS:GO inventory/store tile: slate gradient, rarity glow behind the item, rarity bar along the bottom,
+	## white frame + corner brackets when selected. Content (thumb, labels) are child nodes.
+	var grade := Color("5e98d9")
+	var sel := false
+	var _hov := false
+	func _ready() -> void:
+		focus_mode = Control.FOCUS_NONE
+		flat = true
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		set_meta("sfx", true)
+		mouse_entered.connect(func(): _hov = true; queue_redraw(); SFX.ui("ui_hover", -16))
+		mouse_exited.connect(func(): _hov = false; queue_redraw())
+	func _draw() -> void:
+		var w := size.x
+		var h := size.y
+		var k := 0.06 if _hov else 0.0
+		var top := Color(0.2 + k, 0.215 + k, 0.24 + k)
+		var bot := Color(0.085 + k, 0.09 + k, 0.105 + k)
+		draw_polygon(PackedVector2Array([Vector2(0, 0), Vector2(w, 0), Vector2(w, h), Vector2(0, h)]), PackedColorArray([top, top, bot, bot]))
+		# rarity glow behind the item
+		var c := Vector2(w * 0.5, h * 0.42)
+		for i in 8:
+			var f := 1.0 - float(i) / 8.0
+			draw_circle(c, minf(w, h) * (0.18 + 0.05 * i), Color(grade.r, grade.g, grade.b, 0.035 * f * (1.6 if _hov else 1.0)))
+		# bottom rarity bar with a fade upward
+		var gh := 34.0
+		draw_polygon(PackedVector2Array([Vector2(0, h - gh), Vector2(w, h - gh), Vector2(w, h), Vector2(0, h)]),
+			PackedColorArray([Color(grade, 0.0), Color(grade, 0.0), Color(grade, 0.32), Color(grade, 0.32)]))
+		draw_rect(Rect2(0, h - 4, w, 4), grade)
+		draw_rect(Rect2(Vector2.ZERO, size), Color(1, 1, 1, 0.5 if _hov else 0.08), false, 1.0)
+		if sel:
+			draw_rect(Rect2(Vector2(1, 1), size - Vector2(2, 2)), Color.WHITE, false, 2.0)
+			var l := 14.0
+			for p in [[Vector2(4, 4), Vector2(1, 1)], [Vector2(w - 4, 4), Vector2(-1, 1)], [Vector2(4, h - 8), Vector2(1, -1)], [Vector2(w - 4, h - 8), Vector2(-1, -1)]]:
+				var o: Vector2 = p[0]; var d: Vector2 = p[1]
+				draw_line(o, o + Vector2(l * d.x, 0), UI.ACCENT2, 3.0)
+				draw_line(o, o + Vector2(0, l * d.y), UI.ACCENT2, 3.0)
+
+func _item_tile(id: String, skin: String, grade: Color, top_txt: String, name_txt: String, sub_txt: String, right_txt: String, right_col: Color, sz: Vector2, selected: bool, cb: Callable) -> ItemTile:
+	var b := ItemTile.new()
+	b.grade = grade; b.sel = selected
+	b.custom_minimum_size = sz
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var th := thumb_rect(id, skin, Vector2(sz.x - 24, sz.y * 0.56))
+	th.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	th.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	th.offset_left = 12; th.offset_right = -12; th.offset_top = 18; th.offset_bottom = sz.y - 54
+	th.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(th)
+	if top_txt != "":
+		var tl := UI.lbl(top_txt, 11, Color(1, 1, 1, 0.5), "Nav")
+		tl.position = Vector2(10, 6); tl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(tl)
+	var nm := UI.lbl(name_txt, 16 if sz.y < 180 else 18, Color.WHITE, "Nav")
+	nm.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	nm.offset_left = 10; nm.offset_right = -10; nm.offset_top = -50; nm.offset_bottom = -28
+	nm.clip_text = true; nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(nm)
+	var sl := UI.lbl(sub_txt, 12, grade.lightened(0.35), "Nav")
+	sl.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	sl.offset_left = 10; sl.offset_right = -10; sl.offset_top = -28; sl.offset_bottom = -8
+	sl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(sl)
+	if right_txt != "":
+		var rl := UI.lbl(right_txt, 16, right_col, "Stat", HORIZONTAL_ALIGNMENT_RIGHT)
+		rl.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		rl.offset_left = 10; rl.offset_right = -10; rl.offset_top = -30; rl.offset_bottom = -8
+		rl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(rl)
+	b.pressed.connect(func(): SFX.ui("ui_click", -6); cb.call())
+	return b
+
+## CS-style segmented stat bar: label, 10 segments, value
+func _seg_stat(label: String, val: float, maxv: float, txt: String = "") -> Control:
+	var h := UI.hbox(10)
+	var l := UI.lbl(label, 13, Color(1, 1, 1, 0.6), "Nav")
+	l.custom_minimum_size = Vector2(118, 0)
+	h.add_child(l)
+	var segs := SegBar.new()
+	segs.frac = clampf(val / maxv, 0.0, 1.0)
+	segs.custom_minimum_size = Vector2(0, 10)
+	segs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	segs.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(segs)
+	var vl := UI.lbl(txt if txt != "" else str(int(round(val))), 14, Color.WHITE, "Stat", HORIZONTAL_ALIGNMENT_RIGHT)
+	vl.custom_minimum_size = Vector2(46, 0)
+	h.add_child(vl)
+	return h
+
+class SegBar extends Control:
+	var frac := 0.5
+	func _draw() -> void:
+		var n := 10
+		var gap := 3.0
+		var sw := (size.x - gap * (n - 1)) / n
+		for i in n:
+			var x := i * (sw + gap)
+			var fill := clampf(frac * n - i, 0.0, 1.0)
+			draw_rect(Rect2(x, 0, sw, size.y), Color(1, 1, 1, 0.1))
+			if fill > 0.0:
+				var c := UI.ACCENT if frac < 0.8 else UI.GOLD
+				draw_rect(Rect2(x, 0, sw * fill, size.y), c)
+
+## Big weapon info card used by Market and Donanım: art, rarity, name, ability, segmented stats, numbers, actions
+func _weapon_panel(id: String, skin: String, grade: Color, grade_name: String, actions: Array) -> PanelContainer:
+	var w: Dictionary = GS.WEAPONS[id]
+	var pc := PanelContainer.new()
+	var psb := UI.sb(Color(0.07, 0.075, 0.085, 0.97), Color(1, 1, 1, 0.07), 1, 2, 18)
+	psb.border_width_top = 3; psb.border_color = grade
+	pc.add_theme_stylebox_override("panel", psb)
+	var v := UI.vbox(10)
+	pc.add_child(v)
+	v.add_child(UI.lbl(grade_name + "  ·  " + str(w.get("cls", GS.CATS.get(str(w.get("cat", "")), ""))).to_upper(), 13, grade.lightened(0.3), "Nav"))
+	var nm := UI.lbl(str(w["name"]).to_upper(), 34, Color.WHITE, "Display")
+	nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(nm)
+	if skin != "" and skin != "std":
+		var sd: Dictionary = GS.SKINS.get(skin, GS.SKINS["std"])
+		v.add_child(UI.lbl("Kaplama: " + str(sd["name"]) + "  ·  " + str(GS.RARITY_NAMES[int(sd["rarity"])]), 14, GS.RARITY_COLORS[int(sd["rarity"])], "InterSemi"))
+	var art := ItemTile.new()
+	art.grade = grade
+	art.disabled = true
+	art.mouse_default_cursor_shape = Control.CURSOR_ARROW
+	art.custom_minimum_size = Vector2(0, 190)
+	var th := thumb_rect(id, skin if skin != "" else "std", Vector2(340, 160))
+	th.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	th.set_anchors_preset(Control.PRESET_FULL_RECT)
+	th.offset_left = 14; th.offset_right = -14; th.offset_top = 10; th.offset_bottom = -14
+	art.add_child(th)
+	v.add_child(art)
+	var ab := str(GS.ball(id).get("ability", ""))
+	if ab != "":
+		var al := UI.lbl("★  " + ab, 14, UI.TEXT, "Inter")
+		al.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(al)
+	if not w.get("melee", false) and not w.get("throwable", false):
+		var nums := UI.hbox(0)
+		v.add_child(nums)
+		for kv in [["HASAR", str(int(w.get("dmg", 0)))], ["ATIŞ/DK", str(int(w.get("rpm", 0)))], ["ŞARJÖR", str(int(w.get("mag", 0)))], ["SEVİYE" if GS.owned(id) else "FİYAT", ("+%d" % GS.wlvl(id)) if GS.owned(id) else UI.money(int(w.get("price", 0)))]]:
+			var sv := UI.vbox(-2)
+			sv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			sv.add_child(UI.lbl(kv[0], 11, Color(1, 1, 1, 0.5), "Nav"))
+			sv.add_child(UI.lbl(kv[1], 24, Color.WHITE, "Display"))
+			nums.add_child(sv)
+		for r in _stat_rows(id).slice(0, 7):
+			v.add_child(_seg_stat(r[0], r[1], r[2]))
+	var sp := Control.new(); sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(sp)
+	for row in actions:
+		var ah := UI.hbox(8)
+		v.add_child(ah)
+		for a in row:
+			var b := UI.btn(a[0], a[1], 17, a[2], 0, 46)
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			if a.size() > 3:
+				b.disabled = bool(a[3])
+			ah.add_child(b)
+	return pc
+
 ## ================================================================ LOADOUT (CS2 "Loadout" overlay)
+var lo_sel := ""
 func _page_loadout() -> void:
-	## framed sheet over the street: set tabs on a vertical accent strip, utility slots on the left, the soldier in the
-	## middle, owned pistols and primaries in columns on the right. Clicking a weapon equips it in the active set.
+	## framed sheet: set tabs, utility slots, the soldier, pistol / primary columns of CS:GO item tiles and a weapon
+	## card on the right (art, rarity, segmented stats). Select a tile, then KUŞAN equips it in the active set.
 	soldier.visible = true
-	cam_target = LOBBY_CAM
+	# soldier framed in the free space left of the weapon columns
+	cam_target = LOBBY_CAM + Vector3(1.15, 0.0, 0.35)
+	cam_look = LOBBY_LOOK + Vector3(1.15, 0.0, 0.0)
 	var set := GS.active_set()
-	var vw: float = ui.size.x if ui.size.x > 0 else 1920.0
 	var vh: float = ui.size.y if ui.size.y > 0 else 1080.0
+	if lo_sel == "" or not GS.owned(lo_sel):
+		lo_sel = str(set.get("ana", "ak47"))
 	var frame := Control.new()
 	frame.set_anchors_preset(Control.PRESET_FULL_RECT)
-	frame.offset_left = 60; frame.offset_right = -110; frame.offset_top = 40; frame.offset_bottom = -60
+	frame.offset_left = 40; frame.offset_right = -96; frame.offset_top = 30; frame.offset_bottom = -30
 	content.add_child(frame)
 	var bgp := Panel.new()
 	bgp.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var bsb := UI.sb(Color(0.085, 0.115, 0.125, 0.88), Color(0, 0, 0, 0), 0, 0, 0)
-	bsb.border_width_left = 10; bsb.border_width_right = 10; bsb.border_color = Color("8fc4f5")
+	var bsb := UI.sb(Color(0.075, 0.1, 0.11, 0.28), Color(0, 0, 0, 0), 0, 0, 0)   # see-through: the soldier stays visible
+	bsb.border_width_left = 8; bsb.border_width_right = 8; bsb.border_color = Color("8fc4f5")
 	bgp.add_theme_stylebox_override("panel", bsb)
 	bgp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	frame.add_child(bgp)
-	var row := UI.hbox(0)
+	var vign := _grad_fill(Color(0, 0, 0, 0), Color(0, 0, 0, 0.45))
+	vign.set_anchors_preset(Control.PRESET_FULL_RECT)
+	frame.add_child(vign)
+	var row := UI.hbox(14)
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
-	row.offset_left = 10; row.offset_right = -10
+	row.offset_left = 14; row.offset_right = -14; row.offset_top = 14; row.offset_bottom = -14
 	frame.add_child(row)
-	# vertical set tabs
+	# set tabs
 	var tabs := UI.vbox(4)
-	tabs.custom_minimum_size = Vector2(46, 0)
+	tabs.custom_minimum_size = Vector2(44, 0)
 	tabs.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(tabs)
+	tabs.add_child(UI.lbl("SET", 11, Color(1, 1, 1, 0.5), "Nav", HORIZONTAL_ALIGNMENT_CENTER))
 	for i in GS.Econ.SET_COUNT:
-		var on: bool = int(GS.profile["active_set"]) == i
-		var tb := _pill(str(i + 1), on, func(): GS.profile["active_set"] = i; GS.save_profile(); show_page("loadout"))
-		tb.tooltip_text = "Set %d" % (i + 1)
+		var tb := _pill(str(i + 1), int(GS.profile["active_set"]) == i, func(): GS.profile["active_set"] = i; GS.save_profile(); lo_sel = ""; show_page("loadout"))
 		tb.custom_minimum_size = Vector2(40, 40)
 		tabs.add_child(tb)
-	# left utility column: knife, grenade, agent, gear
-	var lc := UI.vbox(14)
-	lc.custom_minimum_size = Vector2(160, 0)
+	# utility: knife, grenade, agent
+	var lc := UI.vbox(10)
+	lc.custom_minimum_size = Vector2(170, 0)
 	lc.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(lc)
 	for c in ["bicak", "bomba"]:
 		var id := str(set.get(c, ""))
 		if GS.WEAPONS.has(id):
-			lc.add_child(_lo_tile(id, true, c, Vector2(170, 86)))
-	var ag := VBoxContainer.new()
-	ag.add_child(_agent_avatar(84))
-	ag.add_child(UI.lbl(str(GS.CHARACTERS.get(GS.cur_char(), {}).get("name", "Ajan")), 14, UI.TEXT, "Nav", HORIZONTAL_ALIGNMENT_CENTER))
-	ag.tooltip_text = "Ajan değiştir (Çanta)"
-	lc.add_child(ag)
-	# centre: soldier shows through
+			lc.add_child(_lo_tile(id, c, Vector2(170, 118)))
+	var agc := PanelContainer.new()
+	agc.add_theme_stylebox_override("panel", UI.sb(Color(0.12, 0.13, 0.15, 0.95), Color(1, 1, 1, 0.08), 1, 2, 6))
+	var agv := UI.vbox(4)
+	agc.add_child(agv)
+	var av := _agent_avatar(150)
+	av.custom_minimum_size = Vector2(156, 120)
+	agv.add_child(av)
+	agv.add_child(UI.lbl(str(GS.CHARACTERS.get(GS.cur_char(), {}).get("name", "Ajan")).to_upper(), 15, Color.WHITE, "Nav", HORIZONTAL_ALIGNMENT_CENTER))
+	agv.add_child(UI.btn("AJAN DEĞİŞTİR", func(): market_tab = "karakter"; show_page("market"), 12, false, 0, 28))
+	lc.add_child(agc)
 	var mid := Control.new()
 	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(mid)
-	# right columns: pistols | primaries (split in two)
+	# weapon columns
 	var pist: Array = []
 	var prim: Array = []
 	for id in GS.WEAPONS.keys():
@@ -2357,64 +2532,46 @@ func _page_loadout() -> void:
 		match str(GS.WEAPONS[id]["cat"]):
 			"tabanca": pist.append(id)
 			"ana": prim.append(id)
-	var rows_fit := clampi(int((vh - 140.0) / 100.0), 4, 8)
-	var cols: Array = [pist.slice(0, rows_fit)]
-	var pi := 0
-	while pi < prim.size() and cols.size() < 4:
-		cols.append(prim.slice(pi, pi + rows_fit)); pi += rows_fit
-	for ci in cols.size():
-		if ci > 0:
-			var sep := ColorRect.new(); sep.color = Color(1, 1, 1, 0.12); sep.custom_minimum_size = Vector2(1, 0)
-			row.add_child(sep)
-		var colv := UI.vbox(10)
-		colv.alignment = BoxContainer.ALIGNMENT_CENTER
-		colv.custom_minimum_size = Vector2(186, 0)
-		row.add_child(colv)
-		var hdr := UI.lbl("TABANCALAR" if ci == 0 else ("ANA SİLAHLAR" if ci == 1 else ""), 12, Color(1, 1, 1, 0.5), "Nav", HORIZONTAL_ALIGNMENT_CENTER)
-		colv.add_child(hdr)
-		for id in cols[ci]:
-			colv.add_child(_lo_tile(id, str(set.get(GS.WEAPONS[id]["cat"], "")) == id, str(GS.WEAPONS[id]["cat"]), Vector2(176, 82)))
-	# close (X)
-	var x := UI.btn("✕", func(): show_page("lobby"), 22, false, 46, 46)
-	x.anchor_left = 1; x.anchor_right = 1; x.offset_left = -50; x.offset_right = -4; x.offset_top = 4; x.offset_bottom = 50
+	var half := int(ceil(prim.size() / 2.0))
+	var cols: Array = [["TABANCALAR", pist], ["ANA SİLAHLAR", prim.slice(0, half)], ["", prim.slice(half)]]
+	for col in cols:
+		var sc := ScrollContainer.new()
+		sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		sc.custom_minimum_size = Vector2(170, 0)
+		row.add_child(sc)
+		var colv := UI.vbox(8)
+		colv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sc.add_child(colv)
+		var cbg := StyleBoxFlat.new(); cbg.bg_color = Color(0.05, 0.06, 0.07, 0.72)
+		sc.add_theme_stylebox_override("panel", cbg)
+		colv.add_child(UI.lbl(col[0], 12, Color(1, 1, 1, 0.55), "Nav", HORIZONTAL_ALIGNMENT_CENTER))
+		for id in col[1]:
+			colv.add_child(_lo_tile(id, str(GS.WEAPONS[id]["cat"]), Vector2(170, 118)))
+	# weapon card
+	var sk := GS.wskin(lo_sel)
+	var sd: Dictionary = GS.SKINS.get(sk, GS.SKINS["std"])
+	var cat := str(GS.WEAPONS[lo_sel]["cat"])
+	var equipped: bool = str(set.get(cat, "")) == lo_sel
+	var card := _weapon_panel(lo_sel, sk, GS.RARITY_COLORS[int(sd["rarity"])], str(GS.RARITY_NAMES[int(sd["rarity"])]).to_upper(), [
+		[["✔ KUŞANILDI" if equipped else "KUŞAN  (Set %d)" % (int(GS.profile["active_set"]) + 1), func():
+			GS.active_set()[cat] = lo_sel; GS.save_profile(); SFX.ui("inv_equip", -4); _toast(str(GS.WEAPONS[lo_sel]["name"]) + " kuşanıldı", UI.GREEN); show_page("loadout"), not equipped, equipped]],
+		[["3D İNCELE", func(): _inspect(lo_sel, sk), false], ["KAPLAMA / GELİŞTİR", func(): bag_sel = lo_sel; show_page("bag"), false]]])
+	card.custom_minimum_size = Vector2(400, 0)
+	row.add_child(card)
+	var x := UI.btn("✕", func(): show_page("lobby"), 20, false, 40, 40)
+	x.anchor_left = 1; x.anchor_right = 1; x.offset_left = -48; x.offset_right = -8; x.offset_top = -36; x.offset_bottom = 4
 	frame.add_child(x)
-	# bottom strip (CS2 HUD-like): set + equipped primary
-	var info := UI.lbl("SET %d  ·  %s" % [int(GS.profile["active_set"]) + 1, str(GS.WEAPONS.get(str(set.get("ana", "")), {}).get("name", "—"))], 16, Color.WHITE, "Nav")
-	info.anchor_top = 1; info.anchor_bottom = 1; info.offset_top = 6; info.offset_bottom = 40; info.offset_left = 20
-	frame.add_child(info)
 
-func _lo_tile(id: String, equipped: bool, cat: String, sz: Vector2) -> Control:
-	var b := Button.new()
-	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = sz
-	b.flat = true
-	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	b.set_meta("sfx", true)
-	b.tooltip_text = "%s  ·  %s%s" % [GS.WEAPONS[id]["name"], GS.SKINS[GS.wskin(id)]["name"], "  (kuşanılı)" if equipped else "  — tıkla: kuşan"]
-	var th := thumb_rect(id, GS.wskin(id), sz - Vector2(4, 8))
-	th.position = Vector2(2, 0)
-	th.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	th.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.add_child(th)
-	var dot := ColorRect.new()
-	dot.color = GS.RARITY_COLORS[int(GS.SKINS[GS.wskin(id)]["rarity"])]
-	dot.size = Vector2(6, 6); dot.position = Vector2(8, sz.y - 10)
-	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.add_child(dot)
-	if equipped:
-		var br := Brackets.new()
-		br.set_anchors_preset(Control.PRESET_FULL_RECT)
-		br.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		b.add_child(br)
-	b.mouse_entered.connect(func(): SFX.ui("ui_hover", -16))
-	b.pressed.connect(func():
-		if not equipped:
-			GS.active_set()[cat] = id
-			GS.save_profile()
-			SFX.ui("inv_equip", -4)
-			set_showcase(id)
-		show_page("loadout"))
-	return b
+func _lo_tile(id: String, cat: String, sz: Vector2) -> Control:
+	var sk := GS.wskin(id)
+	var sd: Dictionary = GS.SKINS.get(sk, GS.SKINS["std"])
+	var equipped: bool = str(GS.active_set().get(cat, "")) == id
+	var lv := GS.wlvl(id)
+	var t := _item_tile(id, sk, GS.RARITY_COLORS[int(sd["rarity"])], ("● KUŞANILI" if equipped else ""), str(GS.WEAPONS[id]["name"]),
+		str(sd["name"]), ("+%d" % lv) if lv > 0 else "", GS.lvl_color(lv) if lv > 0 else Color.WHITE, sz, id == lo_sel,
+		func(): lo_sel = id; set_showcase(id); show_page("loadout"))
+	t.tooltip_text = "%s · %s%s" % [GS.WEAPONS[id]["name"], sd["name"], " (kuşanılı)" if equipped else ""]
+	return t
 
 class Brackets extends Control:
 	## CS2 "selected" corner brackets
@@ -2638,6 +2795,11 @@ class MapEmblem extends Control:
 		draw_arc(c, r, 0, TAU, 64, Color(1, 1, 1, 0.9), 3.0, true)
 		draw_arc(c, r * 0.82, 0, TAU, 64, col.lightened(0.35), 2.0, true)
 		draw_circle(c, r * 0.78, col)
+		if text == "":
+			if glyph:
+				var gs2 := r * 1.05
+				draw_texture_rect(glyph, Rect2(c - Vector2(gs2, gs2) * 0.5, Vector2(gs2, gs2)), false, Color(1, 1, 1, 0.95))
+			return
 		var bh := r * 0.42
 		draw_rect(Rect2(c.x - r * 1.02, c.y - bh * 0.5, r * 2.04, bh), Color(0.06, 0.06, 0.07, 0.92))
 		draw_rect(Rect2(c.x - r * 1.02, c.y - bh * 0.5, r * 2.04, 2), Color(1, 1, 1, 0.85))
@@ -4214,21 +4376,28 @@ func _page_market() -> void:
 	mk_info.visible = false
 	content.add_child(mk_info)
 	_mk_preview("", "")
+	# v4.18.1 CS:GO store: grid of item tiles on the left, the selected item's card on the right
+	var body := UI.hbox(16)
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(body)
+	var lv := UI.vbox(12)
+	lv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(lv)
 	if market_tab == "silah":
-		v.add_child(_store_hero())
+		lv.add_child(_store_hero())
 	var sc := ScrollContainer.new()
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	v.add_child(sc)
+	lv.add_child(sc)
 	var grid := GridContainer.new()
-	grid.columns = 5 if market_tab == "silah" else 4
+	var side_on: bool = market_tab in ["silah", "stil"]
+	grid.columns = 4 if side_on else 4
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 12)
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
 	sc.add_child(grid)
 	match market_tab:
 		"silah":
-			var any := false
 			var ids: Array = []
 			for id in GS.WEAPONS.keys():
 				if GS.WEAPONS[id].get("hidden", false) or GS.WEAPONS[id].get("throwable", false):
@@ -4237,17 +4406,29 @@ func _page_market() -> void:
 					continue      # timed (crate) weapons stay buyable: buying makes them permanent
 				ids.append(id)
 			ids.sort_custom(func(x, y): return int(GS.WEAPONS[x]["price"]) > int(GS.WEAPONS[y]["price"]))
-			for id in ids:
-				any = true
-				grid.add_child(_store_tile(id))
-			if not any:
-				v.add_child(UI.lbl("Tüm silahlara sahipsin!", 24, UI.GREEN))
+			if ids.is_empty():
+				lv.add_child(UI.lbl("Tüm silahlara sahipsin!", 24, UI.GREEN))
+			else:
+				if mk_sel == "" or not mk_sel in ids:
+					mk_sel = ids[0]
+				for id in ids:
+					var gi := _store_grade(id)
+					var w: Dictionary = GS.WEAPONS[id]
+					grid.add_child(_item_tile(id, "std", STORE_GRADE_COL[gi], str(w.get("cls", "")).to_upper(), str(w["name"]), STORE_GRADE_NAME[gi],
+						"◉ " + UI.money(int(w["price"])), UI.GOLD, Vector2(0, 200), id == mk_sel, func(): mk_sel = id; set_showcase(id); show_page("market")))
+				var gi2 := _store_grade(mk_sel)
+				var price := int(GS.WEAPONS[mk_sel]["price"])
+				var pnl := _weapon_panel(mk_sel, "std", STORE_GRADE_COL[gi2], STORE_GRADE_NAME[gi2], [
+					[["◉ %s   SATIN AL" % UI.money(price), func(): _buy_weapon(mk_sel), true, int(GS.profile["gold"]) < price]],
+					[["3D İNCELE", func(): _inspect(mk_sel, "std"), false]]])
+				pnl.custom_minimum_size = Vector2(410, 0)
+				body.add_child(pnl)
 		"stil":
 			var target_id := bag_sel if bag_sel != "" and GS.owned(bag_sel) else "ak47"
-			var sel := UI.hbox(6)
-			v.add_child(sel)
-			v.move_child(sel, 1)
-			sel.add_child(UI.lbl("Stil uygulanacak silah:", 17, UI.DIM, "Rajdhani-Bold"))
+			var sel := UI.hbox(8)
+			lv.add_child(sel)
+			lv.move_child(sel, 0)
+			sel.add_child(UI.lbl("Kaplamanın uygulanacağı silah:", 15, UI.DIM, "Nav"))
 			var ob := OptionButton.new()
 			ob.custom_minimum_size = Vector2(280, 36)
 			for id in GS.profile["owned"].keys():
@@ -4258,33 +4439,24 @@ func _page_market() -> void:
 						ob.select(ob.item_count - 1)
 			ob.item_selected.connect(func(i): bag_sel = str(ob.get_item_metadata(i)); show_page("market"))
 			sel.add_child(ob)
-			set_showcase(target_id)
+			if mk_skin == "" or not GS.SKINS.has(mk_skin) or mk_skin == "std":
+				mk_skin = GS.SKINS.keys()[1]
+			set_showcase(target_id, mk_skin)
 			for sk in GS.SKINS.keys():
 				if sk == "std":
 					continue
 				var sd: Dictionary = GS.SKINS[sk]
 				var have: bool = GS.profile["owned"][target_id]["skins"].has(sk)
-				var card := UI.panel(Color(0.07, 0.085, 0.11, 0.96), GS.RARITY_COLORS[int(sd["rarity"])], 10)
-				card.custom_minimum_size = Vector2(300, 200)
-				var cv := UI.vbox(4)
-				card.add_child(cv)
-				cv.add_child(UI.lbl(sd["name"], 20, Color.WHITE, "Rajdhani-Bold"))
-				cv.add_child(UI.lbl(GS.RARITY_NAMES[int(sd["rarity"])], 15, GS.RARITY_COLORS[int(sd["rarity"])], "Rajdhani-Bold"))
-				cv.add_child(thumb_rect(target_id, sk, Vector2(0, 90)))
-				var brow := UI.hbox(6)
-				cv.add_child(brow)
-				var pv := UI.btn("◎ ÖNİZLE", func(): _inspect(target_id, sk), 16, false, 0, 38)
-				brow.add_child(pv)
-				if have:
-					var ow := UI.lbl("✔ SAHİPSİN", 18, UI.GREEN, "Rajdhani-Bold")
-					ow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-					brow.add_child(ow)
-				else:
-					var bb := UI.btn("◉ " + UI.money(sd["price"]) + "  SATIN AL", func(): _buy_skin(target_id, sk), 18, true, 0, 38)
-					bb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-					brow.add_child(bb)
-				card.mouse_entered.connect(func(): set_showcase(target_id, sk); _mk_preview(target_id, sk))
-				grid.add_child(card)
+				grid.add_child(_item_tile(target_id, sk, GS.RARITY_COLORS[int(sd["rarity"])], str(GS.RARITY_NAMES[int(sd["rarity"])]).to_upper(), str(sd["name"]),
+					str(GS.WEAPONS[target_id]["name"]), "✔ SAHİPSİN" if have else "◉ " + UI.money(int(sd["price"])), UI.GREEN if have else UI.GOLD,
+					Vector2(0, 190), sk == mk_skin, func(): mk_skin = sk; show_page("market")))
+			var sdd: Dictionary = GS.SKINS[mk_skin]
+			var own2: bool = GS.profile["owned"][target_id]["skins"].has(mk_skin)
+			var pnl2 := _weapon_panel(target_id, mk_skin, GS.RARITY_COLORS[int(sdd["rarity"])], str(GS.RARITY_NAMES[int(sdd["rarity"])]).to_upper(), [
+				[["✔ SAHİPSİN — Çanta'dan tak" if own2 else "◉ %s   KAPLAMAYI AL" % UI.money(int(sdd["price"])), func(): _buy_skin(target_id, mk_skin), not own2, own2 or int(GS.profile["gold"]) < int(sdd["price"])]],
+				[["3D ÖNİZLE", func(): _inspect(target_id, mk_skin), false]]])
+			pnl2.custom_minimum_size = Vector2(410, 0)
+			body.add_child(pnl2)
 		"karakter":
 			for c in GS.CHARACTERS.keys():
 				grid.add_child(_agent_card(c))
@@ -4301,8 +4473,10 @@ func _page_market() -> void:
 				grid.add_child(_store_pack_tile(pi))
 		"ekipman":
 			sc.queue_free()
-			v.add_child(_gear_page())
+			lv.add_child(_gear_page())
 
+var mk_sel := ""
+var mk_skin := ""
 var mk_info: PanelContainer
 func _mk_preview(id: String, skin: String) -> void:
 	if mk_info == null or not is_instance_valid(mk_info):
@@ -4380,7 +4554,7 @@ const STORE_GRADE_COL := [Color("5e98d9"), Color("8847ff"), Color("d32ce6"), Col
 const STORE_GRADE_NAME := ["ASKERİ", "SINIRLI", "GİZLİ", "ÖZEL"]
 
 func _store_bg(col: Color) -> StyleBoxFlat:
-	var sb := UI.sb(Color(0.055, 0.062, 0.075, 1.0), Color(1, 1, 1, 0.05), 1, 3, 0)
+	var sb := UI.sb(Color(0.13, 0.14, 0.16, 1.0), Color(1, 1, 1, 0.08), 1, 2, 0)
 	sb.border_width_bottom = 4
 	sb.border_color = col
 	return sb
@@ -6110,6 +6284,8 @@ func _create_room_dialog() -> void:
 	var cfg := {"name": str(GS.profile["name"]) + " odası", "map": "mahalle", "mode": "ffa", "bots": 9, "diff": 1, "time": 8, "target": 40, "team": "a", "no": randi_range(100, 999)}
 	_room_dialog(cfg)
 
+const MODE_ICON_TEX := {"tdm": "swords", "ffa": "crosshair", "gungame": "game/ak47", "knife": "game/knife", "sniper": "target",
+	"sabotaj": "game/grenade", "bayrak": "map", "kurt": "game/skull"}
 const MODE_ICONS := {"tdm": "⚔", "ffa": "✦", "gungame": "↑", "knife": "✂", "sniper": "◎", "sabotaj": "✹", "bayrak": "⚑", "kurt": "☾"}
 const MODE_SHORT := {"tdm": "Takımlar en çok öldürmeye yarışır", "ffa": "Herkes herkese karşı", "gungame": "Her öldürmede yeni silah",
 	"knife": "Sadece bıçaklar", "sniper": "Sadece nişancı tüfekleri", "sabotaj": "Bomba kur / çöz, turlu oyun", "bayrak": "Bayrağı çal, üssüne getir", "kurt": "Kurda dönüş, pençe ve takla"}
@@ -6121,9 +6297,9 @@ func _chip(text: String, on: bool, cb: Callable, w: int = 0) -> Button:
 	b.custom_minimum_size = Vector2(w, 38)
 	b.add_theme_font_override("font", UI.font("Rajdhani-Bold"))
 	b.add_theme_font_size_override("font_size", 16)
-	b.add_theme_stylebox_override("normal", UI.sb(Color(1, 0.55, 0.12, 0.22) if on else Color(1, 1, 1, 0.05), UI.ACCENT if on else Color(1, 1, 1, 0.1), 1, 8, 8))
-	b.add_theme_stylebox_override("hover", UI.sb(Color(1, 1, 1, 0.1), UI.ACCENT2, 1, 8, 8))
-	b.add_theme_stylebox_override("pressed", UI.sb(Color(1, 0.55, 0.12, 0.3), UI.ACCENT, 1, 8, 8))
+	b.add_theme_stylebox_override("normal", UI.sb(Color(0.33, 0.47, 0.6, 0.6) if on else Color(0.14, 0.15, 0.17, 1), Color(0.6, 0.8, 1.0, 0.6) if on else Color(1, 1, 1, 0.06), 1, 2, 8))
+	b.add_theme_stylebox_override("hover", UI.sb(Color(0.22, 0.24, 0.27, 1), Color(1, 1, 1, 0.3), 1, 2, 8))
+	b.add_theme_stylebox_override("pressed", UI.sb(Color(0.33, 0.47, 0.6, 0.7), Color(0.6, 0.8, 1.0, 0.6), 1, 2, 8))
 	b.add_theme_color_override("font_color", Color.WHITE if on else UI.TEXT)
 	b.pressed.connect(func(): SFX.play("ui_click", -8); cb.call())
 	return b
@@ -6136,7 +6312,9 @@ func _set_label(v: VBoxContainer, t: String) -> void:
 func _room_dialog(cfg: Dictionary, is_online: bool = false, done: Callable = Callable()) -> void:
 	var v := _modal(1280, 790)
 	_room_backdrop(str(cfg["map"]))
-	(v.get_parent() as PanelContainer).add_theme_stylebox_override("panel", UI.sb(Color(0.035, 0.04, 0.05, 0.86), Color(1, 1, 1, 0.1), 1, 6, 24))
+	var rsb := UI.sb(Color(0.08, 0.085, 0.095, 0.96), Color(1, 1, 1, 0.08), 1, 2, 24)
+	rsb.border_width_top = 3; rsb.border_color = Color("8fc4f5")
+	(v.get_parent() as PanelContainer).add_theme_stylebox_override("panel", rsb)
 	var top := UI.hbox(12)
 	v.add_child(top)
 	var tv := UI.vbox(-4)
@@ -6166,42 +6344,41 @@ func _room_dialog(cfg: Dictionary, is_online: bool = false, done: Callable = Cal
 	mg.add_theme_constant_override("h_separation", 10)
 	mg.add_theme_constant_override("v_separation", 10)
 	left.add_child(mg)
+	mg.columns = 5
 	for mid in GS.MAPS.keys():
 		var sel: bool = cfg["map"] == mid
-		var b := Button.new()
-		b.custom_minimum_size = Vector2(238, 118)
-		b.focus_mode = Control.FOCUS_NONE
+		var b := ItemTile.new()
+		b.grade = Color.from_hsv(float(absi(hash(mid)) % 360) / 360.0, 0.5, 0.7)
+		b.sel = sel
+		b.custom_minimum_size = Vector2(140, 150)
 		b.clip_contents = true
-		b.add_theme_stylebox_override("normal", UI.sb(Color(0.05, 0.06, 0.08), UI.ACCENT if sel else Color(1, 1, 1, 0.08), 3 if sel else 1, 10, 0))
-		b.add_theme_stylebox_override("hover", UI.sb(Color(0.08, 0.09, 0.12), UI.ACCENT2, 2, 10, 0))
-		b.add_theme_stylebox_override("pressed", UI.sb(Color(0.05, 0.06, 0.08), UI.ACCENT, 3, 10, 0))
 		var img := _map_image(mid)
 		img.set_anchors_preset(Control.PRESET_FULL_RECT)
-		img.offset_left = 3; img.offset_right = -3; img.offset_top = 3; img.offset_bottom = -3
-		img.modulate = Color(1, 1, 1) if sel else Color(0.72, 0.72, 0.76)
+		img.offset_left = 2; img.offset_right = -2; img.offset_top = 2; img.offset_bottom = -6
+		img.modulate = Color(1, 1, 1) if sel else Color(0.62, 0.62, 0.66)
+		img.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(img)
-		var shade := ColorRect.new()
-		shade.color = Color(0, 0, 0, 0.55)
-		shade.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-		shade.offset_top = -38; shade.offset_left = 3; shade.offset_right = -3; shade.offset_bottom = -3
-		shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var shade := _grad_fill(Color(0, 0, 0, 0.0), Color(0, 0, 0, 0.85))
+		shade.set_anchors_preset(Control.PRESET_FULL_RECT)
 		b.add_child(shade)
-		var l := UI.lbl(GS.MAPS[mid]["name"].to_upper(), 19, Color.WHITE, "RussoOne-Regular")
+		var emb := MapEmblem.new()
+		emb.text = ""
+		emb.glyph = UI.icon_tex("maps/" + mid)
+		emb.col = b.grade
+		emb.position = Vector2(40, 22); emb.size = Vector2(60, 60)
+		emb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(emb)
+		var l := UI.lbl(str(GS.MAPS[mid]["name"]), 15, Color.WHITE, "Nav", HORIZONTAL_ALIGNMENT_CENTER)
 		l.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-		l.offset_top = -36; l.offset_left = 12
+		l.offset_top = -44; l.offset_bottom = -24
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(l)
-		var sz := UI.lbl(str(GS.MAPS[mid].get("size", "")).to_upper(), 13, UI.ACCENT2, "Rajdhani-Bold", HORIZONTAL_ALIGNMENT_RIGHT)
+		var sz := UI.lbl(str(GS.MAPS[mid].get("size", "")) + " harita", 11, Color(1, 1, 1, 0.6), "Inter", HORIZONTAL_ALIGNMENT_CENTER)
 		sz.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-		sz.offset_top = -30; sz.offset_right = -12
+		sz.offset_top = -24; sz.offset_bottom = -8
 		sz.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(sz)
-		if sel:
-			var ck := UI.lbl("✔", 20, UI.ACCENT, "Rajdhani-Bold")
-			ck.position = Vector2(12, 6)
-			ck.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			b.add_child(ck)
-		b.pressed.connect(func(): cfg["map"] = mid; SFX.play("ui_click", -6); redraw.call())
+		b.pressed.connect(func(): cfg["map"] = mid; SFX.ui("ui_toggle", -6); redraw.call())
 		mg.add_child(b)
 	_set_label(left, "OYUN MODU")
 	var mdg := GridContainer.new()
@@ -6214,18 +6391,17 @@ func _room_dialog(cfg: Dictionary, is_online: bool = false, done: Callable = Cal
 		var mb := Button.new()
 		mb.focus_mode = Control.FOCUS_NONE
 		mb.custom_minimum_size = Vector2(238, 64)
-		mb.add_theme_stylebox_override("normal", UI.sb(Color(1, 0.55, 0.12, 0.16) if on else Color(1, 1, 1, 0.04), UI.ACCENT if on else Color(1, 1, 1, 0.08), 2 if on else 1, 10, 0))
-		mb.add_theme_stylebox_override("hover", UI.sb(Color(1, 1, 1, 0.08), UI.ACCENT2, 1, 10, 0))
-		mb.add_theme_stylebox_override("pressed", UI.sb(Color(1, 0.55, 0.12, 0.25), UI.ACCENT, 2, 10, 0))
+		var mns := UI.sb(Color(0.33, 0.47, 0.6, 0.45) if on else Color(0.14, 0.15, 0.17, 1), Color(0.6, 0.8, 1.0, 0.8) if on else Color(1, 1, 1, 0.06), 1, 2, 0)
+		mns.border_width_left = 4 if on else 1
+		mb.add_theme_stylebox_override("normal", mns)
+		mb.add_theme_stylebox_override("hover", UI.sb(Color(0.2, 0.22, 0.25, 1), Color(1, 1, 1, 0.3), 1, 2, 0))
+		mb.add_theme_stylebox_override("pressed", mns)
 		var mh := UI.hbox(10)
 		mh.set_anchors_preset(Control.PRESET_FULL_RECT)
 		mh.offset_left = 12
 		mh.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		mb.add_child(mh)
-		var ic := UI.lbl(str(MODE_ICONS.get(md, "•")), 28, UI.ACCENT if on else UI.DIM, "Rajdhani-Bold")
-		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		ic.custom_minimum_size = Vector2(30, 0)
-		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var ic := UI.icon(str(MODE_ICON_TEX.get(md, "target")), 28, UI.ACCENT2 if on else Color(1, 1, 1, 0.55))
 		mh.add_child(ic)
 		var mv := UI.vbox(-4)
 		mv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -6244,12 +6420,15 @@ func _room_dialog(cfg: Dictionary, is_online: bool = false, done: Callable = Cal
 		mdg.add_child(mb)
 	# ---------------- right: settings + summary
 	var rp := PanelContainer.new()
-	rp.add_theme_stylebox_override("panel", UI.sb(Color(0.03, 0.035, 0.05, 0.95), Color(1, 1, 1, 0.08), 1, 12, 18))
+	rp.add_theme_stylebox_override("panel", UI.sb(Color(0.11, 0.115, 0.13, 1), Color(1, 1, 1, 0.06), 1, 2, 18))
 	rp.custom_minimum_size = Vector2(430, 0)
 	body.add_child(rp)
 	var r := UI.vbox(10)
 	rp.add_child(r)
-	r.add_child(UI.lbl("KURALLAR", 20, UI.ACCENT, "RussoOne-Regular"))
+	var rh0 := UI.hbox(8)
+	rh0.add_child(UI.icon("sliders-horizontal", 20, Color("8fc4f5")))
+	rh0.add_child(UI.lbl("KURALLAR", 20, Color.WHITE, "Display"))
+	r.add_child(rh0)
 	var sab: bool = cfg["mode"] == "sabotaj"
 	if sab:
 		_set_label(r, "KAZANMAK İÇİN TUR")
