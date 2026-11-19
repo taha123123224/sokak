@@ -2027,8 +2027,8 @@ func _page_lobby() -> void:
 	nv.alignment = BoxContainer.ALIGNMENT_END
 	nm2.add_child(nv)
 	nv.add_child(UI.lbl("YENİ GÜNCELLEME  ·  v" + str(preload("res://scripts/updater.gd").VERSION), 13, UI.ACCENT2, "Rajdhani-Bold"))
-	nv.add_child(UI.lbl("YENİ ELLER VE SİLAH ANİMASYONLARI", 26, Color.WHITE, "RussoOne-Regular"))
-	nv.add_child(_wrap("AK-47, Deagle, Glock, UZI ve 870'te 4K profesyonel birinci şahıs eller: gerçek şarjör değiştirme, pompa, tek tek fişek doldurma. F tuşuyla her silahın kendi inceleme animasyonu.", 15))
+	nv.add_child(UI.lbl("SİLAH DÜZELTMELERİ + PERFORMANS TESTİ", 26, Color.WHITE, "RussoOne-Regular"))
+	nv.add_child(_wrap("Bıçaklarda eller geri geldi, AK-47 eski görünümünde, Desert Eagle düz tutuluyor, UZI ve 870'te kollar karakterinle aynı. Ayarlar > Grafik > PERFORMANS TESTİ ile FPS ölç", 15))
 	right.add_child(_rewards_strip())
 	var mp := UI.glass(12, 4)
 	right.add_child(mp)

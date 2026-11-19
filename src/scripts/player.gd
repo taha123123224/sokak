@@ -1130,7 +1130,7 @@ func _finish_throw() -> void:
 var slow_t := 0.0
 
 func take_damage(amount: float, attacker, pos: Vector3, headshot: bool, wid: String) -> void:
-	if not alive or match_node.ended:
+	if not alive or match_node.ended or match_node.has_meta("bench"):
 		return
 	var dmg := amount
 	if wolf and wolf_ctl:
@@ -1438,7 +1438,7 @@ const HIP := {
 }
 
 ## per-weapon hip framing fixes for guns whose proportions differ from their kind (compact SMGs)
-const HIP_ADJ := {"uzi": Vector3(0.03, -0.035, -0.13), "ump45": Vector3(0.025, -0.02, -0.17)}
+const HIP_ADJ := {"ak47": Vector3(0.012, -0.034, -0.02), "uzi": Vector3(0.03, -0.035, -0.13), "ump45": Vector3(0.025, -0.02, -0.17)}
 
 func _vm_kind(id: String) -> String:
 	var w: Dictionary = GS.WEAPONS[id]
@@ -1536,8 +1536,9 @@ func _rig_setup(id: String, path: String) -> void:
 	for mi in vm_weapon.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).visible = false
 	# skinned pack meshes keep their bind-pose bounds; packs whose bind pose sits away from the held pose got culled
-	for mi in fp_root.find_children("*", "MeshInstance3D", true, false):
-		(mi as MeshInstance3D).custom_aabb = AABB(Vector3(-4, -4, -4), Vector3(8, 8, 8))
+	if fp_meta.get("wide_aabb", false):
+		for mi in fp_root.find_children("*", "MeshInstance3D", true, false):
+			(mi as MeshInstance3D).custom_aabb = AABB(Vector3(-4, -4, -4), Vector3(8, 8, 8))
 	for k in ["mag", "bolt", "slide"]:
 		vm_parts.erase(k)
 	_unify_rig_arms()
@@ -1700,6 +1701,11 @@ func _unify_rig_arms() -> void:
 				var mname := (sm.resource_name + " " + (om.resource_name if om else "")).to_lower()
 				if mname.contains("glove"):
 					sh.set_shader_parameter("glove_all", true)
+				elif mname.contains("watch"):
+					sh.set_shader_parameter("hidden", true)
+				elif mname.contains("cloth") or mname.contains("sleeve") or mname.contains("uniform"):
+					# v4.18 pack sleeves (Matzh "Cloths", teenjust500 "sleeve_st6"): the player's own camo sleeve
+					sh.set_shader_parameter("sleeve_v", -2.0)
 				elif mname.contains("sm002"):
 					sh.set_shader_parameter("glove_box", Vector4(0.855, 0.31, 0.69, 1.0))
 				_arm_mats[akey] = sh

@@ -919,12 +919,13 @@ func save_settings() -> void:
 	apply_settings()
 	settings_changed.emit()
 
+## v4.18 RTX 4050 Laptop (6 GB) targets: HIGH / ULTRA at 1080p native; "uhd" is shown as EXTREME
 const QUALITY_PRESETS := {
 	"low": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 0, "ssao": false, "ssil": false, "ssr": false, "sdfgi": false, "glow": false, "volumetric": false, "resolution_scale": 0.75, "draw_distance": 0.6},
 	"medium": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 1, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false, "resolution_scale": 1.0, "draw_distance": 0.8},
-	"high": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 2, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false, "resolution_scale": 1.0, "draw_distance": 1.0},
-	"ultra": {"msaa": 2, "fxaa": true, "taa": false, "shadows": 3, "ssao": true, "ssil": true, "ssr": true, "sdfgi": false, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 1.0},
-	"uhd": {"msaa": 4, "fxaa": true, "taa": false, "shadows": 4, "ssao": true, "ssil": true, "ssr": true, "sdfgi": true, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 1.3},
+	"high": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 3, "ssao": true, "ssil": false, "ssr": true, "sdfgi": false, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 1.0},
+	"ultra": {"msaa": 0, "fxaa": false, "taa": true, "shadows": 3, "ssao": true, "ssil": true, "ssr": true, "sdfgi": false, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 1.15},
+	"uhd": {"msaa": 2, "fxaa": false, "taa": true, "shadows": 4, "ssao": true, "ssil": true, "ssr": true, "sdfgi": true, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 1.3},
 }
 
 ## picks a quality preset from the graphics card (runs once per install / after the v2.7 update)

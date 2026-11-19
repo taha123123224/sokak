@@ -17,7 +17,7 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		var kv := a.trim_prefix("--").split("=")
 		args[kv[0]] = kv[1] if kv.size() > 1 else "1"
-	var testrun := args.has("shot") or args.has("econtest") or args.has("match") or args.has("simstat") or args.has("netsim") or args.has("nettest") or args.has("dumpcatalog")
+	var testrun := args.has("shot") or args.has("bench") or args.has("econtest") or args.has("match") or args.has("simstat") or args.has("netsim") or args.has("nettest") or args.has("dumpcatalog")
 	if not testrun or args.has("gfxtest"):
 		# make sure 3D really draws on this PC (switches to DirectX 12 / OpenGL and restarts if not)
 		if await preload("res://scripts/gfx.gd").startup(self):
@@ -47,6 +47,19 @@ func _ready() -> void:
 		return
 	if args.has("shot"):
 		_test(args)
+		return
+	if args.has("bench"):
+		# v4.18: SOKAK.exe -- --bench=all|hurda,liman [--bench-profile=high] [--bench-time=60] [--bench-res=2560x1440]
+		if await preload("res://scripts/gfx.gd").startup(self):
+			return
+		if args.has("bench-profile"):
+			GS.apply_preset(args["bench-profile"])
+		if args.has("bench-res"):
+			GS.settings["resolution"] = args["bench-res"]
+		GS.settings["dyn_res"] = false
+		GS.apply_settings()
+		var ml: Array = GS.MAPS.keys() if args["bench"] in ["1", "all"] else Array(args["bench"].split(","))
+		start_benchmark(ml, float(args.get("bench-time", "60")), true, int(args.get("bench-bots", "8")))
 		return
 	_check_last_crash()
 	go_login()
@@ -273,6 +286,35 @@ func go_menu(page: String = "lobby") -> void:
 	m.start_page = page
 	m.main = self
 	_swap(m)
+
+## v4.18 benchmark: runs the given maps one after another with the current graphics profile
+var bench_queue: Array = []
+var bench_results: Array = []
+var bench_cfg := {}
+var bench_quit := false
+func start_benchmark(maps: Array, secs: float = 60.0, quit_after: bool = false, bots: int = 8) -> void:
+	bench_queue = maps.duplicate()
+	bench_results.clear()
+	bench_cfg = {"secs": secs, "bots": bots}
+	bench_quit = quit_after
+	_bench_next()
+
+func _bench_next() -> void:
+	if bench_queue.is_empty():
+		GS.set_meta("bench_results", bench_results.duplicate())
+		if bench_quit:
+			get_tree().quit()
+		else:
+			go_menu("lobby")
+		return
+	var m: String = bench_queue.pop_front()
+	start_match({"map": m, "mode": "tdm", "bots": int(bench_cfg.get("bots", 8)), "diff": 1, "time": 99.0, "target": 9999, "team": "a", "no": 1,
+		"name": "BENCHMARK", "bench": true, "bench_time": float(bench_cfg.get("secs", 60.0))})
+
+func bench_done(r: Dictionary) -> void:
+	bench_results.append(r)
+	await get_tree().create_timer(0.5).timeout
+	_bench_next()
 
 func start_match(cfg: Dictionary) -> void:
 	GS.room = cfg

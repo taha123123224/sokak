@@ -101,6 +101,12 @@ func _section(t: String) -> void:
 	body.add_child(UI.spacer(false, 0, 6))
 	body.add_child(UI.header(t, 22))
 
+func _bench(maps: Array) -> void:
+	GS.save_settings()
+	var mn = get_tree().current_scene
+	if mn and mn.has_method("start_benchmark"):
+		mn.start_benchmark(maps, 60.0, false)
+
 func _build() -> void:
 	UI.clear(body)
 	preview = null
@@ -119,12 +125,12 @@ func _build() -> void:
 		"grafik":
 			_section("GRAFİK KALİTESİ ÖN AYARI")
 			var h := UI.hbox(8)
-			for q in [["low", "DÜŞÜK"], ["medium", "ORTA"], ["high", "YÜKSEK"], ["ultra", "ULTRA"], ["uhd", "ULTRA HD (4K)"]]:
+			for q in [["low", "DÜŞÜK"], ["medium", "ORTA"], ["high", "YÜKSEK"], ["ultra", "ULTRA"], ["uhd", "EXTREME"]]:
 				h.add_child(UI.btn(q[1], func(): GS.apply_preset(q[0]); GS.settings["competitive"] = false; _build(), 20, GS.settings["quality"] == q[0] and not GS.settings.get("competitive", false), 150, 48))
 			h.add_child(UI.btn("REKABETÇİ", func(): GS.apply_competitive(); _build(), 20, bool(GS.settings.get("competitive", false)), 150, 48))
 			body.add_child(h)
 			body.add_child(UI.lbl("Rekabetçi: net görüntü ve yüksek FPS. Sis, parlama, hacimsel duman ışıması ve bulanıklık kapalı, gölgeler kısa ve keskin, uzak çevre sade.", 17, UI.DIM, "Rajdhani-Medium"))
-			body.add_child(UI.lbl("Ultra HD: 4x MSAA + TAA, 8K gölge haritası, SDFGI global aydınlatma ve uzak çizim mesafesi. Güçlü ekran kartı gerektirir.", 17, UI.DIM, "Rajdhani-Medium"))
+			body.add_child(UI.lbl("RTX 4050 / 6 GB sınıfı için hedef: 1080p YÜKSEK veya ULTRA. EXTREME: 2x MSAA + TAA, en yüksek gölge, SDFGI global aydınlatma, uzak çizim — güçlü ekran kartı gerektirir. 1440p/4K için çözünürlüğü seçip FSR 2 ile çözünürlük ölçeğini düşür.", 17, UI.DIM, "Rajdhani-Medium"))
 			_section("GRAFİK SÜRÜCÜSÜ  (görüntü bozuksa / 3D görünmüyorsa değiştir)")
 			var Gfx = preload("res://scripts/gfx.gd")
 			var gh := UI.hbox(8)
@@ -149,6 +155,18 @@ func _build() -> void:
 			_check("dyn_res", "Dinamik çözünürlük (FPS düşünce 3D görüntüyü otomatik ölçekler)", "Zayıf bilgisayarlarda akıcılık sağlar")
 			_options("dyn_target", "Hedef FPS", [[60, "60"], [75, "75"], [90, "90"], [120, "120"], [144, "144"]])
 			body.add_child(UI.lbl("Ekran kartın: %s   •   Önerilen ayar: %s" % [RenderingServer.get_video_adapter_name(), str(GS.detect_tier()).to_upper()], 15, UI.DIM, "Rajdhani-SemiBold"))
+			if not in_match:
+				_section("PERFORMANS TESTİ (BENCHMARK)")
+				var bh := UI.hbox(8)
+				body.add_child(bh)
+				bh.add_child(UI.btn("HIZLI TEST — Hurda, 60 sn", func(): _bench(["hurda"]), 17, false, 0, 46))
+				bh.add_child(UI.btn("TAM TEST — %d harita × 60 sn" % GS.MAPS.size(), func(): _bench(GS.MAPS.keys()), 17, false, 0, 46))
+				body.add_child(UI.lbl("Seçili grafik ayarıyla botlu bir maçta sabit kamera rotası izlenir; ortalama FPS, %%1 düşük FPS, kare süresi ve Godot'un kullandığı ekran kartı belleği kaydedilir. Sonuç: Belgeler\\SOKAK_Benchmark (JSON + benchmarks.csv).", 15, UI.DIM, "Rajdhani-SemiBold"))
+				var last: Array = GS.get_meta("bench_results", [])
+				for r in last:
+					body.add_child(UI.lbl("%s  •  %s  •  %s  →  ort %.0f FPS  •  %%1 düşük %.0f  •  %.1f ms  •  VRAM (Godot) %d MB" % [str(GS.MAPS.get(r["map"], {}).get("name", r["map"])), str(r["profile"]).to_upper(), r["render_resolution"], r["avg_fps"], r["low1_fps"], r["avg_frametime_ms"], r["godot_vram_peak_mb"]], 16, UI.ACCENT2, "Rajdhani-Bold"))
+				if not last.is_empty():
+					body.add_child(UI.lbl("Kayıt: " + str(last[-1].get("file", "")), 14, UI.DIM, "Rajdhani-Medium"))
 			_section("EKRAN")
 			_options("window_mode", "Ekran Modu", [["fullscreen", "Tam Ekran (çerçevesiz)"], ["exclusive", "Özel Tam Ekran"], ["windowed", "Pencere"]])
 			_resolution_row()

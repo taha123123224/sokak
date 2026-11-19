@@ -11,9 +11,11 @@ uniform float sleeve_v = -1.0;     // >= 0: texture rows below this V are the sl
 uniform float camo_scale = 5.0;
 uniform vec3 glove : source_color = vec3(0.07, 0.07, 0.075);
 uniform float near_cut = 0.0;
+uniform bool hidden = false;       // v4.18: pack-only parts (wrist watch, body) the player's character doesn't have
 uniform bool glove_all = false;    // the whole surface is a glove (packs with a separate glove mesh)
 uniform vec4 glove_box = vec4(0.0); // x: v above which.. y: u left max, z: u right min, w: 1 = enabled (sm002 body atlas)      // > 0: geometry closer to the camera than this dissolves (hides shoulders)
 void fragment() {
+	if (hidden) discard;
 	if (near_cut > 0.0) {
 		float dz = -VERTEX.z;
 		// ordered dither so the cut is a soft fade, not a hard edge

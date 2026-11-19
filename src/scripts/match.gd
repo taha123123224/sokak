@@ -40,6 +40,13 @@ func _ready() -> void:
 	# only physics bodies (player, bots, grenades) are interpolated; scenery, FX and tweens are not
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	cfg = GS.room
+	if cfg.get("bench", false):
+		# v4.18 performance benchmark run (see scripts/bench.gd)
+		var bn = preload("res://scripts/bench.gd").new()
+		bn.match_node = self
+		bn.duration = float(cfg.get("bench_time", 60.0))
+		bn.next_cb = func(r): if main and main.has_method("bench_done"): main.bench_done(r)
+		add_child(bn)
 	mode = cfg.get("mode", "ffa")
 	teams = GS.MODES[mode]["teams"]
 	map_id = cfg.get("map", "mahalle")
@@ -547,7 +554,7 @@ func _build() -> void:
 	tw.tween_callback(loading.get_parent().queue_free)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	# v4.7 helicopter insertion + parachute (PUBG-style), then spawn
-	var want_intro: bool = bool(GS.settings.get("insertion", true)) and (OS.has_environment("INTRO") or not "--shot" in str(OS.get_cmdline_user_args()))
+	var want_intro: bool = bool(GS.settings.get("insertion", true)) and (OS.has_environment("INTRO") or not "--shot" in str(OS.get_cmdline_user_args())) and not cfg.get("bench", false)
 	if want_intro and player and ResourceLoader.exists("res://assets/models/heli_ch47.glb"):
 		countdown = 999.0
 		hud.root.visible = false

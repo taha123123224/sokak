@@ -41,7 +41,7 @@ SPECS = {
     # v4.17: Matzh "Desert Eagle | First Person Animations" (CC-BY 4.0), 4K: equip / idle / walk / run / fire / reload / reload empty / inspect
     'deagle': dict(glb='/home/claude/sokak/assets_src/sketchfab/sk_fp_deagle_matzh4k_fix.glb', guess=False,
                    gun=['Object_1082', 'Object_1083', 'Object_1084', 'Object_1085'], fit=['Object_1082'],
-                   drop=['Icosphere', 'Skybox', 'Aim'], rear=None, top=None, ref=20,
+                   drop=['Icosphere', 'Skybox', 'Aim'], rear=None, top=None, ref=20, pitch=20.0, shift=[-0.02, 0.0, 0.02],
                    # _fix.glb: the pack's gun vertices were not in the skin's bind space (~1e4 x, flipped); tools/patch_glb_gun.py put
                    # them back with the similarity solved from the gun's own part bones (trigger / hammer / slide / mag pivots)
                    credit="Desert Eagle | First Person Animations — Matzh (CC-BY 4.0)",
@@ -53,6 +53,7 @@ SPECS = {
     'glock': dict(glb='/home/claude/sokak/assets_src/sketchfab/sk_fp_9mm_matzh4k.glb', guess=False,
                   gun=['Object_938', 'Object_939', 'Object_940'], fit=['Object_940'],
                   drop=['Icosphere', 'Object_942', 'Object_944', 'Object_946'], rear=None, top=None, ref=20,
+                  shift=[-0.045, 0.0, 0.035],   # v4.18: one-handed idle sat in the corner: bring it toward the centre
                   credit="9mm Pistol | First Person Animations — Matzh, pistol model by Urpo (CC-BY 4.0)",
                   sections={'draw': {'anim': 'Equip'}, 'idle': {'anim': 'Idle'}, 'fire': {'anim': 'Fire'},
                             'reload': {'anim': 'Reload'}, 'reload_empty': {'anim': 'Reload_Empty'},
@@ -62,7 +63,7 @@ SPECS = {
     # by tools/packs/matzh_src_to_glb.py (13 clips: equip / idle / walk / run / aim / fire / firemode / reload x2 / inspect)
     'uzi': dict(glb='/home/claude/sokak/assets_src/sketchfab/sk_fp_uzi_matzh_src.glb', guess=False,
                 gun=['UZI'], drop=['Icosphere'], rear=None, top=None, ref=20, scale=1.0,
-                cam={'hip': [0.17, -0.2, -0.49], 'fov_k': 1.3},
+                cam={'hip': [0.17, -0.2, -0.49], 'fov_k': 1.55, 'off': (0.03, 0.025, -0.09)}, meta={'near_cut': 0.05},
                 credit="UZI | First Person Animations (2026 Remake) — Matzh (CC-BY 4.0)",
                 sections={'draw': {'anim': 'Equip'}, 'idle': {'anim': 'Idle'}, 'fire': {'anim': 'Fire'},
                           'reload': {'anim': 'Reload'}, 'reload_empty': {'anim': 'Reload_Empty'},
@@ -229,6 +230,9 @@ def run(wid):
         yl = (mi.to_3x3() @ tip).normalized(); zl = (mi.to_3x3() @ V1).normalized()
         cv = lambda v: [v.x, v.z, -v.y]
         sock = {"o": cv(o), "y": cv(yl), "z": cv(zl)}
+    if sp.get('pitch'):
+        # v4.18: tilt the whole rig about the gun centre (x right, y forward, z up): + = muzzle up
+        T = Matrix.Translation(Vector(wcen)) @ Matrix.Rotation(math.radians(sp['pitch']), 4, 'X') @ Matrix.Translation(-Vector(wcen)) @ T
     wfix = None
     vm_fov = 56.0
     if sp.get('cam'):
@@ -312,6 +316,7 @@ def run(wid):
         bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_animation_mode='ACTIONS', export_anim_slide_to_zero=True,
                                   export_force_sampling=True, export_yup=True, export_apply=False)
         meta = {"rig": 1, "credit": sp['credit'], "sections": sp['sections'], "sight_dy": sp.get('sight_dy', 0.0)}
+        meta.update(sp.get('meta', {}))
         if wfix:
             meta["wfix"] = wfix
             meta["vm_fov"] = vm_fov
