@@ -870,6 +870,24 @@ func _setup_env(env_cfg: Dictionary) -> void:
 		sky.sky_material = mm
 	elif str(env_cfg.get("preset", "")) != "alaca":
 		sky.sky_material = sm
+	# v4.18.5: real photographed sky (Poly Haven HDRI, CC0) on every preset/colour pack. Its sun is rotated onto the
+	# map's sun azimuth and the sun light takes the photo's real sun height, so sky, sun disc and shadows agree.
+	var hk: String = {"alaca": "twilight"}.get(preset, preset)
+	var hp := "res://assets/sky/sky_%s.hdr" % hk
+	if ResourceLoader.exists(hp) and not GS.has_meta("nohdri"):
+		var info: Dictionary = _sky_sun_info().get(hk, {})
+		var hm := ShaderMaterial.new()
+		hm.shader = preload("res://shaders/sky_hdri.gdshader")
+		hm.set_shader_parameter("pano", load(hp))
+		var med := maxf(0.2, float(info.get("median", 1.0)))
+		hm.set_shader_parameter("energy", clampf((0.35 if hk == "night" else 0.62) / med, 0.1, 3.0))
+		hm.set_shader_parameter("sun_boost", 1.0)
+		hm.set_shader_parameter("ground_col", Color(c["hor"]).darkened(0.55))
+		if hk in ["day", "golden", "sunset", "twilight"]:
+			sun.rotation_degrees.x = -clampf(float(info.get("elev", -float(c["elev"]))), 9.0, 70.0)
+		var az := deg_to_rad(float(c["az"]))
+		hm.set_shader_parameter("yaw", az - PI + deg_to_rad(float(info.get("az", 0.0))))
+		sky.sky_material = hm
 	# soft fill light from the opposite side (lifts shadows, no extra shadow pass)
 	var fill := DirectionalLight3D.new()
 	fill.rotation_degrees = Vector3(-30, float(c["az"]) + 180.0, 0)
@@ -956,6 +974,9 @@ func _setup_env(env_cfg: Dictionary) -> void:
 		e.fog_density = 0.45
 		e.glow_intensity = 0.6; e.glow_mix = 0.1
 		e.adjustment_contrast = 1.12
+	if OS.has_environment("SOKAK_CLOUDTEST"):
+		# cloud (software renderer) screenshots only: these passes exhaust its RAM; real GPUs never take this path
+		e.ssao_enabled = false; e.ssil_enabled = false; e.ssr_enabled = false; e.volumetric_fog_enabled = false
 	world_env.environment = e
 	var ca := CameraAttributesPractical.new()
 	ca.auto_exposure_enabled = false
@@ -1011,7 +1032,13 @@ static func _grade(c: Vector3, pack: String) -> Color:
 		c = c.lerp(sc2, 0.35)
 	return Color(clampf(c.x, 0, 1), clampf(c.y, 0, 1), clampf(c.z, 0, 1))
 
-static func _grade_lut() -> GradientTexture1D:
+static var _sky_info_cache := {}
+func _sky_sun_info() -> Dictionary:
+	if _sky_info_cache.is_empty() and FileAccess.file_exists("res://assets/sky/sky_sun.json"):
+		_sky_info_cache = JSON.parse_string(FileAccess.get_file_as_string("res://assets/sky/sky_sun.json"))
+	return _sky_info_cache
+
+func _grade_lut() -> GradientTexture1D:
 	var g := Gradient.new()
 	g.offsets = PackedFloat32Array([0.0, 0.12, 0.3, 0.55, 0.8, 1.0])
 	g.colors = PackedColorArray([

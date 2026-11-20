@@ -138,3 +138,7 @@ Ayrıntılı kaynak raporu: `docs/UI_ASSET_REPORT.md`.
 | 7 nişangah | OpenGameArt: hc, para | CC0 | Hazır nişangah galerisi |
 
 Naro ve Sonniss dosyaları lisansları gereği açık kaynak deposuna ham olarak konmaz; yalnızca oyun paketinde dağıtılır.
+
+## v4.18.5 Gökyüzü (Poly Haven, CC0)
+kloofendal_48d_partly_cloudy_puresky (gündüz), qwantani_late_afternoon_puresky (ikindi), industrial_sunset_02_puresky (gün batımı),
+kloofendal_overcast_puresky (kapalı), qwantani_dusk_2_puresky (alacakaranlık), qwantani_night_puresky (gece) — polyhaven.com, CC0.
