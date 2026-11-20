@@ -908,7 +908,8 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	e.ssil_enabled = bool(s["ssil"])
 	e.ssil_radius = 4.0; e.ssil_intensity = 1.25; e.ssil_sharpness = 0.98; e.ssil_normal_rejection = 1.0
 	e.ssr_enabled = bool(s["ssr"])
-	e.ssr_max_steps = 64 if int(s["shadows"]) >= 3 else 40; e.ssr_fade_in = 0.15; e.ssr_fade_out = 2.0; e.ssr_depth_tolerance = 0.3
+	var fq := GS.fx_tier()
+	e.ssr_max_steps = [16, 28, 48, 64, 96][fq]; e.ssr_fade_in = 0.15; e.ssr_fade_out = 2.0; e.ssr_depth_tolerance = 0.3
 	e.sdfgi_enabled = bool(s["sdfgi"])
 	if e.sdfgi_enabled:
 		e.sdfgi_use_occlusion = true
@@ -921,7 +922,9 @@ func _setup_env(env_cfg: Dictionary) -> void:
 	e.set_glow_level(0, 0.0); e.set_glow_level(1, 0.6); e.set_glow_level(2, 1.0); e.set_glow_level(3, 0.8); e.set_glow_level(4, 0.4); e.set_glow_level(5, 0.2)
 	e.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 	e.volumetric_fog_enabled = bool(s["volumetric"])
-	e.volumetric_fog_density = 0.0018
+	e.volumetric_fog_density = 0.0018 if str(env_cfg.get("preset", "")) != "night" else 0.006   # lamp halos at night
+	e.volumetric_fog_gi_inject = 0.6
+	e.volumetric_fog_ambient_inject = 0.15
 	e.volumetric_fog_albedo = Color(1, 0.97, 0.92)
 	e.volumetric_fog_length = 80.0
 	e.volumetric_fog_anisotropy = 0.35

@@ -924,6 +924,13 @@ func load_settings() -> void:
 		if d is Dictionary:
 			for k in d.keys():
 				settings[k] = d[k]
+	# v4.18.4: every preset now carries the full look -> re-apply the chosen preset once so old saves get the effects
+	if not bool(settings.get("fx_v4184", false)):
+		var qn := str(settings.get("quality", "high"))
+		if QUALITY_PRESETS.has(qn):
+			for k in ["ssao", "ssil", "ssr", "glow", "volumetric", "shadows"]:
+				settings[k] = QUALITY_PRESETS[qn][k]
+		settings["fx_v4184"] = true
 	# v2.7: one-time automatic quality pick (older installs defaulted to ULTRA, too heavy for many PCs)
 	if not bool(settings.get("perf_v29", false)):
 		if int(settings.get("fps_cap", 0)) == 0:
@@ -954,13 +961,19 @@ func save_settings() -> void:
 	settings_changed.emit()
 
 ## v4.18 RTX 4050 Laptop (6 GB) targets: HIGH / ULTRA at 1080p native; "uhd" is shown as EXTREME
+## v4.18.4: every preset has the full look (volumetric fog, SSR reflections, SSIL bounce light, SSAO, glow, cinematic
+## grade, soft shadows). The preset only scales how expensive each effect is (see the post-process tiers in apply_settings()).
 const QUALITY_PRESETS := {
-	"low": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 0, "ssao": false, "ssil": false, "ssr": false, "sdfgi": false, "glow": false, "volumetric": false, "resolution_scale": 0.75, "draw_distance": 0.6},
-	"medium": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 1, "ssao": true, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "volumetric": false, "resolution_scale": 1.0, "draw_distance": 0.8},
-	"high": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 3, "ssao": true, "ssil": false, "ssr": true, "sdfgi": false, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 1.0},
+	"low": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 1, "ssao": true, "ssil": false, "ssr": true, "sdfgi": false, "glow": true, "volumetric": true, "resolution_scale": 0.75, "draw_distance": 0.6},
+	"medium": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 2, "ssao": true, "ssil": true, "ssr": true, "sdfgi": false, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 0.8},
+	"high": {"msaa": 0, "fxaa": true, "taa": false, "shadows": 3, "ssao": true, "ssil": true, "ssr": true, "sdfgi": false, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 1.0},
 	"ultra": {"msaa": 0, "fxaa": false, "taa": true, "shadows": 3, "ssao": true, "ssil": true, "ssr": true, "sdfgi": false, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 1.15},
 	"uhd": {"msaa": 2, "fxaa": false, "taa": true, "shadows": 4, "ssao": true, "ssil": true, "ssr": true, "sdfgi": true, "glow": true, "volumetric": true, "resolution_scale": 1.0, "draw_distance": 1.3},
 }
+const QUALITY_TIER := {"low": 0, "medium": 1, "high": 2, "ultra": 3, "uhd": 4}
+func fx_tier() -> int:
+	return int(QUALITY_TIER.get(str(settings.get("quality", "high")), 2))
+
 
 ## picks a quality preset from the graphics card (runs once per install / after the v2.7 update)
 func detect_tier() -> String:
@@ -1091,7 +1104,7 @@ func apply_settings() -> void:
 	RenderingServer.environment_set_ssr_roughness_quality([RenderingServer.ENV_SSR_ROUGHNESS_QUALITY_DISABLED, RenderingServer.ENV_SSR_ROUGHNESS_QUALITY_LOW, RenderingServer.ENV_SSR_ROUGHNESS_QUALITY_MEDIUM, RenderingServer.ENV_SSR_ROUGHNESS_QUALITY_HIGH, RenderingServer.ENV_SSR_ROUGHNESS_QUALITY_HIGH][qi])
 	RenderingServer.environment_glow_set_use_bicubic_upscale(qi >= 2)
 	# removes sparkling specular aliasing on metal (gun barrels, rails, roofs)
-	RenderingServer.screen_space_roughness_limiter_set_active(qi >= 2, 0.25, 0.18)
+	RenderingServer.screen_space_roughness_limiter_set_active(true, 0.25, 0.18)
 	RenderingServer.environment_set_volumetric_fog_volume_size(64 if qi < 3 else 96, 64 if qi < 3 else 96)
 	RenderingServer.environment_set_volumetric_fog_filter_active(qi >= 2)
 	# audio buses
