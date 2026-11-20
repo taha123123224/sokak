@@ -219,10 +219,14 @@ func _warm_vm() -> void:
 			var w := ps.instantiate()
 			MatLib.apply(w, GS.wskin(id))
 			tmp.add_child(w)
-		var fp_path := "res://assets/models/fp_%s.glb" % GS.weapon_base(id)
+		var wk := GS.weapon_base(id)
+		if GS.WEAPONS.get(id, {}).get("melee", false) and ResourceLoader.exists("res://assets/models/fp_melee.glb"):
+			wk = "melee"   # v4.18.2: knives use the shared melee rig -> warm that one (was a first-switch hitch)
+		var fp_path := "res://assets/models/fp_%s.glb" % wk
 		if ResourceLoader.exists(fp_path):
 			var fp: Node3D = _fp_scene(fp_path).instantiate()
 			MatLib.apply(fp)
+			_unify_rig_arms(fp)   # compile the arm shader variant now, not on the first weapon switch
 			tmp.add_child(fp)
 	for i in 3:
 		if DisplayServer.get_name() == "headless":
@@ -1668,8 +1672,10 @@ static func _local_in(root: Node3D, n: Node3D) -> Transform3D:
 ## v3.4.1 one look for every weapon: the rig packs' arms (bare skin, different gloves) get the game's
 ## dark sleeve + glove colours through arm_unify.gdshader (their own UVs / normal maps are kept)
 static var _arm_mats := {}
-func _unify_rig_arms() -> void:
-	for mi in fp_root.find_children("*", "MeshInstance3D", true, false):
+func _unify_rig_arms(root: Node = null) -> void:
+	if root == null:
+		root = fp_root
+	for mi in root.find_children("*", "MeshInstance3D", true, false):
 		var m3 := mi as MeshInstance3D
 		if String(m3.name).begins_with("gun_") or m3.mesh == null:
 			continue
